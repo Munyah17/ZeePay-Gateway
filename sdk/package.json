@@ -1,0 +1,24 @@
+{
+  "name": "zeepay-sdk",
+  "version": "1.0.0",
+  "description": "ZeePay JavaScript/TypeScript SDK for payment processing",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "zeepay",
+    "payments",
+    "payment-gateway",
+    "zimbabwe"
+  ],
+  "author": "ZeePay",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "dependencies": {}
+}

@@ -1,0 +1,730 @@
+openapi: 3.0.3
+info:
+  title: ZeePay API
+  description: |
+    ZeePay Payment Gateway API
+
+    ZeePay provides a unified API for accepting payments through multiple payment methods in Zimbabwe and across Africa.
+
+    ## Authentication
+
+    All API requests require authentication using an API key in the `X-API-Key` header.
+
+    ## Idempotency
+
+    To prevent duplicate charges, you can include an `idempotencyKey` in the request body for idempotent operations.
+
+    ## Webhooks
+
+    Configure webhooks to receive real-time notifications about payment events. All webhook signatures are generated using HMAC-SHA256.
+
+  version: 1.0.0
+  contact:
+    name: ZeePay Support
+    email: support@zeepay.co.zw
+    url: https://zeepay.co.zw
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.zeepay.co.zw/v1
+    description: Production server
+  - url: https://api-test.zeepay.co.zw/v1
+    description: Test server
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Payments
+    description: Payment operations
+  - name: Refunds
+    description: Refund operations
+  - name: Payment Methods
+    description: Available payment methods
+  - name: Webhooks
+    description: Webhook configuration and management
+
+paths:
+  /payments:
+    post:
+      tags:
+        - Payments
+      summary: Create a payment
+      description: Create a new payment and get a checkout URL
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags:
+        - Payments
+      summary: List payments
+      description: List all payments for the authenticated merchant
+      operationId: listPayments
+      parameters:
+        - name: limit
+          in: query
+          description: Number of payments to return
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of payments to skip
+          schema:
+            type: integer
+            default: 0
+        - name: status
+          in: query
+          description: Filter by payment status
+          schema:
+            type: string
+            enum: [pending, processing, succeeded, failed, cancelled]
+      responses:
+        '200':
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /payments/{id}:
+    get:
+      tags:
+        - Payments
+      summary: Get a payment
+      description: Retrieve details of a specific payment
+      operationId: getPayment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - Payments
+      summary: Cancel a payment
+      description: Cancel a pending payment
+      operationId: cancelPayment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum: [cancel]
+      responses:
+        '200':
+          description: Payment cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          description: Cannot cancel payment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /refunds:
+    post:
+      tags:
+        - Refunds
+      summary: Create a refund
+      description: Create a refund for a successful payment
+      operationId: createRefund
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRefundRequest'
+      responses:
+        '201':
+          description: Refund created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /refunds/{id}:
+    get:
+      tags:
+        - Refunds
+      summary: Get a refund
+      description: Retrieve details of a specific refund
+      operationId: getRefund
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Refund details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '404':
+          description: Refund not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /payment-methods:
+    get:
+      tags:
+        - Payment Methods
+      summary: List payment methods
+      description: Get all available payment methods
+      operationId: listPaymentMethods
+      responses:
+        '200':
+          description: List of payment methods
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethodListResponse'
+
+  /webhooks:
+    post:
+      tags:
+        - Webhooks
+      summary: Create webhook endpoint
+      description: Create a new webhook endpoint to receive payment events
+      operationId: createWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookWithSecret'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags:
+        - Webhooks
+      summary: List webhooks
+      description: List all webhook endpoints for the merchant
+      operationId: listWebhooks
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookListResponse'
+
+  /webhooks/{id}:
+    get:
+      tags:
+        - Webhooks
+      summary: Get webhook
+      description: Retrieve details of a specific webhook endpoint
+      operationId: getWebhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '404':
+          description: Webhook not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+        - Webhooks
+      summary: Update webhook
+      description: Update a webhook endpoint
+      operationId: updateWebhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWebhookRequest'
+      responses:
+        '200':
+          description: Webhook updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookWithSecret'
+        '404':
+          description: Webhook not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+        - Webhooks
+      summary: Delete webhook
+      description: Delete a webhook endpoint
+      operationId: deleteWebhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '404':
+          description: Webhook not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /webhooks/{id}/deliveries:
+    get:
+      tags:
+        - Webhooks
+      summary: Get webhook deliveries
+      description: Get delivery history for a webhook endpoint
+      operationId: getWebhookDeliveries
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          description: Number of deliveries to return
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of webhook deliveries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDeliveryListResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    CreatePaymentRequest:
+      type: object
+      required:
+        - amount
+        - currency
+        - reference
+      properties:
+        amount:
+          type: number
+          format: decimal
+          description: Payment amount
+          example: 10.00
+        currency:
+          type: string
+          length: 3
+          description: ISO 4217 currency code
+          example: USD
+        reference:
+          type: string
+          maxLength: 255
+          description: Merchant's unique reference for this payment
+          example: invoice_1042
+        returnUrl:
+          type: string
+          format: uri
+          description: URL to redirect to after successful payment
+        cancelUrl:
+          type: string
+          format: uri
+          description: URL to redirect to if payment is cancelled
+        customerEmail:
+          type: string
+          format: email
+          description: Customer's email address
+        customerPhone:
+          type: string
+          description: Customer's phone number
+        metadata:
+          type: object
+          description: Additional metadata
+          additionalProperties: true
+        idempotencyKey:
+          type: string
+          description: Unique key to prevent duplicate charges
+        paymentMethodId:
+          type: string
+          format: uuid
+          description: Specific payment method to use
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Payment ID
+        reference:
+          type: string
+          description: Merchant reference
+        amount:
+          type: number
+          format: decimal
+          description: Payment amount
+        currency:
+          type: string
+          description: Currency code
+        status:
+          type: string
+          enum: [pending, processing, succeeded, failed, cancelled]
+          description: Payment status
+        checkoutUrl:
+          type: string
+          format: uri
+          description: URL to redirect customer to for payment
+        createdAt:
+          type: string
+          format: date-time
+          description: Payment creation timestamp
+
+    PaymentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'
+        pagination:
+          type: object
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            count:
+              type: integer
+
+    CreateRefundRequest:
+      type: object
+      required:
+        - paymentId
+        - amount
+        - currency
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+          description: ID of the payment to refund
+        amount:
+          type: number
+          format: decimal
+          description: Refund amount
+        currency:
+          type: string
+          length: 3
+          description: Currency code
+        reason:
+          type: string
+          description: Reason for refund
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Refund:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        paymentId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, succeeded, failed]
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          description: Payment method code
+        name:
+          type: string
+          description: Display name
+        provider:
+          type: string
+          description: Payment provider
+        type:
+          type: string
+          description: Payment method type
+        supportedCurrencies:
+          type: array
+          items:
+            type: string
+        minAmount:
+          type: number
+          format: decimal
+        maxAmount:
+          type: number
+          format: decimal
+
+    PaymentMethodListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentMethod'
+
+    CreateWebhookRequest:
+      type: object
+      required:
+        - url
+        - events
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Webhook endpoint URL
+        events:
+          type: array
+          items:
+            type: string
+          description: Events to subscribe to
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WebhookWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/Webhook'
+        - type: object
+          properties:
+            secret:
+              type: string
+              description: Webhook secret for signature verification (only returned on creation or when rotated)
+
+    WebhookListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Webhook'
+
+    UpdateWebhookRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        isActive:
+          type: boolean
+        rotateSecret:
+          type: boolean
+          description: Generate a new webhook secret
+
+    WebhookDeliveryListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              status:
+                type: string
+                enum: [pending, delivered, failed]
+              httpStatusCode:
+                type: integer
+              attemptCount:
+                type: integer
+              createdAt:
+                type: string
+                format: date-time
+              deliveredAt:
+                type: string
+                format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        message:
+          type: string
+          description: Detailed error description
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
