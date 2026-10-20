@@ -35,7 +35,6 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      // Mock data for now
       setApiKeys([
         { id: '1', keyPrefix: 'zp_test_1234', environment: 'test', isActive: true, lastUsedAt: '2026-10-19T10:00:00Z', createdAt: '2026-10-01T00:00:00Z' },
         { id: '2', keyPrefix: 'zp_live_5678', environment: 'live', isActive: true, createdAt: '2026-10-10T00:00:00Z' },
@@ -53,7 +52,6 @@ export default function SettingsPage() {
 
   const handleGenerateKey = async () => {
     try {
-      // Mock key generation
       const mockKey = `zp_${newKeyEnvironment}_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
       setGeneratedKey(mockKey);
       setShowNewKeyModal(false);
@@ -67,37 +65,44 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-              <p className="text-gray-600 text-sm">Manage your account settings</p>
+    <div className="min-h-screen bg-white">
+      <nav className="border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-14">
+            <div className="flex items-center gap-8">
+              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
+              <div className="flex gap-6">
+                <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
+                <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
+                <Link href="/dashboard/settings" className="text-xs text-gray-900">Settings</Link>
+                <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
+              </div>
             </div>
-            <nav className="flex space-x-4">
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Overview</Link>
-              <Link href="/dashboard/transactions" className="text-gray-600 hover:text-gray-900">Transactions</Link>
-              <Link href="/dashboard/settings" className="text-blue-600 font-medium">Settings</Link>
-              <Link href="/dashboard/simulator" className="text-gray-600 hover:text-gray-900">Simulator</Link>
-            </nav>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-gray-600">merchant@example.com</span>
+              <Link href="/auth/logout" className="text-xs text-gray-600 hover:text-gray-900">
+                Sign out
+              </Link>
+            </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tabs */}
+        <div className="mb-8">
+          <h1 className="text-sm font-semibold text-gray-900">Settings</h1>
+          <p className="text-xs text-gray-600 mt-1">Manage your account settings</p>
+        </div>
+
         <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px flex gap-8">
             <button
               onClick={() => setActiveTab('api-keys')}
               className={`${
                 activeTab === 'api-keys'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              } whitespace-nowrap py-3 px-1 border-b-2 text-xs font-medium`}
             >
               API Keys
             </button>
@@ -105,9 +110,9 @@ export default function SettingsPage() {
               onClick={() => setActiveTab('webhooks')}
               className={`${
                 activeTab === 'webhooks'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              } whitespace-nowrap py-3 px-1 border-b-2 text-xs font-medium`}
             >
               Webhooks
             </button>
@@ -116,33 +121,31 @@ export default function SettingsPage() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading settings...</p>
+            <p className="text-xs text-gray-600">Loading...</p>
           </div>
         ) : (
           <>
             {activeTab === 'api-keys' && (
               <div className="space-y-6">
-                {/* New Key Modal */}
                 {generatedKey && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-2">API Key Generated</h3>
-                    <p className="text-blue-700 text-sm mb-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-6">
+                    <p className="text-xs font-semibold text-blue-900 mb-2">API Key Generated</p>
+                    <p className="text-xs text-blue-700 mb-4">
                       Copy this key now. You won't be able to see it again.
                     </p>
-                    <div className="flex items-center space-x-2">
-                      <code className="flex-1 bg-white border border-blue-300 rounded px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-white border border-blue-300 rounded px-3 py-1.5 text-xs">
                         {generatedKey}
                       </code>
                       <button
                         onClick={() => copyToClipboard(generatedKey)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                        className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs hover:bg-blue-700"
                       >
                         Copy
                       </button>
                       <button
                         onClick={() => setGeneratedKey(null)}
-                        className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
+                        className="border border-gray-300 px-3 py-1.5 rounded text-xs hover:bg-gray-50"
                       >
                         Close
                       </button>
@@ -150,13 +153,12 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {/* API Keys Section */}
-                <div className="bg-white rounded-lg shadow p-6">
+                <div className="border border-gray-200 rounded p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold">API Keys</h2>
+                    <h2 className="text-xs font-semibold text-gray-900">API Keys</h2>
                     <button
                       onClick={() => setShowNewKeyModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                      className="bg-black text-white px-3 py-1.5 rounded text-xs hover:bg-gray-800"
                     >
                       Generate New Key
                     </button>
@@ -164,15 +166,15 @@ export default function SettingsPage() {
 
                   <div className="space-y-4">
                     {apiKeys.map((key) => (
-                      <div key={key.id} className="border border-gray-200 rounded-lg p-4">
+                      <div key={key.id} className="border border-gray-200 rounded p-4">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium text-gray-900">{key.keyPrefix}***</p>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-xs font-medium text-gray-900">{key.keyPrefix}***</p>
+                            <p className="text-xs text-gray-500 mt-1">
                               Environment: <span className="font-medium">{key.environment}</span>
                             </p>
                             {key.lastUsedAt && (
-                              <p className="text-sm text-gray-500">
+                              <p className="text-xs text-gray-500">
                                 Last used: {new Date(key.lastUsedAt).toLocaleString()}
                               </p>
                             )}
@@ -188,34 +190,33 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Generate Key Modal */}
                 {showNewKeyModal && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                      <h3 className="text-lg font-semibold mb-4">Generate New API Key</h3>
+                    <div className="bg-white rounded p-6 max-w-md w-full mx-4">
+                      <h3 className="text-xs font-semibold text-gray-900 mb-4">Generate New API Key</h3>
                       <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
                           Environment
                         </label>
                         <select
                           value={newKeyEnvironment}
                           onChange={(e) => setNewKeyEnvironment(e.target.value as 'test' | 'live')}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2"
+                          className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                         >
                           <option value="test">Test</option>
                           <option value="live">Live</option>
                         </select>
                       </div>
-                      <div className="flex justify-end space-x-3">
+                      <div className="flex justify-end gap-3">
                         <button
                           onClick={() => setShowNewKeyModal(false)}
-                          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                          className="border border-gray-300 px-3 py-1.5 rounded text-xs hover:bg-gray-50"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={handleGenerateKey}
-                          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          className="bg-black text-white px-3 py-1.5 rounded text-xs hover:bg-gray-800"
                         >
                           Generate
                         </button>
@@ -228,22 +229,21 @@ export default function SettingsPage() {
 
             {activeTab === 'webhooks' && (
               <div className="space-y-6">
-                {/* Webhooks Section */}
-                <div className="bg-white rounded-lg shadow p-6">
+                <div className="border border-gray-200 rounded p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold">Webhook Endpoints</h2>
-                    <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    <h2 className="text-xs font-semibold text-gray-900">Webhook Endpoints</h2>
+                    <button className="bg-black text-white px-3 py-1.5 rounded text-xs hover:bg-gray-800">
                       Add Webhook
                     </button>
                   </div>
 
                   <div className="space-y-4">
                     {webhooks.map((webhook) => (
-                      <div key={webhook.id} className="border border-gray-200 rounded-lg p-4">
+                      <div key={webhook.id} className="border border-gray-200 rounded p-4">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <p className="font-medium text-gray-900">{webhook.url}</p>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-xs font-medium text-gray-900">{webhook.url}</p>
+                            <p className="text-xs text-gray-500 mt-1">
                               Events: {webhook.events.join(', ')}
                             </p>
                           </div>
@@ -258,27 +258,26 @@ export default function SettingsPage() {
                   </div>
 
                   {webhooks.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-xs text-gray-500">
                       No webhook endpoints configured
                     </div>
                   )}
                 </div>
 
-                {/* Webhook Documentation */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold mb-4">Webhook Events</h3>
+                <div className="border border-gray-200 rounded p-6">
+                  <h3 className="text-xs font-semibold text-gray-900 mb-4">Webhook Events</h3>
                   <div className="space-y-3">
                     <div className="border border-gray-200 rounded p-3">
-                      <p className="font-medium text-gray-900">payment.succeeded</p>
-                      <p className="text-sm text-gray-500">Sent when a payment is successfully completed</p>
+                      <p className="text-xs font-medium text-gray-900">payment.succeeded</p>
+                      <p className="text-xs text-gray-500">Sent when a payment is successfully completed</p>
                     </div>
                     <div className="border border-gray-200 rounded p-3">
-                      <p className="font-medium text-gray-900">payment.failed</p>
-                      <p className="text-sm text-gray-500">Sent when a payment fails</p>
+                      <p className="text-xs font-medium text-gray-900">payment.failed</p>
+                      <p className="text-xs text-gray-500">Sent when a payment fails</p>
                     </div>
                     <div className="border border-gray-200 rounded p-3">
-                      <p className="font-medium text-gray-900">payment.refunded</p>
-                      <p className="text-sm text-gray-500">Sent when a refund is processed</p>
+                      <p className="text-xs font-medium text-gray-900">payment.refunded</p>
+                      <p className="text-xs text-gray-500">Sent when a refund is processed</p>
                     </div>
                   </div>
                 </div>

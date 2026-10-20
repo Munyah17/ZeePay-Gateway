@@ -87,50 +87,48 @@ export default function SimulatorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Payment Simulator</h1>
-              <p className="text-gray-600 text-sm">Test payment scenarios in test mode</p>
+    <div className="min-h-screen bg-white">
+      <nav className="border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-14">
+            <div className="flex items-center gap-8">
+              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
+              <div className="flex gap-6">
+                <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
+                <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
+                <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
+                <Link href="/dashboard/simulator" className="text-xs text-gray-900">Simulator</Link>
+              </div>
             </div>
-            <nav className="flex space-x-4">
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Overview</Link>
-              <Link href="/dashboard/transactions" className="text-gray-600 hover:text-gray-900">Transactions</Link>
-              <Link href="/dashboard/settings" className="text-gray-600 hover:text-gray-900">Settings</Link>
-              <Link href="/dashboard/simulator" className="text-blue-600 font-medium">Simulator</Link>
-            </nav>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-gray-600">merchant@example.com</span>
+              <Link href="/auth/logout" className="text-xs text-gray-600 hover:text-gray-900">
+                Sign out
+              </Link>
+            </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                The payment simulator is only available in test mode. No real money will be processed.
-              </p>
-            </div>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-sm font-semibold text-gray-900">Payment Simulator</h1>
+          <p className="text-xs text-gray-600 mt-1">Test payment scenarios in test mode</p>
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6">
+          <p className="text-xs text-yellow-700">
+            The payment simulator is only available in test mode. No real money will be processed.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Simulator Controls */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Simulate Payment Status</h2>
+          <div className="border border-gray-200 rounded p-6">
+            <h2 className="text-xs font-semibold text-gray-900 mb-4">Simulate Payment Status</h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
                   Payment ID (Provider Reference)
                 </label>
                 <input
@@ -138,18 +136,18 @@ export default function SimulatorPage() {
                   value={paymentId}
                   onChange={(e) => setPaymentId(e.target.value)}
                   placeholder="e.g., mock_abc123..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
                   Scenario
                 </label>
                 <select
                   value={selectedScenario}
                   onChange={(e) => setSelectedScenario(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                 >
                   <option value="">Select a scenario...</option>
                   {scenarios.map((scenario) => (
@@ -160,18 +158,18 @@ export default function SimulatorPage() {
                 </select>
               </div>
 
-              <div className="flex space-x-3">
+              <div className="flex gap-3">
                 <button
                   onClick={handleSimulate}
                   disabled={loading || !paymentId || !selectedScenario}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="flex-1 bg-black text-white py-2 px-4 rounded text-xs hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Simulating...' : 'Simulate'}
                 </button>
                 <button
                   onClick={handleFetchPayment}
                   disabled={loading || !paymentId}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded text-xs hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Fetching...' : 'Fetch Payment'}
                 </button>
@@ -179,67 +177,64 @@ export default function SimulatorPage() {
             </div>
 
             {error && (
-              <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-xs">
                 {error}
               </div>
             )}
           </div>
 
-          {/* Results */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Result</h2>
+          <div className="border border-gray-200 rounded p-6">
+            <h2 className="text-xs font-semibold text-gray-900 mb-4">Result</h2>
 
             {result ? (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <pre className="text-sm overflow-x-auto">
+              <div className="bg-gray-50 rounded p-4">
+                <pre className="text-xs overflow-x-auto">
                   {JSON.stringify(result, null, 2)}
                 </pre>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-xs text-gray-500">
                 Run a simulation to see results here
               </div>
             )}
           </div>
         </div>
 
-        {/* Available Scenarios */}
-        <div className="bg-white rounded-lg shadow p-6 mt-6">
-          <h2 className="text-lg font-semibold mb-4">Available Scenarios</h2>
+        <div className="border border-gray-200 rounded p-6 mt-6">
+          <h2 className="text-xs font-semibold text-gray-900 mb-4">Available Scenarios</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {scenarios.map((scenario) => (
-              <div key={scenario.id} className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-medium text-gray-900">{scenario.label}</h3>
-                <p className="text-sm text-gray-500 mt-1">Status: {scenario.status}</p>
+              <div key={scenario.id} className="border border-gray-200 rounded p-4">
+                <p className="text-xs font-medium text-gray-900">{scenario.label}</p>
+                <p className="text-xs text-gray-500 mt-1">Status: {scenario.status}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Integration Testing Guide */}
-        <div className="bg-white rounded-lg shadow p-6 mt-6">
-          <h2 className="text-lg font-semibold mb-4">Integration Testing Guide</h2>
-          <div className="space-y-4 text-sm text-gray-700">
+        <div className="border border-gray-200 rounded p-6 mt-6">
+          <h2 className="text-xs font-semibold text-gray-900 mb-4">Integration Testing Guide</h2>
+          <div className="space-y-4 text-xs text-gray-700">
             <div>
-              <h3 className="font-medium text-gray-900 mb-1">1. Create a Test Payment</h3>
+              <p className="font-medium text-gray-900 mb-1">1. Create a Test Payment</p>
               <p className="text-gray-600">
                 Use the API to create a payment in test mode. The payment will start with a "pending" status.
               </p>
             </div>
             <div>
-              <h3 className="font-medium text-gray-900 mb-1">2. Simulate Payment Completion</h3>
+              <p className="font-medium text-gray-900 mb-1">2. Simulate Payment Completion</p>
               <p className="text-gray-600">
                 Use the simulator to change the payment status to "succeeded" to test your webhook handlers.
               </p>
             </div>
             <div>
-              <h3 className="font-medium text-gray-900 mb-1">3. Test Failure Scenarios</h3>
+              <p className="font-medium text-gray-900 mb-1">3. Test Failure Scenarios</p>
               <p className="text-gray-600">
                 Simulate failed payments to ensure your application handles errors gracefully.
               </p>
             </div>
             <div>
-              <h3 className="font-medium text-gray-900 mb-1">4. Verify Webhook Delivery</h3>
+              <p className="font-medium text-gray-900 mb-1">4. Verify Webhook Delivery</p>
               <p className="text-gray-600">
                 Check your webhook delivery history in the Settings tab to ensure events are being delivered.
               </p>

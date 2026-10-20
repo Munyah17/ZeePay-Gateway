@@ -23,7 +23,6 @@ export default function TransactionsPage() {
 
   const fetchTransactions = async () => {
     try {
-      // Mock data for now
       const mockTransactions: Transaction[] = [
         { id: '1', reference: 'INV-1042', amount: 10, currency: 'USD', status: 'succeeded', createdAt: '2026-10-19T10:00:00Z' },
         { id: '2', reference: 'INV-1041', amount: 25, currency: 'USD', status: 'pending', createdAt: '2026-10-19T09:30:00Z' },
@@ -47,48 +46,55 @@ export default function TransactionsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'succeeded':
-        return 'bg-green-100 text-green-800';
+        return 'text-green-700';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'text-yellow-700';
       case 'failed':
-        return 'bg-red-100 text-red-800';
+        return 'text-red-700';
       case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
+        return 'text-gray-600';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'text-gray-600';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-              <p className="text-gray-600 text-sm">View and manage your payment transactions</p>
+    <div className="min-h-screen bg-white">
+      <nav className="border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-14">
+            <div className="flex items-center gap-8">
+              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
+              <div className="flex gap-6">
+                <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
+                <Link href="/dashboard/transactions" className="text-xs text-gray-900">Transactions</Link>
+                <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
+                <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
+              </div>
             </div>
-            <nav className="flex space-x-4">
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Overview</Link>
-              <Link href="/dashboard/transactions" className="text-blue-600 font-medium">Transactions</Link>
-              <Link href="/dashboard/settings" className="text-gray-600 hover:text-gray-900">Settings</Link>
-              <Link href="/dashboard/simulator" className="text-gray-600 hover:text-gray-900">Simulator</Link>
-            </nav>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-gray-600">merchant@example.com</span>
+              <Link href="/auth/logout" className="text-xs text-gray-600 hover:text-gray-900">
+                Sign out
+              </Link>
+            </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex items-center space-x-4">
-            <label className="text-sm font-medium text-gray-700">Filter by status:</label>
+        <div className="mb-8">
+          <h1 className="text-sm font-semibold text-gray-900">Transactions</h1>
+          <p className="text-xs text-gray-600 mt-1">View and manage your payment transactions</p>
+        </div>
+
+        <div className="border border-gray-200 rounded p-6 mb-6">
+          <div className="flex items-center gap-4">
+            <label className="text-xs font-medium text-gray-700">Filter by status:</label>
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
             >
               <option value="all">All</option>
               <option value="succeeded">Succeeded</option>
@@ -99,46 +105,44 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        {/* Transactions Table */}
-        <div className="bg-white rounded-lg shadow">
+        <div className="border border-gray-200 rounded">
           {loading ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading transactions...</p>
+              <p className="text-xs text-gray-600">Loading...</p>
             </div>
           ) : transactions.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500">No transactions found</p>
+              <p className="text-xs text-gray-500">No transactions found</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead>
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200">
                   {transactions.map((transaction) => (
                     <tr key={transaction.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{transaction.reference}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 text-xs text-gray-900">{transaction.reference}</td>
+                      <td className="px-4 py-3 text-xs text-gray-900">
                         ${transaction.amount.toFixed(2)} {transaction.currency}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(transaction.status)}`}>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs ${getStatusColor(transaction.status)}`}>
                           {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-4 py-3 text-xs text-gray-500">
                         {new Date(transaction.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <button className="text-blue-600 hover:text-blue-900 mr-3">View</button>
+                      <td className="px-4 py-3 text-xs">
+                        <button className="text-gray-600 hover:text-gray-900">View</button>
                       </td>
                     </tr>
                   ))}
