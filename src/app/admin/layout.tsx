@@ -1,14 +1,9 @@
-import { SidebarProvider } from "@/context/SidebarContext";
-import DashboardLayoutWrapper from "@/layout/DashboardLayout";
+import BootstrapDashboardLayout from "@/layout/BootstrapDashboardLayout";
 
 export default function Layout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <SidebarProvider>
-      <DashboardLayoutWrapper isAdmin={true}>{children}</DashboardLayoutWrapper>
-    </SidebarProvider>
-  );
+  return <BootstrapDashboardLayout isAdmin={true}>{children}</BootstrapDashboardLayout>;
 }

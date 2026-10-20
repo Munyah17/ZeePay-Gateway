@@ -19,10 +19,12 @@ export default function RefundsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    const authed = localStorage.getItem('zeepay_authed');
-    if (!authed) {
-      router.push('/auth/login');
-      return;
+    if (typeof window !== 'undefined') {
+      const authed = localStorage.getItem('zeepay_authed');
+      if (!authed) {
+        router.push('/auth/login');
+        return;
+      }
     }
 
     fetchRefunds();
@@ -42,168 +44,161 @@ export default function RefundsPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('zeepay_authed');
-    localStorage.removeItem('zeepay_user');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('zeepay_authed');
+      localStorage.removeItem('zeepay_user');
+    }
     router.push('/');
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Succeeded':
-        return 'text-green-700';
+        return 'bg-success';
       case 'Pending':
-        return 'text-yellow-700';
+        return 'bg-warning text-dark';
       case 'Failed':
-        return 'text-red-700';
+        return 'bg-danger';
       default:
-        return 'text-gray-600';
+        return 'bg-secondary';
     }
   };
 
   return (
-    <div>
-      <nav className="border-b border-gray-200" style={{display: 'none'}}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-14">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
-                <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
-                <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
-                <Link href="/dashboard/customers" className="text-xs text-gray-600 hover:text-gray-900">Customers</Link>
-                <Link href="/dashboard/methods" className="text-xs text-gray-600 hover:text-gray-900">Methods</Link>
-                <Link href="/dashboard/refunds" className="text-xs text-gray-900">Refunds</Link>
-                <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
-                <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">merchant@example.com</span>
-              <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
-                Sign out
-              </button>
-            </div>
+    <>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 className="h4 mb-0">Refunds</h2>
+          <p className="text-muted small mb-0">Track and initiate refunds for supported payment providers</p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="btn btn-primary btn-sm"
+        >
+          <i className="bi bi-plus-lg me-1"></i> Create refund
+        </button>
+      </div>
+
+      <div className="alert alert-warning mb-4" role="alert">
+        <strong>Demo only.</strong> Refund actions below update mock records only. Actual refund support depends on the underlying payment provider and transaction status.
+      </div>
+
+      {loading ? (
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
         </div>
-      </nav>
-
-      <main>
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-sm font-semibold text-gray-900">Refunds</h1>
-            <p className="text-xs text-gray-600 mt-1">Track and initiate refunds for supported payment providers</p>
+      ) : (
+        <div className="card">
+          <div className="card-header d-flex justify-content-between align-items-center">
+            <h5 className="card-title mb-0">Refund history</h5>
+            <span className="badge bg-primary">
+              {refunds.length} records
+            </span>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800"
-          >
-            ＋ Create refund
-          </button>
-        </div>
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6">
-          <p className="text-xs text-yellow-800">
-            <strong>Demo only.</strong> Refund actions below update mock records only. Actual refund support depends on the underlying payment provider and transaction status.
-          </p>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-xs text-gray-600">Loading...</p>
-          </div>
-        ) : (
-          <div className="border border-gray-200 rounded p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xs font-semibold text-gray-900">Refund history</h2>
-              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                {refunds.length} records
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
+          <div className="card-body">
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Refund ID</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payment ID</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th>Refund ID</th>
+                    <th>Payment ID</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {refunds.map((refund) => (
                     <tr key={refund.id}>
-                      <td className="px-4 py-3 text-xs text-gray-900 font-mono">{refund.id}</td>
-                      <td className="px-4 py-3 text-xs text-gray-900 font-mono">{refund.paymentId}</td>
-                      <td className="px-4 py-3 text-xs text-gray-900">${refund.amount.toFixed(2)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs ${getStatusColor(refund.status)}`}>
+                      <td className="font-monospace small">{refund.id}</td>
+                      <td className="font-monospace small">{refund.paymentId}</td>
+                      <td>${refund.amount.toFixed(2)}</td>
+                      <td>
+                        <span className={`badge ${getStatusBadge(refund.status)}`}>
                           {refund.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{refund.date}</td>
+                      <td className="text-muted">{refund.date}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {refunds.length === 0 && (
+                <div className="text-center py-4 text-muted">
+                  No refunds found
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {showCreateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded p-6 max-w-md w-full mx-4">
-              <h3 className="text-xs font-semibold text-gray-900 mb-4">Create refund</h3>
-              <form className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Payment</label>
-                  <select className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500">
-                    <option>pay_8x2k91 — $10.00 (invoice_1042)</option>
-                    <option>pay_7m4422 — $50.00 (invoice_1041)</option>
-                    <option>pay_9q0678 — $20.00 (invoice_1040)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Refund amount (USD)</label>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    defaultValue="10"
-                    className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Reason</label>
-                  <select className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500">
-                    <option>Customer request</option>
-                    <option>Duplicate payment</option>
-                    <option>Service not delivered</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <p className="text-xs text-gray-500">This creates a simulated refund record only.</p>
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="border border-gray-300 px-3 py-1.5 rounded text-xs hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    onClick={(e) => { e.preventDefault(); setShowCreateModal(false); }}
-                    className="bg-black text-white px-3 py-1.5 rounded text-xs hover:bg-gray-800"
-                  >
-                    Create demo refund
-                  </button>
-                </div>
-              </form>
+      {showCreateModal && (
+        <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Create refund</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowCreateModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <form>
+                  <div className="mb-3">
+                    <label className="form-label small">Payment</label>
+                    <select className="form-select form-select-sm">
+                      <option>pay_8x2k91 — $10.00 (invoice_1042)</option>
+                      <option>pay_7m4422 — $50.00 (invoice_1041)</option>
+                      <option>pay_9q0678 — $20.00 (invoice_1040)</option>
+                    </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small">Refund amount (USD)</label>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      defaultValue="10"
+                      className="form-control form-control-sm"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small">Reason</label>
+                    <select className="form-select form-select-sm">
+                      <option>Customer request</option>
+                      <option>Duplicate payment</option>
+                      <option>Service not delivered</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <p className="text-muted small">This creates a simulated refund record only.</p>
+                </form>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Create demo refund
+                </button>
+              </div>
             </div>
           </div>
-        )}
-      </main>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

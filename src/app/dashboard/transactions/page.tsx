@@ -43,118 +43,131 @@ export default function TransactionsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'succeeded':
-        return 'text-green-700';
+        return 'bg-success';
       case 'pending':
-        return 'text-yellow-700';
+        return 'bg-warning text-dark';
       case 'failed':
-        return 'text-red-700';
+        return 'bg-danger';
       case 'cancelled':
-        return 'text-gray-600';
+        return 'bg-secondary';
       default:
-        return 'text-gray-600';
+        return 'bg-secondary';
     }
   };
 
   return (
-    <div>
-      <nav className="border-b border-gray-200" style={{display: 'none'}}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-14">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
-                <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
-                <Link href="/dashboard/transactions" className="text-xs text-gray-900">Transactions</Link>
-                <Link href="/dashboard/customers" className="text-xs text-gray-600 hover:text-gray-900">Customers</Link>
-                <Link href="/dashboard/methods" className="text-xs text-gray-600 hover:text-gray-900">Methods</Link>
-                <Link href="/dashboard/refunds" className="text-xs text-gray-600 hover:text-gray-900">Refunds</Link>
-                <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
-                <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
+    <>
+      <div className="mb-4">
+        <h2 className="h4">Transactions</h2>
+        <p className="text-muted">View and manage your payment transactions</p>
+      </div>
+
+      <div className="card mb-4">
+        <div className="card-body">
+          <div className="row align-items-center">
+            <div className="col-md-3">
+              <label className="form-label small">Filter by status:</label>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="form-select form-select-sm"
+              >
+                <option value="all">All</option>
+                <option value="succeeded">Succeeded</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div className="col-md-9 text-md-end mt-3 mt-md-0">
+              <button className="btn btn-primary btn-sm">
+                <i className="bi bi-download me-1"></i> Export
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-body">
+          {loading ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">merchant@example.com</span>
-              <Link href="/auth/logout" className="text-xs text-gray-600 hover:text-gray-900">
-                Sign out
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main>
-        <div className="mb-8">
-          <h1 className="text-sm font-semibold text-gray-900">Transactions</h1>
-          <p className="text-xs text-gray-600 mt-1">View and manage your payment transactions</p>
-        </div>
-
-        <div className="border border-gray-200 rounded p-6 mb-6">
-          <div className="flex items-center gap-4">
-            <label className="text-xs font-medium text-gray-700">Filter by status:</label>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
-            >
-              <option value="all">All</option>
-              <option value="succeeded">Succeeded</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="border border-gray-200 rounded">
-          {loading ? (
-            <div className="text-center py-12">
-              <p className="text-xs text-gray-600">Loading...</p>
-            </div>
-          ) : transactions.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-xs text-gray-500">No transactions found</p>
-            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th>Reference</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {transactions.map((transaction) => (
-                    <tr key={transaction.id}>
-                      <td className="px-4 py-3 text-xs text-gray-900">{transaction.reference}</td>
-                      <td className="px-4 py-3 text-xs text-gray-900">
-                        ${transaction.amount.toFixed(2)} {transaction.currency}
+                <tbody>
+                  {transactions.map((tx) => (
+                    <tr key={tx.id}>
+                      <td>
+                        <span className="fw-medium">{tx.reference}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs ${getStatusColor(transaction.status)}`}>
-                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                      <td>${tx.amount.toFixed(2)} {tx.currency}</td>
+                      <td>
+                        <span className={`badge ${getStatusBadge(tx.status)}`}>
+                          {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
-                        {new Date(transaction.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        <button className="text-gray-600 hover:text-gray-900">View</button>
+                      <td className="text-muted">{new Date(tx.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <div className="btn-group btn-group-sm">
+                          <button className="btn btn-outline-primary">
+                            <i className="bi bi-eye"></i>
+                          </button>
+                          <button className="btn btn-outline-secondary">
+                            <i className="bi bi-download"></i>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {transactions.length === 0 && (
+                <div className="text-center py-4 text-muted">
+                  No transactions found
+                </div>
+              )}
             </div>
           )}
         </div>
-      </main>
-    </div>
+        <div className="card-footer">
+          <nav aria-label="Page navigation">
+            <ul className="pagination pagination-sm justify-content-end mb-0">
+              <li className="page-item disabled">
+                <a className="page-link" href="#">Previous</a>
+              </li>
+              <li className="page-item active">
+                <a className="page-link" href="#">1</a>
+              </li>
+              <li className="page-item">
+                <a className="page-link" href="#">2</a>
+              </li>
+              <li className="page-item">
+                <a className="page-link" href="#">3</a>
+              </li>
+              <li className="page-item">
+                <a className="page-link" href="#">Next</a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </>
   );
 }

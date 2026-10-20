@@ -6,21 +6,23 @@ export default function Home() {
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14">
-            <div className="flex items-center gap-8">
+            <div className="flex items-center">
               <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
-                <Link href="/" className="text-xs text-gray-600 hover:text-gray-900">Home</Link>
-                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Product</Link>
-                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Developers</Link>
-                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Pricing</Link>
-                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Company</Link>
-              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Link href="/auth/login" className="text-xs text-gray-600 hover:text-gray-900">Sign in</Link>
-              <Link href="/auth/register" className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800">
-                Get started
-              </Link>
+            <div className="flex items-center gap-6">
+              <div className="flex gap-6">
+                <Link href="/" className="text-xs text-gray-600 hover:text-gray-900 text-decoration-none">Home</Link>
+                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900 text-decoration-none">Product</Link>
+                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900 text-decoration-none">Developers</Link>
+                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900 text-decoration-none">Pricing</Link>
+                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900 text-decoration-none">Company</Link>
+              </div>
+              <div className="flex items-center gap-4 border-l border-gray-200 pl-6">
+                <Link href="/auth/login" className="text-xs text-gray-600 hover:text-gray-900 text-decoration-none">Sign in</Link>
+                <Link href="/auth/register" className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800 text-decoration-none">
+                  Get started
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -162,22 +164,118 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="py-16 border-b border-gray-100">
+        <section className="py-16 border-b border-gray-100 bg-gradient-to-br from-blue-50 via-white to-green-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-8">Supported payment methods</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <h2 className="text-xl font-semibold text-gray-900 mb-8 text-center">Supported payment methods</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
               {[
-                { name: 'EcoCash', type: 'Mobile Money' },
-                { name: 'InnBucks', type: 'Mobile Money' },
-                { name: 'Omari', type: 'Mobile Money' },
-                { name: 'Visa', type: 'Card' },
-                { name: 'Mastercard', type: 'Card' },
+                { name: 'EcoCash', type: 'Mobile Money', color: 'from-green-400 to-green-600', icon: '📱' },
+                { name: 'InnBucks', type: 'Mobile Money', color: 'from-blue-400 to-blue-600', icon: '💰' },
+                { name: 'Omari', type: 'Mobile Money', color: 'from-purple-400 to-purple-600', icon: '💳' },
+                { name: 'Visa', type: 'Card', color: 'from-blue-600 to-blue-800', icon: '💎' },
+                { name: 'Mastercard', type: 'Card', color: 'from-red-500 to-orange-500', icon: '🔴' },
               ].map((method) => (
-                <div key={method.name} className="border border-gray-200 rounded p-4">
-                  <p className="text-sm font-medium text-gray-900">{method.name}</p>
-                  <p className="text-xs text-gray-500 mt-1">{method.type}</p>
+                <div key={method.name} className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all border border-gray-100">
+                  <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${method.color} flex items-center justify-center text-3xl mb-4 mx-auto`}>
+                    {method.icon}
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900 text-center">{method.name}</p>
+                  <p className="text-xs text-gray-500 mt-1 text-center">{method.type}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-20 border-b border-gray-100 bg-gradient-to-r from-blue-600 to-purple-600">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div className="text-white">
+                <h2 className="text-3xl font-bold mb-4">Experience seamless payments with TopMe</h2>
+                <p className="text-lg mb-6 text-blue-100">
+                  Our consumer-facing app for personal payments, airtime top-ups, and bill payments. 
+                  Fast, secure, and designed for Zimbabwe.
+                </p>
+                <div className="flex gap-4">
+                  <a
+                    href="https://topme.co.zw"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+                  >
+                    Visit TopMe →
+                  </a>
+                  <button className="border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors">
+                    Learn more
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className="w-64 h-96 bg-gradient-to-br from-blue-400 to-purple-500 rounded-3xl shadow-2xl transform rotate-6 hover:rotate-0 transition-transform">
+                    <div className="p-6 h-full flex flex-col justify-between">
+                      <div className="flex justify-between items-start">
+                        <div className="text-white">
+                          <p className="text-sm opacity-80">TopMe</p>
+                          <p className="text-2xl font-bold">Pay</p>
+                        </div>
+                        <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                          <span className="text-2xl">💳</span>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="bg-white/20 rounded-lg p-3 backdrop-blur">
+                          <p className="text-white text-xs opacity-80">Airtime</p>
+                          <p className="text-white font-semibold">Econet, NetOne, Telecel</p>
+                        </div>
+                        <div className="bg-white/20 rounded-lg p-3 backdrop-blur">
+                          <p className="text-white text-xs opacity-80">Bill Payments</p>
+                          <p className="text-white font-semibold">ZESA, Water, Internet</p>
+                        </div>
+                        <div className="bg-white/20 rounded-lg p-3 backdrop-blur">
+                          <p className="text-white text-xs opacity-80">Send Money</p>
+                          <p className="text-white font-semibold">Instant transfers</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 border-b border-gray-100 bg-gradient-to-br from-green-50 via-white to-blue-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-8 text-center">Why choose ZeePay?</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all border border-gray-100">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center text-3xl mb-6 mx-auto">
+                  ⚡
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 text-center">Lightning Fast</h3>
+                <p className="text-sm text-gray-600 text-center">
+                  Process payments in seconds, not hours. Our optimized infrastructure ensures instant confirmation for all transactions.
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all border border-gray-100">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center text-3xl mb-6 mx-auto">
+                  🔒
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 text-center">Bank-Grade Security</h3>
+                <p className="text-sm text-gray-600 text-center">
+                  PCI-DSS compliant with end-to-end encryption. Your customers' data is protected with the highest security standards.
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all border border-gray-100">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl flex items-center justify-center text-3xl mb-6 mx-auto">
+                  💰
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 text-center">Lowest Fees</h3>
+                <p className="text-sm text-gray-600 text-center">
+                  Competitive transaction rates with no hidden fees. Save more on every payment compared to traditional providers.
+                </p>
+              </div>
             </div>
           </div>
         </section>

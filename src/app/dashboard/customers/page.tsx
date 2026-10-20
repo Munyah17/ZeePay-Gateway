@@ -19,10 +19,12 @@ export default function CustomersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
-    const authed = localStorage.getItem('zeepay_authed');
-    if (!authed) {
-      router.push('/auth/login');
-      return;
+    if (typeof window !== 'undefined') {
+      const authed = localStorage.getItem('zeepay_authed');
+      if (!authed) {
+        router.push('/auth/login');
+        return;
+      }
     }
 
     fetchCustomers();
@@ -45,79 +47,71 @@ export default function CustomersPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('zeepay_authed');
-    localStorage.removeItem('zeepay_user');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('zeepay_authed');
+      localStorage.removeItem('zeepay_user');
+    }
     router.push('/');
   };
 
   return (
-    <div>
-      <nav className="border-b border-gray-200" style={{display: 'none'}}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-14">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
-                <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
-                <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
-                <Link href="/dashboard/customers" className="text-xs text-gray-900">Customers</Link>
-                <Link href="/dashboard/methods" className="text-xs text-gray-600 hover:text-gray-900">Methods</Link>
-                <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
-                <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">merchant@example.com</span>
-              <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
-                Sign out
-              </button>
-            </div>
+    <>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 className="h4 mb-0">Customers</h2>
+          <p className="text-muted small mb-0">Customers associated with your payment activity</p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="btn btn-primary btn-sm"
+          data-bs-toggle="modal"
+          data-bs-target="#addCustomerModal"
+        >
+          <i className="bi bi-plus-lg me-1"></i> Add customer
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
         </div>
-      </nav>
-
-      <main>
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-sm font-semibold text-gray-900">Customers</h1>
-            <p className="text-xs text-gray-600 mt-1">Customers associated with your payment activity</p>
-          </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800"
-          >
-            ＋ Add customer
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-xs text-gray-600">Loading...</p>
-          </div>
-        ) : (
-          <div className="border border-gray-200 rounded p-6">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
+      ) : (
+        <div className="card">
+          <div className="card-body">
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payments</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total paid</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Last activity</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                    <th>Customer</th>
+                    <th>Email</th>
+                    <th>Payments</th>
+                    <th>Total paid</th>
+                    <th>Last activity</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {customers.map((customer, index) => (
                     <tr key={index}>
-                      <td className="px-4 py-3 text-xs text-gray-900 font-medium">{customer.name}</td>
-                      <td className="px-4 py-3 text-xs text-gray-600">{customer.email}</td>
-                      <td className="px-4 py-3 text-xs text-gray-900">{customer.payments}</td>
-                      <td className="px-4 py-3 text-xs text-gray-900">${customer.totalPaid.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{customer.lastActivity}</td>
-                      <td className="px-4 py-3 text-xs">
-                        <button className="text-gray-600 hover:text-gray-900">View</button>
+                      <td>
+                        <div className="d-flex align-items-center">
+                          <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2"
+                               style={{ width: '32px', height: '32px' }}>
+                            {customer.name.charAt(0)}
+                          </div>
+                          <span className="fw-medium">{customer.name}</span>
+                        </div>
+                      </td>
+                      <td className="text-muted">{customer.email}</td>
+                      <td>{customer.payments}</td>
+                      <td>${customer.totalPaid.toFixed(2)}</td>
+                      <td className="text-muted small">{customer.lastActivity}</td>
+                      <td>
+                        <button className="btn btn-sm btn-outline-primary">
+                          View
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -125,60 +119,86 @@ export default function CustomersPage() {
               </table>
             </div>
           </div>
-        )}
+          <div className="card-footer">
+            <nav aria-label="Page navigation">
+              <ul className="pagination pagination-sm justify-content-end mb-0">
+                <li className="page-item disabled">
+                  <a className="page-link" href="#">Previous</a>
+                </li>
+                <li className="page-item active">
+                  <a className="page-link" href="#">1</a>
+                </li>
+                <li className="page-item">
+                  <a className="page-link" href="#">Next</a>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      )}
 
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded p-6 max-w-md w-full mx-4">
-              <h3 className="text-xs font-semibold text-gray-900 mb-4">Add customer</h3>
-              <form className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Full name</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
-                    placeholder="Customer name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Email address</label>
-                  <input
-                    type="email"
-                    required
-                    className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
-                    placeholder="customer@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone (optional)</label>
-                  <input
-                    type="tel"
-                    className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500"
-                    placeholder="+263..."
-                  />
-                </div>
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="border border-gray-300 px-3 py-1.5 rounded text-xs hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    onClick={(e) => { e.preventDefault(); setShowAddModal(false); }}
-                    className="bg-black text-white px-3 py-1.5 rounded text-xs hover:bg-gray-800"
-                  >
-                    Add customer
-                  </button>
-                </div>
-              </form>
+      {showAddModal && (
+        <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Add customer</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowAddModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <form>
+                  <div className="mb-3">
+                    <label className="form-label small">Full name</label>
+                    <input
+                      type="text"
+                      required
+                      className="form-control form-control-sm"
+                      placeholder="Customer name"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small">Email address</label>
+                    <input
+                      type="email"
+                      required
+                      className="form-control form-control-sm"
+                      placeholder="customer@example.com"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small">Phone (optional)</label>
+                    <input
+                      type="tel"
+                      className="form-control form-control-sm"
+                      placeholder="+263..."
+                    />
+                  </div>
+                </form>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowAddModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowAddModal(false)}
+                >
+                  Add customer
+                </button>
+              </div>
             </div>
           </div>
-        )}
-      </main>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -16,10 +16,12 @@ export default function MethodsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const authed = localStorage.getItem('zeepay_authed');
-    if (!authed) {
-      router.push('/auth/login');
-      return;
+    if (typeof window !== 'undefined') {
+      const authed = localStorage.getItem('zeepay_authed');
+      if (!authed) {
+        router.push('/auth/login');
+        return;
+      }
     }
 
     fetchMethods();
@@ -45,8 +47,10 @@ export default function MethodsPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('zeepay_authed');
-    localStorage.removeItem('zeepay_user');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('zeepay_authed');
+      localStorage.removeItem('zeepay_user');
+    }
     router.push('/');
   };
 
@@ -58,142 +62,127 @@ export default function MethodsPage() {
     ));
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Active':
-        return 'text-green-700';
+        return 'bg-success';
       case 'Sandbox':
-        return 'text-yellow-700';
+        return 'bg-warning text-dark';
       case 'Inactive':
-        return 'text-gray-600';
+        return 'bg-secondary';
       case 'Not configured':
-        return 'text-gray-500';
+        return 'bg-dark';
       case 'Roadmap':
-        return 'text-blue-700';
+        return 'bg-info text-dark';
       default:
-        return 'text-gray-600';
+        return 'bg-secondary';
     }
   };
 
   return (
-    <div>
-      <nav className="border-b border-gray-200" style={{display: 'none'}}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-14">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
-                <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
-                <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
-                <Link href="/dashboard/customers" className="text-xs text-gray-600 hover:text-gray-900">Customers</Link>
-                <Link href="/dashboard/methods" className="text-xs text-gray-900">Methods</Link>
-                <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
-                <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">merchant@example.com</span>
-              <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
-                Sign out
-              </button>
-            </div>
+    <>
+      <div className="mb-4">
+        <h2 className="h4">Payment methods</h2>
+        <p className="text-muted">Manage the methods enabled for your ZeePay merchant account</p>
+      </div>
+
+      <div className="alert alert-warning mb-4" role="alert">
+        <strong>Prototype mode.</strong> Toggles update this demo interface only. Live payment methods require provider approval, credentials, and successful integration testing.
+      </div>
+
+      {loading ? (
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
         </div>
-      </nav>
-
-      <main>
-        <div className="mb-8">
-          <h1 className="text-sm font-semibold text-gray-900">Payment methods</h1>
-          <p className="text-xs text-gray-600 mt-1">Manage the methods enabled for your ZeePay merchant account</p>
-        </div>
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6">
-          <p className="text-xs text-yellow-800">
-            <strong>Prototype mode.</strong> Toggles update this demo interface only. Live payment methods require provider approval, credentials, and successful integration testing.
-          </p>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-xs text-gray-600">Loading...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="border border-gray-200 rounded p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xs font-semibold text-gray-900">Your payment methods</h2>
-                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+      ) : (
+        <div className="row g-4">
+          <div className="col-lg-8">
+            <div className="card">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">Your payment methods</h5>
+                <span className="badge bg-primary">
                   {methods.filter(m => m.status === 'Active').length} enabled
                 </span>
               </div>
-              <div className="space-y-4">
-                {methods.map((method) => (
-                  <div key={method.name} className="border border-gray-200 rounded p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-xs font-semibold text-gray-700">
-                        {method.name.substring(0, 2).toUpperCase()}
+              <div className="card-body">
+                <div className="list-group list-group-flush">
+                  {methods.map((method) => (
+                    <div key={method.name} className="list-group-item d-flex justify-content-between align-items-center">
+                      <div className="d-flex align-items-center gap-3">
+                        <div className="bg-light rounded d-flex align-items-center justify-content-center"
+                             style={{ width: '40px', height: '40px' }}>
+                          <span className="fw-bold text-muted small">{method.name.substring(0, 2).toUpperCase()}</span>
+                        </div>
+                        <div>
+                          <h6 className="mb-0 small fw-medium">{method.name}</h6>
+                          <small className="text-muted">
+                            {['EcoCash', 'InnBucks', 'Omari', 'Visa & Mastercard'].includes(method.name)
+                              ? 'Initial integration target'
+                              : 'Planned integration · Not live'}
+                          </small>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-900">{method.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {['EcoCash', 'InnBucks', 'Omari', 'Visa & Mastercard'].includes(method.name)
-                            ? 'Initial integration target'
-                            : 'Planned integration · Not live'}
-                        </p>
+                      <div className="d-flex align-items-center gap-3">
+                        <span className={`badge ${getStatusBadge(method.status)}`}>
+                          {method.status}
+                        </span>
+                        {['EcoCash', 'InnBucks', 'Omari', 'Visa & Mastercard'].includes(method.name) && (
+                          <div className="form-check form-switch">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              checked={method.status === 'Active'}
+                              onChange={() => toggleMethod(method.name)}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs ${getStatusColor(method.status)}`}>
-                        {method.status}
-                      </span>
-                      {['EcoCash', 'InnBucks', 'Omari', 'Visa & Mastercard'].includes(method.name) && (
-                        <input
-                          type="checkbox"
-                          checked={method.status === 'Active'}
-                          onChange={() => toggleMethod(method.name)}
-                          className="h-3 w-3 border-gray-300 rounded"
-                        />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border border-gray-200 rounded p-6">
-              <h2 className="text-xs font-semibold text-gray-900 mb-6">Provider coverage</h2>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                  <div>
-                    <p className="text-xs font-medium text-gray-900">Connected / sandbox</p>
-                    <p className="text-xs text-gray-500">Local mobile money and card sandbox</p>
-                  </div>
-                  <span className="text-xs font-semibold text-gray-900">3</span>
+                  ))}
                 </div>
-                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                  <div>
-                    <p className="text-xs font-medium text-gray-900">Setup required</p>
-                    <p className="text-xs text-gray-500">Additional card network onboarding</p>
-                  </div>
-                  <span className="text-xs font-semibold text-gray-900">2</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-xs font-medium text-gray-900">Roadmap</p>
-                    <p className="text-xs text-gray-500">Subject to provider access and eligibility</p>
-                  </div>
-                  <span className="text-xs font-semibold text-gray-900">3</span>
-                </div>
-              </div>
-              <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mt-6">
-                <p className="text-xs text-yellow-800">
-                  The interface never treats a roadmap item as an operational payment method. Provider capability and merchant eligibility must be verified before live activation.
-                </p>
               </div>
             </div>
           </div>
-        )}
-      </main>
-    </div>
+
+          <div className="col-lg-4">
+            <div className="card">
+              <div className="card-header">
+                <h5 className="card-title mb-0">Provider coverage</h5>
+              </div>
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                  <div>
+                    <h6 className="small fw-medium mb-0">Connected / sandbox</h6>
+                    <small className="text-muted">Local mobile money and card sandbox</small>
+                  </div>
+                  <span className="fw-bold">3</span>
+                </div>
+                <div className="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                  <div>
+                    <h6 className="small fw-medium mb-0">Setup required</h6>
+                    <small className="text-muted">Additional card network onboarding</small>
+                  </div>
+                  <span className="fw-bold">2</span>
+                </div>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h6 className="small fw-medium mb-0">Roadmap</h6>
+                    <small className="text-muted">Subject to provider access and eligibility</small>
+                  </div>
+                  <span className="fw-bold">3</span>
+                </div>
+              </div>
+              <div className="card-footer">
+                <div className="alert alert-warning small mb-0" role="alert">
+                  The interface never treats a roadmap item as an operational payment method. Provider capability and merchant eligibility must be verified before live activation.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

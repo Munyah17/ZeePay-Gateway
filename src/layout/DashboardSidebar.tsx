@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { ChevronDownIcon } from "@/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type NavItem = {
@@ -176,14 +175,26 @@ export default function DashboardSidebar({ isAdmin = false }: DashboardSidebarPr
                 <span className="menu-item-text">{nav.key.charAt(0).toUpperCase() + nav.key.slice(1)}</span>
               )}
               {(isExpanded || isHovered || isMobileOpen) && (
-                <ChevronDownIcon
+                <svg
                   className={cn(
                     "ms-auto h-5 w-5 transition-transform duration-200",
                     openSubmenu?.index === index
                       ? "rotate-180 text-gray-900"
                       : "",
                   )}
-                />
+                  width="20"
+                  height="20"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fillRule="evenodd"
+                    clipRule="evenodd"
+                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                    fill="currentColor"
+                  />
+                </svg>
               )}
             </button>
           ) : (

@@ -41,6 +41,12 @@ export default function DashboardPage() {
     fetchDashboardStats();
   }, [router]);
 
+  useEffect(() => {
+    if (!loading) {
+      initCharts();
+    }
+  }, [loading]);
+
   const fetchDashboardStats = async () => {
     try {
       setStats({
@@ -57,6 +63,49 @@ export default function DashboardPage() {
     }
   };
 
+  const initCharts = () => {
+    const ctx1 = document.getElementById('revenueChart') as HTMLCanvasElement;
+    if (ctx1) {
+      new (window as any).Chart(ctx1, {
+        type: 'line',
+        data: {
+          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+          datasets: [{
+            label: 'Revenue',
+            data: [12000, 19000, 15000, 25000, 22000, 30000],
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+    }
+
+    const ctx2 = document.getElementById('paymentMethodChart') as HTMLCanvasElement;
+    if (ctx2) {
+      new (window as any).Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: ['EcoCash', 'Visa', 'Mastercard', 'InnBucks'],
+          datasets: [{
+            data: [40, 30, 20, 10],
+            backgroundColor: ['#0d6efd', '#198754', '#dc3545', '#ffc107']
+          }]
+        },
+        options: {
+          responsive: true
+        }
+      });
+    }
+  };
+
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('zeepay_authed');
@@ -66,118 +115,172 @@ export default function DashboardPage() {
   };
 
   return (
-    <div>
-      <main>
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-xs text-gray-600">Loading...</p>
+    <>
+      {loading ? (
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
-        ) : (
-          <>
-            <div className="mb-8">
-              <h1 className="text-sm font-semibold text-gray-900">Good afternoon, {user?.name?.split(' ')[0] || 'John'} 👋</h1>
-              <p className="text-xs text-gray-600 mt-1">Here's what's happening with your payments</p>
-            </div>
+        </div>
+      ) : (
+        <>
+          <div className="mb-4">
+            <h2 className="h4">Good afternoon, {user?.name?.split(' ')[0] || 'John'} 👋</h2>
+            <p className="text-muted">Here's what's happening with your payments</p>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <div className="border border-gray-200 rounded p-4">
-                <p className="text-xs text-gray-600">Total volume</p>
-                <p className="text-lg font-semibold text-gray-900 mt-1">$12,480</p>
-                <p className="text-xs text-gray-500 mt-1">↑ 12.4% vs previous period</p>
-              </div>
-              <div className="border border-gray-200 rounded p-4">
-                <p className="text-xs text-gray-600">Successful payments</p>
-                <p className="text-lg font-semibold text-gray-900 mt-1">142</p>
-                <p className="text-xs text-gray-500 mt-1">↑ 18.2% vs previous period</p>
-              </div>
-              <div className="border border-gray-200 rounded p-4">
-                <p className="text-xs text-gray-600">Pending payments</p>
-                <p className="text-lg font-semibold text-gray-900 mt-1">5</p>
-                <p className="text-xs text-gray-500 mt-1">↓ 50% vs previous period</p>
-              </div>
-              <div className="border border-gray-200 rounded p-4">
-                <p className="text-xs text-gray-600">Failed payments</p>
-                <p className="text-lg font-semibold text-gray-900 mt-1">2</p>
-                <p className="text-xs text-gray-500 mt-1">↓ 3.1% vs previous period</p>
+          <div className="row g-4 mb-4">
+            <div className="col-md-6 col-lg-3">
+              <div className="card">
+                <div className="card-body">
+                  <h6 className="card-subtitle mb-2 text-muted">Total volume</h6>
+                  <h3 className="card-title">$12,480</h3>
+                  <p className="card-text text-success small">↑ 12.4% vs previous period</p>
+                </div>
               </div>
             </div>
-
-            <div className="border border-gray-200 rounded p-6 mb-8">
-              <h2 className="text-xs font-semibold text-gray-900 mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Link
-                  href="/dashboard/transactions"
-                  className="border border-gray-200 rounded p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <p className="text-xs font-medium text-gray-900">View Transactions</p>
-                  <p className="text-xs text-gray-600 mt-1">Browse all payment transactions</p>
-                </Link>
-                <Link
-                  href="/dashboard/settings"
-                  className="border border-gray-200 rounded p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <p className="text-xs font-medium text-gray-900">API Keys</p>
-                  <p className="text-xs text-gray-600 mt-1">Manage your API credentials</p>
-                </Link>
-                <Link
-                  href="/dashboard/settings"
-                  className="border border-gray-200 rounded p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <p className="text-xs font-medium text-gray-900">Webhooks</p>
-                  <p className="text-xs text-gray-600 mt-1">Configure webhook endpoints</p>
-                </Link>
+            <div className="col-md-6 col-lg-3">
+              <div className="card">
+                <div className="card-body">
+                  <h6 className="card-subtitle mb-2 text-muted">Successful payments</h6>
+                  <h3 className="card-title">142</h3>
+                  <p className="card-text text-success small">↑ 18.2% vs previous period</p>
+                </div>
               </div>
             </div>
-
-            <div className="border border-gray-200 rounded p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xs font-semibold text-gray-900">Recent Transactions</h2>
-                <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">
-                  View all →
-                </Link>
+            <div className="col-md-6 col-lg-3">
+              <div className="card">
+                <div className="card-body">
+                  <h6 className="card-subtitle mb-2 text-muted">Pending payments</h6>
+                  <h3 className="card-title">5</h3>
+                  <p className="card-text text-danger small">↓ 50% vs previous period</p>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+            </div>
+            <div className="col-md-6 col-lg-3">
+              <div className="card">
+                <div className="card-body">
+                  <h6 className="card-subtitle mb-2 text-muted">Failed payments</h6>
+                  <h3 className="card-title">2</h3>
+                  <p className="card-text text-success small">↓ 3.1% vs previous period</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="row g-4 mb-4">
+            <div className="col-lg-8">
+              <div className="card">
+                <div className="card-header">
+                  <h5 className="card-title mb-0">Revenue Overview</h5>
+                </div>
+                <div className="card-body">
+                  <canvas id="revenueChart" height="300"></canvas>
+                </div>
+              </div>
+            </div>
+            <div className="col-lg-4">
+              <div className="card">
+                <div className="card-header">
+                  <h5 className="card-title mb-0">Payment Methods</h5>
+                </div>
+                <div className="card-body">
+                  <canvas id="paymentMethodChart" height="300"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card mb-4">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h5 className="card-title mb-0">Quick Actions</h5>
+            </div>
+            <div className="card-body">
+              <div className="row g-3">
+                <div className="col-md-4">
+                  <Link
+                    href="/dashboard/transactions"
+                    className="card text-decoration-none text-dark h-100"
+                  >
+                    <div className="card-body">
+                      <i className="bi bi-credit-card fs-2 text-primary mb-2"></i>
+                      <h6 className="card-title">View Transactions</h6>
+                      <p className="card-text small text-muted">Browse all payment transactions</p>
+                    </div>
+                  </Link>
+                </div>
+                <div className="col-md-4">
+                  <Link
+                    href="/dashboard/settings"
+                    className="card text-decoration-none text-dark h-100"
+                  >
+                    <div className="card-body">
+                      <i className="bi bi-key fs-2 text-primary mb-2"></i>
+                      <h6 className="card-title">API Keys</h6>
+                      <p className="card-text small text-muted">Manage your API credentials</p>
+                    </div>
+                  </Link>
+                </div>
+                <div className="col-md-4">
+                  <Link
+                    href="/dashboard/settings"
+                    className="card text-decoration-none text-dark h-100"
+                  >
+                    <div className="card-body">
+                      <i className="bi bi-gear fs-2 text-primary mb-2"></i>
+                      <h6 className="card-title">Webhooks</h6>
+                      <p className="card-text small text-muted">Configure webhook endpoints</p>
+                    </div>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h5 className="card-title mb-0">Recent Transactions</h5>
+              <Link href="/dashboard/transactions" className="btn btn-sm btn-outline-primary">
+                View all
+              </Link>
+            </div>
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table table-hover">
                   <thead>
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th>Reference</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody>
                     <tr>
-                      <td className="px-4 py-3 text-xs text-gray-900">INV-1042</td>
-                      <td className="px-4 py-3 text-xs text-gray-900">$10.00</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-green-700">Succeeded</span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">2 min ago</td>
+                      <td>INV-1042</td>
+                      <td>$10.00</td>
+                      <td><span className="badge bg-success">Succeeded</span></td>
+                      <td>2 min ago</td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-3 text-xs text-gray-900">INV-1041</td>
-                      <td className="px-4 py-3 text-xs text-gray-900">$25.00</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-green-700">Succeeded</span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">5 min ago</td>
+                      <td>INV-1041</td>
+                      <td>$25.00</td>
+                      <td><span className="badge bg-success">Succeeded</span></td>
+                      <td>5 min ago</td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-3 text-xs text-gray-900">INV-1040</td>
-                      <td className="px-4 py-3 text-xs text-gray-900">$20.00</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-yellow-700">Pending</span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">12 min ago</td>
+                      <td>INV-1040</td>
+                      <td>$20.00</td>
+                      <td><span className="badge bg-warning text-dark">Pending</span></td>
+                      <td>12 min ago</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
-          </>
-        )}
-      </main>
-    </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }
