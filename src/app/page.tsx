@@ -6,27 +6,20 @@ export default function Home() {
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14">
-            <div className="flex items-center">
-              <span className="text-sm font-semibold text-gray-900">ZeePay</span>
-              <span className="text-xs text-gray-500 ml-4 border-l border-gray-200 pl-4">
-                Payments without the pain
-              </span>
+            <div className="flex items-center gap-8">
+              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
+              <div className="flex gap-6">
+                <Link href="/" className="text-xs text-gray-600 hover:text-gray-900">Home</Link>
+                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Product</Link>
+                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Developers</Link>
+                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Pricing</Link>
+                <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Company</Link>
+              </div>
             </div>
-            <div className="flex items-center gap-6">
-              <Link href="/docs" className="text-xs text-gray-600 hover:text-gray-900">
-                Documentation
-              </Link>
-              <Link href="/pricing" className="text-xs text-gray-600 hover:text-gray-900">
-                Pricing
-              </Link>
-              <Link href="/auth/login" className="text-xs text-gray-600 hover:text-gray-900">
-                Sign in
-              </Link>
-              <Link
-                href="/auth/register"
-                className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800"
-              >
-                Start free
+            <div className="flex items-center gap-4">
+              <Link href="/auth/login" className="text-xs text-gray-600 hover:text-gray-900">Sign in</Link>
+              <Link href="/auth/register" className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800">
+                Get started
               </Link>
             </div>
           </div>
@@ -108,58 +101,58 @@ export default function Home() {
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Everything you need to get paid</h2>
               <p className="text-sm text-gray-600">One developer-friendly platform from checkout to reconciliation</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              <div>
-                <div className="text-2xl mb-2">⌘</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+                <div className="text-3xl mb-3">⌘</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Simple integration</h3>
                 <p className="text-xs text-gray-600">
                   A clear API, SDK examples, and a test environment built for developers.
                 </p>
               </div>
-              <div>
-                <div className="text-2xl mb-2">↗</div>
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+                <div className="text-3xl mb-3">↗</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Hosted checkout</h3>
                 <p className="text-xs text-gray-600">
                   Let ZeePay handle PCI compliance while you maintain your brand experience.
                 </p>
               </div>
-              <div>
-                <div className="text-2xl mb-2">⌁</div>
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+                <div className="text-3xl mb-3">⌁</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Webhooks & events</h3>
                 <p className="text-xs text-gray-600">
                   Real-time notifications with automatic retries and signature verification.
                 </p>
               </div>
-              <div>
-                <div className="text-2xl mb-2">⇄</div>
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+                <div className="text-3xl mb-3">⇄</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Reconciliation</h3>
                 <p className="text-xs text-gray-600">
                   Match provider settlements against your records automatically.
                 </p>
               </div>
-              <div>
-                <div className="text-2xl mb-2">◈</div>
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+                <div className="text-3xl mb-3">◈</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Multiple methods</h3>
                 <p className="text-xs text-gray-600">
                   Mobile money, cards, wallets, and bank transfers through one API.
                 </p>
               </div>
-              <div>
-                <div className="text-2xl mb-2">↩</div>
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+                <div className="text-3xl mb-3">↩</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Refunds & disputes</h3>
                 <p className="text-xs text-gray-600">
                   Process refunds and manage chargebacks with clear audit trails.
                 </p>
               </div>
-              <div>
-                <div className="text-2xl mb-2">♙</div>
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+                <div className="text-3xl mb-3">♙</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Customer management</h3>
                 <p className="text-xs text-gray-600">
                   Track payment history and build customer profiles across transactions.
                 </p>
               </div>
-              <div>
-                <div className="text-2xl mb-2">⚑</div>
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+                <div className="text-3xl mb-3">⚑</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Risk monitoring</h3>
                 <p className="text-xs text-gray-600">
                   Built-in fraud detection and configurable risk rules for your business.

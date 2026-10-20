@@ -51,8 +51,8 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <nav className="border-b border-gray-200">
+    <div>
+      <nav className="border-b border-gray-200" style={{display: 'none'}}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14">
             <div className="flex items-center gap-8">
@@ -76,7 +76,7 @@ export default function CustomersPage() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main>
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-sm font-semibold text-gray-900">Customers</h1>

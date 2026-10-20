@@ -25,17 +25,19 @@ export default function DashboardPage() {
   const [user, setUser] = useState<{ name: string; email: string; business: string } | null>(null);
 
   useEffect(() => {
-    const authed = localStorage.getItem('zeepay_authed');
-    if (!authed) {
-      router.push('/auth/login');
-      return;
+    if (typeof window !== 'undefined') {
+      const authed = localStorage.getItem('zeepay_authed');
+      if (!authed) {
+        router.push('/auth/login');
+        return;
+      }
+
+      const userData = localStorage.getItem('zeepay_user');
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
     }
-    
-    const userData = localStorage.getItem('zeepay_user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
-    
+
     fetchDashboardStats();
   }, [router]);
 
@@ -56,46 +58,16 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('zeepay_authed');
-    localStorage.removeItem('zeepay_user');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('zeepay_authed');
+      localStorage.removeItem('zeepay_user');
+    }
     router.push('/');
   };
 
-  const StatCard = ({ title, value, subtitle }: { title: string; value: string | number; subtitle?: string }) => (
-    <div className="border border-gray-200 rounded p-4">
-      <p className="text-xs text-gray-600">{title}</p>
-      <p className="text-lg font-semibold text-gray-900 mt-1">{value}</p>
-      {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-white">
-      <nav className="border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-14">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
-                <Link href="/dashboard" className="text-xs text-gray-900">Overview</Link>
-                <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
-                <Link href="/dashboard/customers" className="text-xs text-gray-600 hover:text-gray-900">Customers</Link>
-                <Link href="/dashboard/methods" className="text-xs text-gray-600 hover:text-gray-900">Methods</Link>
-                <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
-                <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">{user?.email || 'merchant@example.com'}</span>
-              <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
-                Sign out
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div>
+      <main>
         {loading ? (
           <div className="text-center py-12">
             <p className="text-xs text-gray-600">Loading...</p>
@@ -108,26 +80,26 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <StatCard
-                title="Total volume"
-                value="$12,480"
-                subtitle="↑ 12.4% vs previous period"
-              />
-              <StatCard
-                title="Successful payments"
-                value="142"
-                subtitle="↑ 18.2% vs previous period"
-              />
-              <StatCard
-                title="Pending payments"
-                value="5"
-                subtitle="↓ 50% vs previous period"
-              />
-              <StatCard
-                title="Failed payments"
-                value="2"
-                subtitle="↓ 3.1% vs previous period"
-              />
+              <div className="border border-gray-200 rounded p-4">
+                <p className="text-xs text-gray-600">Total volume</p>
+                <p className="text-lg font-semibold text-gray-900 mt-1">$12,480</p>
+                <p className="text-xs text-gray-500 mt-1">↑ 12.4% vs previous period</p>
+              </div>
+              <div className="border border-gray-200 rounded p-4">
+                <p className="text-xs text-gray-600">Successful payments</p>
+                <p className="text-lg font-semibold text-gray-900 mt-1">142</p>
+                <p className="text-xs text-gray-500 mt-1">↑ 18.2% vs previous period</p>
+              </div>
+              <div className="border border-gray-200 rounded p-4">
+                <p className="text-xs text-gray-600">Pending payments</p>
+                <p className="text-lg font-semibold text-gray-900 mt-1">5</p>
+                <p className="text-xs text-gray-500 mt-1">↓ 50% vs previous period</p>
+              </div>
+              <div className="border border-gray-200 rounded p-4">
+                <p className="text-xs text-gray-600">Failed payments</p>
+                <p className="text-lg font-semibold text-gray-900 mt-1">2</p>
+                <p className="text-xs text-gray-500 mt-1">↓ 3.1% vs previous period</p>
+              </div>
             </div>
 
             <div className="border border-gray-200 rounded p-6 mb-8">

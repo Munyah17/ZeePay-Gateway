@@ -87,30 +87,8 @@ export default function SimulatorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <nav className="border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-14">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
-                <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
-                <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
-                <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
-                <Link href="/dashboard/simulator" className="text-xs text-gray-900">Simulator</Link>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">merchant@example.com</span>
-              <Link href="/auth/logout" className="text-xs text-gray-600 hover:text-gray-900">
-                Sign out
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div>
+      <main>
         <div className="mb-8">
           <h1 className="text-sm font-semibold text-gray-900">Payment Simulator</h1>
           <p className="text-xs text-gray-600 mt-1">Test payment scenarios in test mode</p>
