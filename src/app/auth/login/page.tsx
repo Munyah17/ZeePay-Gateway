@@ -1,6 +1,31 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('john@acmesolutions.co.zw');
+  const [password, setPassword] = useState('DemoPass123!');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    // Simulate authentication - in production this would call an API
+    setTimeout(() => {
+      localStorage.setItem('zeepay_user', JSON.stringify({
+        name: 'John Doe',
+        email: email,
+        business: 'Acme Solutions'
+      }));
+      localStorage.setItem('zeepay_authed', 'true');
+      router.push('/dashboard');
+    }, 500);
+  };
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <nav className="border-b border-gray-200">
@@ -21,14 +46,14 @@ export default function LoginPage() {
       <main className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-xl font-semibold text-gray-900">Sign in to your account</h1>
-            <p className="text-xs text-gray-600 mt-2">Enter your email and password to access your dashboard</p>
+            <h1 className="text-xl font-semibold text-gray-900">Welcome back</h1>
+            <p className="text-xs text-gray-600 mt-2">Log in to your ZeePay dashboard</p>
           </div>
 
-          <form className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-xs font-medium text-gray-700 mb-1">
-                Email
+                Email address
               </label>
               <input
                 id="email"
@@ -36,6 +61,8 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:border-gray-500"
                 placeholder="you@example.com"
               />
@@ -51,6 +78,8 @@ export default function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:border-gray-500"
                 placeholder="••••••••"
               />
@@ -75,9 +104,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full bg-black text-white py-2 rounded text-xs hover:bg-gray-800"
+              disabled={loading}
+              className="w-full bg-black text-white py-2 rounded text-xs hover:bg-gray-800 disabled:bg-gray-300"
             >
-              Sign in
+              {loading ? 'Signing in...' : 'Log in'}
             </button>
           </form>
 
@@ -87,6 +117,9 @@ export default function LoginPage() {
               <Link href="/auth/register" className="text-gray-900 hover:underline">
                 Sign up
               </Link>
+            </p>
+            <p className="text-xs text-gray-500 mt-4">
+              Prototype only · No real authentication is performed
             </p>
           </div>
         </div>

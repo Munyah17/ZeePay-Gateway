@@ -8,6 +8,9 @@ export default function Home() {
           <div className="flex justify-between h-14">
             <div className="flex items-center">
               <span className="text-sm font-semibold text-gray-900">ZeePay</span>
+              <span className="text-xs text-gray-500 ml-4 border-l border-gray-200 pl-4">
+                Payments without the pain
+              </span>
             </div>
             <div className="flex items-center gap-6">
               <Link href="/docs" className="text-xs text-gray-600 hover:text-gray-900">
@@ -33,27 +36,67 @@ export default function Home() {
       <main>
         <section className="py-20 border-b border-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="max-w-3xl">
-              <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">
-                Payments infrastructure for Zimbabwe
-              </h1>
-              <p className="mt-4 text-base text-gray-600">
-                Accept payments from EcoCash, InnBucks, Omari, Visa, and Mastercard through a single API.
-                Built for developers who want to focus on their product, not payment complexity.
-              </p>
-              <div className="mt-8 flex gap-3">
-                <Link
-                  href="/auth/register"
-                  className="text-xs bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
-                >
-                  Start building
-                </Link>
-                <Link
-                  href="/docs"
-                  className="text-xs border border-gray-300 px-4 py-2 rounded hover:bg-gray-50"
-                >
-                  Read the docs
-                </Link>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div>
+                <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded inline-block mb-4">
+                  BUILT FOR DEVELOPERS IN ZIMBABWE
+                </span>
+                <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl mb-4">
+                  One API.<br />
+                  <span className="text-gray-600">Every way to pay.</span>
+                </h1>
+                <p className="text-base text-gray-600 mb-8">
+                  Accept payments from Zimbabwe and around the world with a single integration. Less payment plumbing, 
+                  clearer transactions, and a checkout your customers can understand.
+                </p>
+                <div className="flex gap-3 mb-8">
+                  <Link
+                    href="/auth/register"
+                    className="text-xs bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+                  >
+                    Get started free →
+                  </Link>
+                  <Link
+                    href="/docs"
+                    className="text-xs border border-gray-300 px-4 py-2 rounded hover:bg-gray-50"
+                  >
+                    View documentation
+                  </Link>
+                </div>
+                <div className="flex gap-8">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">15+</p>
+                    <p className="text-xs text-gray-500">Planned methods</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">One API</p>
+                    <p className="text-xs text-gray-500">Unified integration</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">24/7</p>
+                    <p className="text-xs text-gray-500">Self-service tools</p>
+                  </div>
+                </div>
+              </div>
+              <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-semibold text-gray-900">ZeePay checkout</span>
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Secure demo</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">PAYMENT SUMMARY</p>
+                <p className="text-2xl font-semibold text-gray-900 mb-1">$10.00</p>
+                <p className="text-xs text-gray-500 mb-4">Invoice #INV-1042 · Acme Solutions</p>
+                <div className="space-y-3 mb-4">
+                  {['Visa & Mastercard', 'EcoCash', 'InnBucks', 'Omari'].map((method, i) => (
+                    <div key={method} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-700">{method}</span>
+                      <span className={i === 0 ? 'text-blue-600' : 'text-gray-300'}>
+                        {i === 0 ? '●' : '○'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 text-center">🔒 Secure checkout · Demo interface</p>
               </div>
             </div>
           </div>
@@ -61,29 +104,65 @@ export default function Home() {
 
         <section className="py-16 border-b border-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Everything you need to get paid</h2>
+              <p className="text-sm text-gray-600">One developer-friendly platform from checkout to reconciliation</p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Unified API</h3>
+                <div className="text-2xl mb-2">⌘</div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Simple integration</h3>
                 <p className="text-xs text-gray-600">
-                  One integration for all payment providers. Switch providers without changing your code.
+                  A clear API, SDK examples, and a test environment built for developers.
                 </p>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Instant payouts</h3>
+                <div className="text-2xl mb-2">↗</div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Hosted checkout</h3>
                 <p className="text-xs text-gray-600">
-                  Get your money faster with automated settlement to your bank account.
+                  Let ZeePay handle PCI compliance while you maintain your brand experience.
                 </p>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Webhooks</h3>
+                <div className="text-2xl mb-2">⌁</div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Webhooks & events</h3>
                 <p className="text-xs text-gray-600">
-                  Real-time notifications for payment events. Build automated workflows.
+                  Real-time notifications with automatic retries and signature verification.
                 </p>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Developer-first</h3>
+                <div className="text-2xl mb-2">⇄</div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Reconciliation</h3>
                 <p className="text-xs text-gray-600">
-                  Comprehensive SDKs, detailed documentation, and responsive support.
+                  Match provider settlements against your records automatically.
+                </p>
+              </div>
+              <div>
+                <div className="text-2xl mb-2">◈</div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Multiple methods</h3>
+                <p className="text-xs text-gray-600">
+                  Mobile money, cards, wallets, and bank transfers through one API.
+                </p>
+              </div>
+              <div>
+                <div className="text-2xl mb-2">↩</div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Refunds & disputes</h3>
+                <p className="text-xs text-gray-600">
+                  Process refunds and manage chargebacks with clear audit trails.
+                </p>
+              </div>
+              <div>
+                <div className="text-2xl mb-2">♙</div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Customer management</h3>
+                <p className="text-xs text-gray-600">
+                  Track payment history and build customer profiles across transactions.
+                </p>
+              </div>
+              <div>
+                <div className="text-2xl mb-2">⚑</div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Risk monitoring</h3>
+                <p className="text-xs text-gray-600">
+                  Built-in fraud detection and configurable risk rules for your business.
                 </p>
               </div>
             </div>
@@ -112,53 +191,69 @@ export default function Home() {
 
         <section className="py-16 border-b border-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="text-center mb-12">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Accept your first payment</h2>
+              <p className="text-sm text-gray-600">Use the ZeePay SDK to create a checkout session on your server</p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Simple integration</h2>
-                <p className="text-sm text-gray-600 mb-6">
-                  Get started in minutes with our REST API. Create payments, handle webhooks, and manage refunds with a few lines of code.
-                </p>
-                <div className="bg-gray-900 rounded p-4 overflow-x-auto">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">1. Install the SDK</h3>
+                <div className="bg-gray-900 rounded p-4 overflow-x-auto mb-6">
+                  <pre className="text-xs text-gray-300">npm install zeepay</pre>
+                </div>
+                
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">2. Create a payment on your server</h3>
+                <div className="bg-gray-900 rounded p-4 overflow-x-auto mb-6">
                   <pre className="text-xs text-gray-300">
-{`const response = await fetch('https://api.zeepay.co/v1/payments', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer sk_live_xxx',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    amount: 100.00,
-    currency: 'USD',
-    paymentMethod: 'ecocash',
-    customerPhone: '+263712345678'
-  })
+{`import ZeePay from "zeepay";
+
+const zee = new ZeePay(
+  process.env.ZEEPAY_SECRET_KEY
+);
+
+const payment = await zee.payments.create({
+  amount: 10,
+  currency: "USD",
+  reference: "invoice_1042"
+});
+
+return Response.json({ 
+  checkoutUrl: payment.checkoutUrl 
 });`}
                   </pre>
                 </div>
+
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">3. Redirect the customer</h3>
+                <div className="bg-gray-900 rounded p-4 overflow-x-auto">
+                  <pre className="text-xs text-gray-300">window.location.href = payment.checkoutUrl;</pre>
+                </div>
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Real-time dashboard</h2>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Developer quickstart</h3>
                 <p className="text-sm text-gray-600 mb-6">
-                  Monitor your payments, view analytics, and manage your business from a single dashboard.
+                  Get started with our test environment. No real payments are processed in sandbox mode.
                 </p>
-                <ul className="space-y-2">
-                  <li className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                    Payment analytics and reporting
-                  </li>
-                  <li className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                    Real-time transaction monitoring
-                  </li>
-                  <li className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                    Merchant and customer management
-                  </li>
-                  <li className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                    Webhook configuration and testing
-                  </li>
-                </ul>
+                <div className="space-y-4">
+                  <div className="border border-gray-200 rounded p-4">
+                    <h4 className="text-xs font-semibold text-gray-900 mb-2">Test API keys</h4>
+                    <p className="text-xs text-gray-600 mb-2">Use test keys for sandbox transactions</p>
+                    <code className="text-xs bg-gray-100 px-2 py-1 rounded">zp_test_sk_demo_8d71</code>
+                  </div>
+                  <div className="border border-gray-200 rounded p-4">
+                    <h4 className="text-xs font-semibold text-gray-900 mb-2">Webhook testing</h4>
+                    <p className="text-xs text-gray-600 mb-2">Simulate payment events to test your handlers</p>
+                    <Link href="/dashboard/simulator" className="text-xs text-blue-600 hover:text-blue-700">
+                      Open simulator →
+                    </Link>
+                  </div>
+                  <div className="border border-gray-200 rounded p-4">
+                    <h4 className="text-xs font-semibold text-gray-900 mb-2">Full documentation</h4>
+                    <p className="text-xs text-gray-600 mb-2">Complete API reference and guides</p>
+                    <Link href="/docs" className="text-xs text-blue-600 hover:text-blue-700">
+                      View docs →
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -166,46 +261,55 @@ export default function Home() {
 
         <section className="py-16 border-b border-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-8">Pricing</h2>
+            <div className="text-center mb-12">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Simple, transparent pricing</h2>
+              <p className="text-sm text-gray-600">Pay only for what you use. No monthly fees, no hidden costs</p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="border border-gray-200 rounded p-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Starter</h3>
-                <p className="text-2xl font-semibold text-gray-900 mb-4">1.5% <span className="text-xs text-gray-500">per transaction</span></p>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Mobile Money</h3>
+                <p className="text-2xl font-semibold text-gray-900 mb-1">1.5%</p>
+                <p className="text-xs text-gray-500 mb-4">per transaction</p>
                 <ul className="space-y-2 mb-6">
-                  <li className="text-xs text-gray-600">Up to $10,000/month</li>
-                  <li className="text-xs text-gray-600">Basic dashboard</li>
-                  <li className="text-xs text-gray-600">Email support</li>
+                  <li className="text-xs text-gray-600">EcoCash</li>
+                  <li className="text-xs text-gray-600">InnBucks</li>
+                  <li className="text-xs text-gray-600">Omari</li>
+                  <li className="text-xs text-gray-600">Instant settlement</li>
                 </ul>
-                <Link href="/auth/register" className="block text-xs text-center border border-gray-300 py-2 rounded hover:bg-gray-50">
-                  Get started
-                </Link>
+                <p className="text-xs text-gray-500 mb-4">+$0.10 flat fee per transaction</p>
               </div>
               <div className="border-2 border-black rounded p-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Growth</h3>
-                <p className="text-2xl font-semibold text-gray-900 mb-4">1.2% <span className="text-xs text-gray-500">per transaction</span></p>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900">Cards</h3>
+                  <span className="text-xs bg-black text-white px-2 py-1 rounded">POPULAR</span>
+                </div>
+                <p className="text-2xl font-semibold text-gray-900 mb-1">2.0%</p>
+                <p className="text-xs text-gray-500 mb-4">per transaction</p>
                 <ul className="space-y-2 mb-6">
-                  <li className="text-xs text-gray-600">Up to $100,000/month</li>
-                  <li className="text-xs text-gray-600">Advanced analytics</li>
-                  <li className="text-xs text-gray-600">Priority support</li>
-                  <li className="text-xs text-gray-600">Custom branding</li>
+                  <li className="text-xs text-gray-600">Visa</li>
+                  <li className="text-xs text-gray-600">Mastercard</li>
+                  <li className="text-xs text-gray-600">American Express</li>
+                  <li className="text-xs text-gray-600">International cards</li>
                 </ul>
-                <Link href="/auth/register" className="block text-xs text-center bg-black text-white py-2 rounded hover:bg-gray-800">
-                  Get started
-                </Link>
+                <p className="text-xs text-gray-500 mb-4">+$0.30 flat fee per transaction</p>
               </div>
               <div className="border border-gray-200 rounded p-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Enterprise</h3>
-                <p className="text-2xl font-semibold text-gray-900 mb-4">Custom</p>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Bank Transfer</h3>
+                <p className="text-2xl font-semibold text-gray-900 mb-1">0.8%</p>
+                <p className="text-xs text-gray-500 mb-4">per transaction</p>
                 <ul className="space-y-2 mb-6">
-                  <li className="text-xs text-gray-600">Unlimited volume</li>
-                  <li className="text-xs text-gray-600">Dedicated support</li>
-                  <li className="text-xs text-gray-600">SLA guarantee</li>
-                  <li className="text-xs text-gray-600">Custom integrations</li>
+                  <li className="text-xs text-gray-600">Zimbabwean banks</li>
+                  <li className="text-xs text-gray-600">Same-day settlement</li>
+                  <li className="text-xs text-gray-600">Bulk payments</li>
+                  <li className="text-xs text-gray-600">Recurring payments</li>
                 </ul>
-                <Link href="/contact" className="block text-xs text-center border border-gray-300 py-2 rounded hover:bg-gray-50">
-                  Contact sales
-                </Link>
+                <p className="text-xs text-gray-500 mb-4">+$0.05 flat fee per transaction</p>
               </div>
+            </div>
+            <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded">
+              <p className="text-xs text-green-800">
+                <strong>Better than Paynow:</strong> Lower transaction fees, faster settlement times, and a modern API for seamless integration. No monthly subscription fees — you only pay when you get paid.
+              </p>
             </div>
           </div>
         </section>

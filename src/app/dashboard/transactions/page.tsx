@@ -68,6 +68,9 @@ export default function TransactionsPage() {
               <div className="flex gap-6">
                 <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-900">Overview</Link>
                 <Link href="/dashboard/transactions" className="text-xs text-gray-900">Transactions</Link>
+                <Link href="/dashboard/customers" className="text-xs text-gray-600 hover:text-gray-900">Customers</Link>
+                <Link href="/dashboard/methods" className="text-xs text-gray-600 hover:text-gray-900">Methods</Link>
+                <Link href="/dashboard/refunds" className="text-xs text-gray-600 hover:text-gray-900">Refunds</Link>
                 <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
                 <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
               </div>

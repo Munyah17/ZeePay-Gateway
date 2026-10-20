@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface DashboardStats {
   totalPayments: number;
@@ -12,6 +13,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>({
     totalPayments: 0,
     successfulPayments: 0,
@@ -20,10 +22,22 @@ export default function DashboardPage() {
     totalAmount: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<{ name: string; email: string; business: string } | null>(null);
 
   useEffect(() => {
+    const authed = localStorage.getItem('zeepay_authed');
+    if (!authed) {
+      router.push('/auth/login');
+      return;
+    }
+    
+    const userData = localStorage.getItem('zeepay_user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+    
     fetchDashboardStats();
-  }, []);
+  }, [router]);
 
   const fetchDashboardStats = async () => {
     try {
@@ -39,6 +53,12 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('zeepay_authed');
+    localStorage.removeItem('zeepay_user');
+    router.push('/');
   };
 
   const StatCard = ({ title, value, subtitle }: { title: string; value: string | number; subtitle?: string }) => (
@@ -59,15 +79,17 @@ export default function DashboardPage() {
               <div className="flex gap-6">
                 <Link href="/dashboard" className="text-xs text-gray-900">Overview</Link>
                 <Link href="/dashboard/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
+                <Link href="/dashboard/customers" className="text-xs text-gray-600 hover:text-gray-900">Customers</Link>
+                <Link href="/dashboard/methods" className="text-xs text-gray-600 hover:text-gray-900">Methods</Link>
                 <Link href="/dashboard/settings" className="text-xs text-gray-600 hover:text-gray-900">Settings</Link>
                 <Link href="/dashboard/simulator" className="text-xs text-gray-600 hover:text-gray-900">Simulator</Link>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">merchant@example.com</span>
-              <Link href="/auth/logout" className="text-xs text-gray-600 hover:text-gray-900">
+              <span className="text-xs text-gray-600">{user?.email || 'merchant@example.com'}</span>
+              <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
                 Sign out
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -81,30 +103,30 @@ export default function DashboardPage() {
         ) : (
           <>
             <div className="mb-8">
-              <h1 className="text-sm font-semibold text-gray-900">Overview</h1>
-              <p className="text-xs text-gray-600 mt-1">Payment activity and metrics</p>
+              <h1 className="text-sm font-semibold text-gray-900">Good afternoon, {user?.name?.split(' ')[0] || 'John'} 👋</h1>
+              <p className="text-xs text-gray-600 mt-1">Here's what's happening with your payments</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <StatCard
-                title="Total Payments"
-                value={stats.totalPayments}
-                subtitle="All time"
+                title="Total volume"
+                value="$12,480"
+                subtitle="↑ 12.4% vs previous period"
               />
               <StatCard
-                title="Successful"
-                value={stats.successfulPayments}
-                subtitle={`${((stats.successfulPayments / stats.totalPayments) * 100).toFixed(1)}% success`}
+                title="Successful payments"
+                value="142"
+                subtitle="↑ 18.2% vs previous period"
               />
               <StatCard
-                title="Pending"
-                value={stats.pendingPayments}
-                subtitle="Awaiting completion"
+                title="Pending payments"
+                value="5"
+                subtitle="↓ 50% vs previous period"
               />
               <StatCard
-                title="Total Amount"
-                value={`$${stats.totalAmount.toLocaleString()}`}
-                subtitle="USD"
+                title="Failed payments"
+                value="2"
+                subtitle="↓ 3.1% vs previous period"
               />
             </div>
 
@@ -159,23 +181,23 @@ export default function DashboardPage() {
                       <td className="px-4 py-3">
                         <span className="text-xs text-green-700">Succeeded</span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">Oct 19, 2026</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">2 min ago</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 text-xs text-gray-900">INV-1041</td>
                       <td className="px-4 py-3 text-xs text-gray-900">$25.00</td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-yellow-700">Pending</span>
+                        <span className="text-xs text-green-700">Succeeded</span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">Oct 19, 2026</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">5 min ago</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 text-xs text-gray-900">INV-1040</td>
-                      <td className="px-4 py-3 text-xs text-gray-900">$15.00</td>
+                      <td className="px-4 py-3 text-xs text-gray-900">$20.00</td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-green-700">Succeeded</span>
+                        <span className="text-xs text-yellow-700">Pending</span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">Oct 18, 2026</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">12 min ago</td>
                     </tr>
                   </tbody>
                 </table>
