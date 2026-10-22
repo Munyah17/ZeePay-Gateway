@@ -1,0 +1,315 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import StatusBadge from '@/components/StatusBadge';
+
+export default function Bills() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const authed = localStorage.getItem('zeepay_authed');
+      if (!authed) {
+        router.push('/auth/login');
+        return;
+      }
+    }
+    setLoading(false);
+  }, [router]);
+
+  const billCategories = [
+    { id: 'utilities', name: 'Utilities', icon: '⚡', color: 'bg-warning' },
+    { id: 'telecom', name: 'Telecom', icon: '📱', color: 'bg-primary' },
+    { id: 'electricity', name: 'Electricity', icon: '💡', color: 'bg-success' },
+    { id: 'water', name: 'Water', icon: '💧', color: 'bg-info' },
+    { id: 'internet', name: 'Internet', icon: '🌐', color: 'bg-secondary' },
+    { id: 'tv', name: 'TV', icon: '📺', color: 'bg-danger' },
+  ];
+
+  const bills = [
+    {
+      id: 'bill_001',
+      category: 'electricity',
+      provider: 'ZESA',
+      accountNumber: '1234567890',
+      amount: 125.50,
+      currency: 'USD',
+      dueDate: '2024-01-25',
+      status: 'Pending',
+      lastPaid: '2023-12-25',
+      autopay: true,
+    },
+    {
+      id: 'bill_002',
+      category: 'telecom',
+      provider: 'Econet',
+      accountNumber: '+263 71 234 5678',
+      amount: 45.00,
+      currency: 'USD',
+      dueDate: '2024-01-20',
+      status: 'Overdue',
+      lastPaid: '2022-12-20',
+      autopay: false,
+    },
+    {
+      id: 'bill_003',
+      category: 'utilities',
+      provider: 'City of Harare',
+      accountNumber: 'WTR-987654',
+      amount: 35.00,
+      currency: 'USD',
+      dueDate: '2024-01-28',
+      status: 'Pending',
+      lastPaid: '2023-12-28',
+      autopay: true,
+    },
+    {
+      id: 'bill_004',
+      category: 'internet',
+      provider: 'Liquid Telkom',
+      accountNumber: 'NET-456789',
+      amount: 89.99,
+      currency: 'USD',
+      dueDate: '2024-01-30',
+      status: 'Pending',
+      lastPaid: '2023-12-30',
+      autopay: true,
+    },
+    {
+      id: 'bill_005',
+      category: 'tv',
+      provider: 'DStv',
+      accountNumber: 'DSTV-789012',
+      amount: 55.00,
+      currency: 'USD',
+      dueDate: '2024-01-15',
+      status: 'Paid',
+      lastPaid: '2024-01-14',
+      autopay: true,
+    },
+  ];
+
+  const filteredBills = selectedCategory === 'all' 
+    ? bills 
+    : bills.filter(bill => bill.category === selectedCategory);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Paid': return 'bg-success';
+      case 'Pending': return 'bg-warning text-dark';
+      case 'Overdue': return 'bg-danger';
+      default: return 'bg-secondary';
+    }
+  };
+
+  const totalDue = filteredBills
+    .filter(b => b.status === 'Pending' || b.status === 'Overdue')
+    .reduce((sum, b) => sum + b.amount, 0);
+
+  return (
+    <>
+      <div className="mb-4">
+        <h2 className="h4">Pay Bills</h2>
+        <p className="text-muted">Manage and pay your bills securely</p>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <div className="row g-3 mb-4">
+            <div className="col-md-4">
+              <div className="card">
+                <div className="card-body">
+                  <p className="text-muted small mb-1">Total Due</p>
+                  <h3 className="h3 mb-0 text-danger">${totalDue.toFixed(2)}</h3>
+                  <p className="text-muted small mb-0">{filteredBills.filter(b => b.status === 'Pending' || b.status === 'Overdue').length} bills pending</p>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="card">
+                <div className="card-body">
+                  <p className="text-muted small mb-1">Paid This Month</p>
+                  <h3 className="h3 mb-0 text-success">
+                    ${filteredBills.filter(b => b.status === 'Paid' && new Date(b.lastPaid).getMonth() === new Date().getMonth()).reduce((sum, b) => sum + b.amount, 0).toFixed(2)}
+                  </h3>
+                  <p className="text-muted small mb-0">{filteredBills.filter(b => b.status === 'Paid').length} bills paid</p>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="card">
+                <div className="card-body">
+                  <p className="text-muted small mb-1">Autopay Enabled</p>
+                  <h3 className="h3 mb-0 text-primary">{filteredBills.filter(b => b.autopay).length}</h3>
+                  <p className="text-muted small mb-0">bills on autopay</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Category Filter */}
+          <div className="card mb-4">
+            <div className="card-body">
+              <div className="d-flex gap-2 flex-wrap">
+                <button
+                  className={`btn ${selectedCategory === 'all' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => setSelectedCategory('all')}
+                >
+                  All Bills
+                </button>
+                {billCategories.map((category) => (
+                  <button
+                    key={category.id}
+                    className={`btn ${selectedCategory === category.id ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    onClick={() => setSelectedCategory(category.id)}
+                  >
+                    {category.icon} {category.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Bills List */}
+          <div className="card mb-4">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h5 className="card-title mb-0">Your Bills</h5>
+              <button className="btn btn-sm btn-primary">
+                <i className="bi bi-plus-circle me-1"></i>
+                Add Bill
+              </button>
+            </div>
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Provider</th>
+                      <th>Account Number</th>
+                      <th>Amount</th>
+                      <th>Due Date</th>
+                      <th>Status</th>
+                      <th>Autopay</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBills.map((bill) => (
+                      <tr key={bill.id}>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="fs-4">{billCategories.find(c => c.id === bill.category)?.icon}</span>
+                            <div>
+                              <h6 className="mb-0 small fw-medium">{bill.provider}</h6>
+                              <small className="text-muted">{billCategories.find(c => c.id === bill.category)?.name}</small>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="small font-monospace">{bill.accountNumber}</td>
+                        <td className="fw-medium">{bill.currency} {bill.amount.toFixed(2)}</td>
+                        <td className="small">{new Date(bill.dueDate).toLocaleDateString()}</td>
+                        <td>
+                          <span className={`badge ${getStatusColor(bill.status)}`}>{bill.status}</span>
+                        </td>
+                        <td>
+                          {bill.autopay ? (
+                            <span className="badge bg-success">
+                              <i className="bi bi-check-circle me-1"></i>
+                              Enabled
+                            </span>
+                          ) : (
+                            <span className="badge bg-secondary">Disabled</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="btn-group btn-group-sm">
+                            <button className="btn btn-outline-primary" title="Pay Now">
+                              <i className="bi bi-credit-card"></i>
+                            </button>
+                            <button className="btn btn-outline-primary" title="View Details">
+                              <i className="bi bi-eye"></i>
+                            </button>
+                            <button className="btn btn-outline-secondary" title="More">
+                              <i className="bi bi-three-dots"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Pay All Button */}
+          {totalDue > 0 && (
+            <div className="card mb-4 bg-light">
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h6 className="mb-1">Pay All Pending Bills</h6>
+                    <p className="text-muted small mb-0">Total: ${totalDue.toFixed(2)}</p>
+                  </div>
+                  <button className="btn btn-primary">
+                    <i className="bi bi-credit-card me-2"></i>
+                    Pay All
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Links */}
+          <div className="row g-4">
+            <div className="col-md-6">
+              <div className="card h-100">
+                <div className="card-body">
+                  <h6 className="mb-3">Quick Actions</h6>
+                  <div className="d-grid gap-2">
+                    <Link href="/user/send" className="btn btn-outline-primary text-start">
+                      <i className="bi bi-send me-2"></i>
+                      Send Money
+                    </Link>
+                    <Link href="/user/airtime" className="btn btn-outline-primary text-start">
+                      <i className="bi bi-phone me-2"></i>
+                      Buy Airtime
+                    </Link>
+                    <Link href="/user/history" className="btn btn-outline-primary text-start">
+                      <i className="bi bi-clock-history me-2"></i>
+                      Transaction History
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-6">
+              <div className="card h-100">
+                <div className="card-body">
+                  <h6 className="mb-3">Bill Payment Tips</h6>
+                  <ul className="small text-muted mb-0">
+                    <li className="mb-2">Enable autopay to never miss a due date</li>
+                    <li className="mb-2">Set up payment reminders for important bills</li>
+                    <li className="mb-2">Review bills before payment to ensure accuracy</li>
+                    <li>Keep your account information updated</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
