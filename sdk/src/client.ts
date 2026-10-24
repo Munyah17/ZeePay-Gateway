@@ -44,7 +44,7 @@ export class ZeePayClient {
       headers,
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
 
     if (!response.ok) {
       throw new Error(data.error || data.message || 'Request failed');
