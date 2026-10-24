@@ -51,6 +51,9 @@ Payment state transitions are managed by a state machine in `src/lib/services/st
 ### Webhook Delivery
 Webhooks are delivered with retries using exponential backoff. Signatures are verified using HMAC-SHA256. Implementation in `src/lib/webhooks/delivery.ts`.
 
+### Subscriptions / Auto-Deduct
+Recurring billing is implemented via **payment mandates** — standing authorizations the customer approves once, after which ZeePay debits automatically (including mobile money methods with no native recurring support). Service: `src/lib/services/subscription-service.ts`. Provider mandate methods: `createMandate`, `chargeMandate`, `revokeMandate` on the `PaymentProvider` interface. The billing engine runs via `POST /api/v1/subscriptions/process-due` (secured by `CRON_SECRET` env, schedule hourly).
+
 ## Testing
 
 Use the payment simulator at `/dashboard/simulator` to test payment scenarios without processing real money.

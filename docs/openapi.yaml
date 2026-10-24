@@ -45,6 +45,8 @@ tags:
     description: Available payment methods
   - name: Webhooks
     description: Webhook configuration and management
+  - name: Subscriptions
+    description: Recurring billing with auto-deduct
 
 paths:
   /payments:
@@ -396,6 +398,208 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /subscriptions:
+    post:
+      tags: [Subscriptions]
+      summary: Create a subscription
+      description: |
+        Creates a subscription with automatic recurring debits. A payment mandate
+        is created with the provider — for mobile money (EcoCash, InnBucks, Omari)
+        the customer approves the mandate once (PIN/USSD prompt), and for cards
+        the mandate is tokenized during an initial authorization. Once active,
+        ZeePay debits the customer automatically on each billing date —
+        including methods that do not natively support recurring payments.
+      operationId: createSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubscriptionRequest'
+      responses:
+        '201':
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags: [Subscriptions]
+      summary: List subscriptions
+      operationId: listSubscriptions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, past_due, paused, cancelled]
+      responses:
+        '200':
+          description: List of subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionListResponse'
+
+  /subscriptions/{id}:
+    get:
+      tags: [Subscriptions]
+      summary: Get a subscription
+      operationId: getSubscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscription details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Subscriptions]
+      summary: Update a subscription
+      description: Pause, resume, or cancel a subscription.
+      operationId: updateSubscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [pause, resume, cancel]
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Updated subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+    delete:
+      tags: [Subscriptions]
+      summary: Cancel a subscription
+      description: Cancels the subscription and revokes the underlying payment mandate.
+      operationId: cancelSubscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: reason
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cancelled subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+
+  /subscriptions/{id}/approve:
+    post:
+      tags: [Subscriptions]
+      summary: Approve a subscription mandate
+      description: |
+        Marks a pending subscription's mandate as approved. In production this is
+        invoked by the provider callback after the customer completes authorization
+        (PIN prompt, wallet approval, or card 3DS). In sandbox it simulates that step.
+      operationId: approveSubscription
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Activated subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+
+  /subscriptions/process-due:
+    post:
+      tags: [Subscriptions]
+      summary: Run the billing engine
+      description: |
+        Charges all subscriptions whose next billing date has passed. Invoke on a
+        schedule (e.g. hourly cron). Secured by the `CRON_SECRET` bearer token.
+      operationId: processDueSubscriptions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Billing run summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed:
+                    type: integer
+                  succeeded:
+                    type: integer
+                  failed:
+                    type: integer
+                  cancelled:
+                    type: integer
+                  errors:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /webhooks/{id}/deliveries:
     get:
       tags:
@@ -709,6 +913,117 @@ components:
               deliveredAt:
                 type: string
                 format: date-time
+
+    CreateSubscriptionRequest:
+      type: object
+      required: [merchantReference, amount, currency, interval, methodCode]
+      properties:
+        merchantReference:
+          type: string
+          description: Merchant's subscription or plan reference
+        description:
+          type: string
+        amount:
+          type: number
+          description: Amount to debit on each billing date
+        currency:
+          type: string
+          enum: [USD, ZWG, ZAR, ZMW, BWP]
+        interval:
+          type: string
+          enum: [daily, weekly, monthly, yearly]
+        intervalCount:
+          type: integer
+          default: 1
+          description: Bill every N intervals (e.g. 2 = every 2 months)
+        methodCode:
+          type: string
+          description: Payment method for auto-deduct (ecocash, innbucks, omari, visa, mastercard)
+        customerEmail:
+          type: string
+          format: email
+        customerPhone:
+          type: string
+        returnUrl:
+          type: string
+          format: uri
+        cancelUrl:
+          type: string
+          format: uri
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+          description: Optional date when the subscription stops
+        maxRetries:
+          type: integer
+          default: 3
+          description: Failed debit attempts before auto-cancelling
+        metadata:
+          type: object
+        idempotencyKey:
+          type: string
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+        reference:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        interval:
+          type: string
+          enum: [daily, weekly, monthly, yearly]
+        intervalCount:
+          type: integer
+        status:
+          type: string
+          enum: [pending, active, past_due, paused, cancelled]
+        methodCode:
+          type: string
+        customerEmail:
+          type: string
+        customerPhone:
+          type: string
+        nextBillingDate:
+          type: string
+          format: date-time
+        lastBilledAt:
+          type: string
+          format: date-time
+        approvalUrl:
+          type: string
+          description: Where the customer approves the mandate (pending subscriptions)
+        mandateId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SubscriptionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subscription'
+        pagination:
+          type: object
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            count:
+              type: integer
 
     Error:
       type: object

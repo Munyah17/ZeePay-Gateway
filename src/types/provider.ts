@@ -47,6 +47,52 @@ export interface RefundResult {
   providerResponse?: Record<string, any>;
 }
 
+// --- Mandates (recurring debit authorizations) ---
+
+export type MandateStatus = 'pending' | 'active' | 'revoked' | 'failed';
+
+/**
+ * Input for creating a payment mandate — a standing authorization
+ * that allows merchant-initiated debits (auto-deduct).
+ */
+export interface CreateMandateInput {
+  reference: string;
+  amount: number;
+  currency: string;
+  interval: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  returnUrl?: string;
+  cancelUrl?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface MandateResult {
+  id: string;
+  providerReference: string;
+  status: MandateStatus;
+  approvalUrl?: string;
+  metadata?: Record<string, any>;
+  providerResponse?: Record<string, any>;
+}
+
+/**
+ * Input for a merchant-initiated charge against an active mandate.
+ * This is the "auto-deduct" — no customer interaction required.
+ */
+export interface ChargeMandateInput {
+  mandateReference: string;
+  amount: number;
+  currency: string;
+  reference: string;
+  metadata?: Record<string, any>;
+}
+
+export interface RevokeMandateInput {
+  mandateReference: string;
+  reason?: string;
+}
+
 export interface ProviderCredentials {
   [key: string]: string | number | boolean;
 }

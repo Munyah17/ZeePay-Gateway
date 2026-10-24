@@ -5,6 +5,10 @@ import {
   GetPaymentInput,
   RefundPaymentInput,
   RefundResult,
+  CreateMandateInput,
+  MandateResult,
+  ChargeMandateInput,
+  RevokeMandateInput,
   PaymentProviderCapabilities,
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,7 +34,9 @@ export class InnBucksProvider extends BasePaymentProvider {
       getPayment: true,
       refundPayment: true,
       supportsWebhooks: true,
-      supportsRecurring: false,
+      // Recurring is provided via ZeePay mandates (debit-order style
+      // standing authorization) layered on top of InnBucks debits.
+      supportsRecurring: true,
     };
   }
 
@@ -172,6 +178,104 @@ export class InnBucksProvider extends BasePaymentProvider {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Create an InnBucks debit-order mandate.
+   * The customer authorizes future debits once, after which the
+   * merchant can debit without further interaction.
+   */
+  async createMandate(input: CreateMandateInput): Promise<MandateResult> {
+    this.ensureInitialized();
+
+    const phoneNumber = this.validateAndFormatPhoneNumber(input.customerPhone);
+
+    const payload = {
+      merchantId: this.merchantId,
+      amount: input.amount,
+      currency: input.currency || 'USD',
+      reference: input.reference,
+      interval: input.interval,
+      customerPhone: phoneNumber,
+      customerEmail: input.customerEmail,
+      returnUrl: input.returnUrl,
+      cancelUrl: input.cancelUrl,
+      metadata: input.metadata,
+    };
+
+    try {
+      const response = await this.makeRequest('/mandates', 'POST', payload);
+
+      return {
+        id: response.mandateId || uuidv4(),
+        providerReference: response.reference,
+        status: this.mapMandateStatus(response.status),
+        approvalUrl: response.approvalUrl,
+        metadata: input.metadata,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`InnBucks mandate creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Debit an active mandate — merchant-initiated transaction (auto-deduct).
+   */
+  async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
+    this.ensureInitialized();
+
+    const payload = {
+      merchantId: this.merchantId,
+      amount: input.amount,
+      currency: input.currency,
+      reference: input.reference,
+      initiator: 'merchant',
+      metadata: input.metadata,
+    };
+
+    try {
+      const response = await this.makeRequest(`/mandates/${input.mandateReference}/debit`, 'POST', payload);
+
+      return {
+        id: response.transactionId || uuidv4(),
+        providerReference: response.reference,
+        status: this.mapInnBucksStatus(response.status),
+        amount: input.amount,
+        currency: input.currency,
+        metadata: input.metadata,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`InnBucks mandate debit failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async revokeMandate(input: RevokeMandateInput): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      await this.makeRequest(`/mandates/${input.mandateReference}`, 'DELETE', {
+        reason: input.reason,
+      });
+    } catch (error) {
+      throw new Error(`InnBucks mandate revocation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private mapMandateStatus(status: string): 'pending' | 'active' | 'revoked' | 'failed' {
+    const statusMap: Record<string, 'pending' | 'active' | 'revoked' | 'failed'> = {
+      'PENDING': 'pending',
+      'PENDING_APPROVAL': 'pending',
+      'ACTIVE': 'active',
+      'APPROVED': 'active',
+      'REVOKED': 'revoked',
+      'CANCELLED': 'revoked',
+      'FAILED': 'failed',
+      'REJECTED': 'failed',
+    };
+
+    return statusMap[status.toUpperCase()] || 'pending';
   }
 
   /**

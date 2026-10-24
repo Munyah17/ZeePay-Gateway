@@ -5,6 +5,10 @@ import {
   GetPaymentInput,
   RefundPaymentInput,
   RefundResult,
+  CreateMandateInput,
+  MandateResult,
+  ChargeMandateInput,
+  RevokeMandateInput,
   PaymentProviderCapabilities,
   PaymentStatus,
   RefundStatus,
@@ -17,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export class MockProvider extends BasePaymentProvider {
   private payments: Map<string, PaymentResult> = new Map();
+  private mandates: Map<string, MandateResult> = new Map();
 
   constructor() {
     super('mock', 'mock');
@@ -35,6 +40,7 @@ export class MockProvider extends BasePaymentProvider {
   protected onInitialize(): void {
     // Clear payments on re-initialization for test isolation
     this.payments.clear();
+    this.mandates.clear();
   }
 
   async createPayment(input: CreatePaymentInput): Promise<PaymentResult> {
@@ -129,6 +135,76 @@ export class MockProvider extends BasePaymentProvider {
 
   async healthCheck(): Promise<boolean> {
     return true;
+  }
+
+  /**
+   * Create a mandate for recurring debits.
+   * In mock mode, mandates are created in 'active' status immediately
+   * (simulating instant customer approval in test environment).
+   */
+  async createMandate(input: CreateMandateInput): Promise<MandateResult> {
+    this.ensureInitialized();
+
+    const providerReference = `mandate_${uuidv4()}`;
+    const result: MandateResult = {
+      id: uuidv4(),
+      providerReference,
+      status: 'active',
+      metadata: {
+        amount: input.amount,
+        currency: input.currency,
+        interval: input.interval,
+        ...input.metadata,
+      },
+    };
+
+    this.mandates.set(providerReference, result);
+    return result;
+  }
+
+  /**
+   * Charge an active mandate — merchant-initiated auto-deduct.
+   * No customer interaction needed once the mandate is active.
+   */
+  async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
+    this.ensureInitialized();
+
+    const mandate = this.mandates.get(input.mandateReference);
+    if (!mandate) {
+      throw new Error(`Mandate ${input.mandateReference} not found`);
+    }
+    if (mandate.status !== 'active') {
+      throw new Error(`Cannot charge mandate with status ${mandate.status}`);
+    }
+
+    const providerReference = `mock_${uuidv4()}`;
+    const result: PaymentResult = {
+      id: uuidv4(),
+      providerReference,
+      // Mock auto-deduct completes immediately
+      status: 'succeeded',
+      amount: input.amount,
+      currency: input.currency,
+      metadata: {
+        mandateReference: input.mandateReference,
+        ...input.metadata,
+      },
+    };
+
+    this.payments.set(providerReference, result);
+    return result;
+  }
+
+  async revokeMandate(input: RevokeMandateInput): Promise<void> {
+    this.ensureInitialized();
+
+    const mandate = this.mandates.get(input.mandateReference);
+    if (!mandate) {
+      throw new Error(`Mandate ${input.mandateReference} not found`);
+    }
+
+    mandate.status = 'revoked';
+    this.mandates.set(input.mandateReference, mandate);
   }
 
   /**

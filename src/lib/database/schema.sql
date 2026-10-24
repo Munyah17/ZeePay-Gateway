@@ -132,6 +132,67 @@ CREATE TABLE refunds (
   completed_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Payment mandates table (standing authorizations for auto-deduct / recurring debits)
+CREATE TABLE payment_mandates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id),
+  provider_id UUID REFERENCES payment_providers(id),
+  provider_name VARCHAR(50) NOT NULL, -- ecocash, innbucks, visa, etc.
+  provider_reference VARCHAR(255) NOT NULL, -- Mandate/token reference at provider
+  method_code VARCHAR(50) NOT NULL, -- ecocash, innbucks, visa, mastercard
+  customer_email VARCHAR(255),
+  customer_phone VARCHAR(50),
+  amount DECIMAL(12, 2) NOT NULL, -- Max debit amount authorized
+  currency VARCHAR(3) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, active, revoked, failed
+  approval_url VARCHAR(500), -- URL where customer approves the mandate
+  approved_at TIMESTAMP WITH TIME ZONE,
+  revoked_at TIMESTAMP WITH TIME ZONE,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Subscriptions table (recurring billing schedules)
+CREATE TABLE subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id),
+  mandate_id UUID NOT NULL REFERENCES payment_mandates(id),
+  merchant_reference VARCHAR(255) NOT NULL, -- Merchant's subscription/plan reference
+  description VARCHAR(500),
+  amount DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  interval VARCHAR(20) NOT NULL, -- daily, weekly, monthly, yearly
+  interval_count INTEGER NOT NULL DEFAULT 1, -- e.g. every 2 months
+  customer_email VARCHAR(255),
+  customer_phone VARCHAR(50),
+  status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, active, past_due, paused, cancelled
+  next_billing_date TIMESTAMP WITH TIME ZONE, -- When the next auto-deduct runs
+  last_billed_at TIMESTAMP WITH TIME ZONE,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  max_retries INTEGER NOT NULL DEFAULT 3, -- Failures before cancelling
+  start_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  end_date TIMESTAMP WITH TIME ZONE, -- Optional subscription end
+  cancelled_at TIMESTAMP WITH TIME ZONE,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Subscription charges table (links each auto-deduct attempt to a payment)
+CREATE TABLE subscription_charges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+  payment_id UUID REFERENCES payments(id),
+  amount DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, succeeded, failed
+  attempt_number INTEGER NOT NULL DEFAULT 1,
+  error_message TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Webhook endpoints table
 CREATE TABLE webhook_endpoints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -214,6 +275,12 @@ CREATE TABLE audit_logs (
 CREATE INDEX idx_payments_merchant_id ON payments(merchant_id);
 CREATE INDEX idx_payments_status ON payments(status);
 CREATE INDEX idx_payments_merchant_reference ON payments(merchant_reference);
+CREATE INDEX idx_payment_mandates_merchant_id ON payment_mandates(merchant_id);
+CREATE INDEX idx_payment_mandates_status ON payment_mandates(status);
+CREATE INDEX idx_subscriptions_merchant_id ON subscriptions(merchant_id);
+CREATE INDEX idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX idx_subscriptions_next_billing ON subscriptions(next_billing_date) WHERE status = 'active';
+CREATE INDEX idx_subscription_charges_subscription_id ON subscription_charges(subscription_id);
 CREATE INDEX idx_payment_attempts_payment_id ON payment_attempts(payment_id);
 CREATE INDEX idx_payment_attempts_provider_reference ON payment_attempts(provider_reference);
 CREATE INDEX idx_webhook_deliveries_endpoint_id ON webhook_deliveries(webhook_endpoint_id);
@@ -252,6 +319,15 @@ CREATE TRIGGER update_payment_attempts_updated_at BEFORE UPDATE ON payment_attem
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_refunds_updated_at BEFORE UPDATE ON refunds
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_payment_mandates_updated_at BEFORE UPDATE ON payment_mandates
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_subscription_charges_updated_at BEFORE UPDATE ON subscription_charges
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_webhook_endpoints_updated_at BEFORE UPDATE ON webhook_endpoints

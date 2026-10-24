@@ -8,6 +8,10 @@ import {
   CreateWebhookInput,
   ListPaymentsOptions,
   ListPaymentsResponse,
+  CreateSubscriptionInput,
+  Subscription,
+  ListSubscriptionsOptions,
+  ListSubscriptionsResponse,
   ApiResponse,
 } from './types';
 
@@ -179,6 +183,72 @@ export class ZeePayClient {
 
     return this.request<{ data: any[] }>(endpoint);
   }
+
+  /**
+   * Create a subscription with auto-deduct.
+   * For mobile money the customer approves the mandate once;
+   * afterwards ZeePay debits automatically on each billing date.
+   */
+  async createSubscription(input: CreateSubscriptionInput): Promise<Subscription> {
+    return this.request<Subscription>('/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  /**
+   * Get a subscription by ID
+   */
+  async getSubscription(subscriptionId: string): Promise<Subscription> {
+    return this.request<Subscription>(`/subscriptions/${subscriptionId}`);
+  }
+
+  /**
+   * List subscriptions for the merchant
+   */
+  async listSubscriptions(
+    options?: ListSubscriptionsOptions
+  ): Promise<ListSubscriptionsResponse> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.offset) params.append('offset', options.offset.toString());
+    if (options?.status) params.append('status', options.status);
+
+    const queryString = params.toString();
+    const endpoint = `/subscriptions${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<ListSubscriptionsResponse>(endpoint);
+  }
+
+  /**
+   * Pause an active subscription
+   */
+  async pauseSubscription(subscriptionId: string): Promise<Subscription> {
+    return this.request<Subscription>(`/subscriptions/${subscriptionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'pause' }),
+    });
+  }
+
+  /**
+   * Resume a paused subscription
+   */
+  async resumeSubscription(subscriptionId: string): Promise<Subscription> {
+    return this.request<Subscription>(`/subscriptions/${subscriptionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'resume' }),
+    });
+  }
+
+  /**
+   * Cancel a subscription and revoke its mandate
+   */
+  async cancelSubscription(subscriptionId: string, reason?: string): Promise<Subscription> {
+    return this.request<Subscription>(`/subscriptions/${subscriptionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'cancel', reason }),
+    });
+  }
 }
 
 /**
@@ -255,5 +325,36 @@ export class Webhooks {
 
   async getDeliveries(webhookId: string, limit?: number): Promise<{ data: any[] }> {
     return this.client.getWebhookDeliveries(webhookId, limit);
+  }
+}
+
+/**
+ * Subscriptions resource — recurring billing with auto-deduct
+ */
+export class Subscriptions {
+  constructor(private client: ZeePayClient) {}
+
+  async create(input: CreateSubscriptionInput): Promise<Subscription> {
+    return this.client.createSubscription(input);
+  }
+
+  async get(subscriptionId: string): Promise<Subscription> {
+    return this.client.getSubscription(subscriptionId);
+  }
+
+  async list(options?: ListSubscriptionsOptions): Promise<ListSubscriptionsResponse> {
+    return this.client.listSubscriptions(options);
+  }
+
+  async pause(subscriptionId: string): Promise<Subscription> {
+    return this.client.pauseSubscription(subscriptionId);
+  }
+
+  async resume(subscriptionId: string): Promise<Subscription> {
+    return this.client.resumeSubscription(subscriptionId);
+  }
+
+  async cancel(subscriptionId: string, reason?: string): Promise<Subscription> {
+    return this.client.cancelSubscription(subscriptionId, reason);
   }
 }

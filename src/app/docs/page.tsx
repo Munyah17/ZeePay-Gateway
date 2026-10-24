@@ -12,6 +12,11 @@ const endpoints = [
   { method: 'POST', path: '/v1/payment_links', description: 'Create a payment link' },
   { method: 'GET', path: '/v1/settlements', description: 'List settlements' },
   { method: 'POST', path: '/v1/webhooks', description: 'Register a webhook endpoint' },
+  { method: 'POST', path: '/v1/subscriptions', description: 'Create a subscription (auto-deduct)' },
+  { method: 'GET', path: '/v1/subscriptions', description: 'List subscriptions' },
+  { method: 'GET', path: '/v1/subscriptions/:id', description: 'Retrieve a subscription' },
+  { method: 'PATCH', path: '/v1/subscriptions/:id', description: 'Pause, resume, or cancel' },
+  { method: 'POST', path: '/v1/subscriptions/:id/approve', description: 'Approve a mandate (sandbox)' },
 ];
 
 const events = [
@@ -21,6 +26,12 @@ const events = [
   { event: 'refund.succeeded', description: 'Refund completed' },
   { event: 'settlement.paid', description: 'Settlement paid to merchant' },
   { event: 'dispute.created', description: 'A dispute was opened' },
+  { event: 'subscription.created', description: 'Subscription created (mandate pending)' },
+  { event: 'subscription.activated', description: 'Mandate approved, auto-deduct enabled' },
+  { event: 'subscription.charge_succeeded', description: 'Recurring debit succeeded' },
+  { event: 'subscription.charge_failed', description: 'Recurring debit failed (will retry)' },
+  { event: 'subscription.updated', description: 'Subscription paused or resumed' },
+  { event: 'subscription.cancelled', description: 'Subscription ended' },
 ];
 
 export default function DocsPage() {
@@ -47,6 +58,7 @@ export default function DocsPage() {
                 <li className="nav-item"><a href="#quickstart" className="nav-link px-0 text-dark">Quickstart</a></li>
                 <li className="nav-item"><a href="#auth" className="nav-link px-0 text-dark">Authentication</a></li>
                 <li className="nav-item"><a href="#api" className="nav-link px-0 text-dark">API Reference</a></li>
+                <li className="nav-item"><a href="#subscriptions" className="nav-link px-0 text-dark">Subscriptions</a></li>
                 <li className="nav-item"><a href="#webhooks" className="nav-link px-0 text-dark">Webhooks</a></li>
                 <li className="nav-item"><a href="#errors" className="nav-link px-0 text-dark">Errors & Idempotency</a></li>
               </ul>
@@ -118,6 +130,45 @@ const payment = await zee.payments.create({
               <p className="small text-muted mt-2">
                 Full OpenAPI 3.0 specification: <code>docs/openapi.yaml</code>
               </p>
+            </section>
+
+            <section id="subscriptions" className="mb-5">
+              <h2 className="h5 mb-3">Subscriptions & Auto-Deduct</h2>
+              <p className="small">
+                ZeePay subscriptions debit your customers automatically on each billing date —
+                <strong> including EcoCash, InnBucks and Omari wallets that don't natively support
+                recurring payments</strong>. A mandate is created when you create a subscription; the
+                customer approves it once, then ZeePay handles every debit.
+              </p>
+              <ol className="small text-muted">
+                <li className="mb-2">
+                  <strong>Create:</strong> <code>POST /v1/subscriptions</code> with <code>methodCode</code>,
+                  <code>amount</code>, <code>interval</code> and customer details.
+                </li>
+                <li className="mb-2">
+                  <strong>Approve:</strong> the customer authorizes once (wallet PIN / card 3DS) via the
+                  returned <code>approvalUrl</code>. In sandbox, call
+                  <code>POST /v1/subscriptions/:id/approve</code> to simulate it.
+                </li>
+                <li className="mb-2">
+                  <strong>Auto-deduct:</strong> the billing engine debits on each
+                  <code>nextBillingDate</code>. Failed debits retry automatically (subscription becomes
+                  <code>past_due</code>) until <code>maxRetries</code> is exhausted.
+                </li>
+              </ol>
+              <div className="card bg-dark text-light">
+                <div className="card-body">
+                  <pre className="mb-0 small" style={{ color: '#c7d2fe' }}>{`const sub = await zee.subscriptions.create({
+  merchantReference: "plan_premium",
+  amount: 9.99,
+  currency: "USD",
+  interval: "monthly",
+  methodCode: "ecocash",           // auto-deduct EcoCash monthly!
+  customerPhone: "+263771234567"
+});
+// Redirect customer to sub.approvalUrl to authorize the mandate`}</pre>
+                </div>
+              </div>
             </section>
 
             <section id="webhooks" className="mb-5">

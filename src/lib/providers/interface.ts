@@ -4,6 +4,10 @@ import {
   GetPaymentInput,
   RefundPaymentInput,
   RefundResult,
+  CreateMandateInput,
+  MandateResult,
+  ChargeMandateInput,
+  RevokeMandateInput,
   ProviderConfig,
   PaymentProviderCapabilities,
 } from '@/types/provider';
@@ -69,4 +73,23 @@ export interface PaymentProvider {
    * Health check to verify provider is accessible
    */
   healthCheck(): Promise<boolean>;
+
+  /**
+   * Create a payment mandate — a standing authorization allowing
+   * merchant-initiated debits (subscriptions / auto-deduct).
+   * Optional - only providers supporting recurring payments implement this.
+   */
+  createMandate?(input: CreateMandateInput): Promise<MandateResult>;
+
+  /**
+   * Charge an active mandate (merchant-initiated transaction).
+   * Optional - only providers supporting recurring payments implement this.
+   */
+  chargeMandate?(input: ChargeMandateInput): Promise<PaymentResult>;
+
+  /**
+   * Revoke a mandate, cancelling all future auto-deductions.
+   * Optional - only providers supporting recurring payments implement this.
+   */
+  revokeMandate?(input: RevokeMandateInput): Promise<void>;
 }

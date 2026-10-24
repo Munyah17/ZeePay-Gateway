@@ -89,3 +89,67 @@ export interface ListPaymentsResponse {
     count: number;
   };
 }
+
+// --- Subscriptions (auto-deduct) ---
+
+export type BillingInterval = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export type SubscriptionStatus =
+  | 'pending'
+  | 'active'
+  | 'past_due'
+  | 'paused'
+  | 'cancelled';
+
+export interface CreateSubscriptionInput {
+  merchantReference: string;
+  description?: string;
+  amount: number;
+  currency: string;
+  interval: BillingInterval;
+  intervalCount?: number;
+  methodCode: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  returnUrl?: string;
+  cancelUrl?: string;
+  startDate?: string;
+  endDate?: string;
+  maxRetries?: number;
+  metadata?: Record<string, any>;
+  idempotencyKey?: string;
+}
+
+export interface Subscription {
+  id: string;
+  reference: string;
+  description?: string;
+  amount: number;
+  currency: string;
+  interval: BillingInterval;
+  intervalCount: number;
+  status: SubscriptionStatus;
+  methodCode: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  nextBillingDate?: string;
+  lastBilledAt?: string;
+  approvalUrl?: string;
+  mandateId: string;
+  createdAt: string;
+}
+
+export interface ListSubscriptionsOptions {
+  limit?: number;
+  offset?: number;
+  status?: string;
+}
+
+export interface ListSubscriptionsResponse {
+  data: Subscription[];
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
+}

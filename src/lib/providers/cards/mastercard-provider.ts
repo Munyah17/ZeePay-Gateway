@@ -5,6 +5,10 @@ import {
   GetPaymentInput,
   RefundPaymentInput,
   RefundResult,
+  CreateMandateInput,
+  MandateResult,
+  ChargeMandateInput,
+  RevokeMandateInput,
   PaymentProviderCapabilities,
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
@@ -170,6 +174,107 @@ export class MastercardProvider extends BasePaymentProvider {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Create a card mandate — tokenizes the customer's card during an
+   * initial cardholder-present authorization so the merchant can
+   * submit merchant-initiated transactions (MIT) afterwards.
+   */
+  async createMandate(input: CreateMandateInput): Promise<MandateResult> {
+    this.ensureInitialized();
+
+    const payload = {
+      merchantId: this.merchantId,
+      cardType: 'mastercard',
+      amount: input.amount,
+      currency: input.currency || 'USD',
+      reference: input.reference,
+      interval: input.interval,
+      customerEmail: input.customerEmail,
+      customerPhone: input.customerPhone,
+      returnUrl: input.returnUrl,
+      cancelUrl: input.cancelUrl,
+      storedCredential: 'CARDHOLDER_INITIATED',
+      metadata: input.metadata,
+    };
+
+    try {
+      const response = await this.makeRequest('/tokens', 'POST', payload);
+
+      return {
+        id: response.tokenId || uuidv4(),
+        providerReference: response.reference,
+        status: this.mapMandateStatus(response.status),
+        approvalUrl: response.approvalUrl,
+        metadata: input.metadata,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`Mastercard mandate creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Charge a tokenized card mandate — merchant-initiated transaction.
+   */
+  async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
+    this.ensureInitialized();
+
+    const payload = {
+      merchantId: this.merchantId,
+      cardType: 'mastercard',
+      token: input.mandateReference,
+      amount: input.amount,
+      currency: input.currency,
+      reference: input.reference,
+      initiator: 'merchant',
+      recurringType: 'RECURRING',
+      metadata: input.metadata,
+    };
+
+    try {
+      const response = await this.makeRequest('/payments', 'POST', payload);
+
+      return {
+        id: response.transactionId || uuidv4(),
+        providerReference: response.reference,
+        status: this.mapCardStatus(response.status),
+        amount: input.amount,
+        currency: input.currency,
+        metadata: input.metadata,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`Mastercard mandate charge failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async revokeMandate(input: RevokeMandateInput): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      await this.makeRequest(`/tokens/${input.mandateReference}`, 'DELETE', {
+        reason: input.reason,
+      });
+    } catch (error) {
+      throw new Error(`Mastercard mandate revocation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private mapMandateStatus(status: string): 'pending' | 'active' | 'revoked' | 'failed' {
+    const statusMap: Record<string, 'pending' | 'active' | 'revoked' | 'failed'> = {
+      'PENDING': 'pending',
+      'PENDING_APPROVAL': 'pending',
+      'ACTIVE': 'active',
+      'APPROVED': 'active',
+      'REVOKED': 'revoked',
+      'CANCELLED': 'revoked',
+      'FAILED': 'failed',
+      'REJECTED': 'failed',
+    };
+
+    return statusMap[status.toUpperCase()] || 'pending';
   }
 
   /**
