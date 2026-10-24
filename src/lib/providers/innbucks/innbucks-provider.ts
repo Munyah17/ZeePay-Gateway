@@ -15,9 +15,19 @@ import { v4 as uuidv4 } from 'uuid';
 
 /**
  * InnBucks payment provider for Zimbabwe mobile money payments.
- * 
- * InnBucks is a mobile money platform operated by InnBucks (formerly CBZ).
- * This provider handles payment creation, status checking, and refunds through InnBucks's API.
+ *
+ * InnBucks (Simbisa Brands) offers a Merchant API for integrated merchants.
+ * Public API docs are gated — apply at https://www.innbucks.co.zw/index.php/home/merchants
+ * (info@innbucks.co.zw, toll-free 569). The confirmed authorization flow:
+ *   1. Merchant initiates a transaction → API returns an authorizationcode
+ *      and authorizationexpires timestamp.
+ *   2. The customer approves via the InnBucks app — either by entering the
+ *      authorization code or via the deep link
+ *      com.innbucks.customer://purchase?paymentToken=<authorizationcode>
+ *   3. The payment completes once the customer confirms in-app.
+ *
+ * InnBucks migrated to Mambu (API-first core banking) in 2025, so its
+ * merchant API surface is expected to expand.
  */
 export class InnBucksProvider extends BasePaymentProvider {
   private baseUrl!: string;
@@ -75,15 +85,28 @@ export class InnBucksProvider extends BasePaymentProvider {
 
     try {
       const response = await this.makeRequest('/payments', 'POST', payload);
-      
+
+      // InnBucks returns an authorizationcode the customer uses to approve
+      // the payment inside the InnBucks app. The deep link opens the app
+      // directly to the purchase confirmation screen.
+      const authorizationCode = response.authorizationcode || response.authorizationCode;
+      const deepLink = authorizationCode
+        ? `com.innbucks.customer://purchase?paymentToken=${authorizationCode}`
+        : undefined;
+
       return {
         id: response.transactionId || uuidv4(),
         providerReference: response.reference,
         status: this.mapInnBucksStatus(response.status),
-        checkoutUrl: response.checkoutUrl,
+        // Prefer the app deep link over any web checkout URL
+        checkoutUrl: deepLink || response.checkoutUrl,
         amount: input.amount,
         currency: input.currency,
-        metadata: input.metadata,
+        metadata: {
+          ...input.metadata,
+          authorizationcode: authorizationCode,
+          authorizationexpires: response.authorizationexpires || response.authorizationExpires,
+        },
         providerResponse: response,
       };
     } catch (error) {

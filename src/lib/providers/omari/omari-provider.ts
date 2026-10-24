@@ -9,15 +9,22 @@ import {
   MandateResult,
   ChargeMandateInput,
   RevokeMandateInput,
+  PayoutInput,
+  PayoutResult,
+  GetPayoutInput,
   PaymentProviderCapabilities,
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Omari payment provider for Zimbabwe mobile money payments.
- * 
- * Omari is a mobile money platform in Zimbabwe.
- * This provider handles payment creation, status checking, and refunds through Omari's API.
+ *
+ * Omari (Old Mutual Digital Services) offers merchant API integration for
+ * online payments, B2C payouts and change disbursement into customer
+ * wallets. API docs are gated behind business account registration at
+ * https://omari.co.zw/register?form=business (WhatsApp +263774707707).
+ * Merchant onboarding requires company documents (cert. of incorporation,
+ * board resolution, CR6, tax clearance, director IDs).
  */
 export class OmariProvider extends BasePaymentProvider {
   private baseUrl!: string;
@@ -37,6 +44,8 @@ export class OmariProvider extends BasePaymentProvider {
       // Recurring is provided via ZeePay mandates (debit-order style
       // standing authorization) layered on top of Omari debits.
       supportsRecurring: true,
+      // Omari advertises B2C payouts and change disbursement to merchants.
+      createPayout: true,
     };
   }
 
@@ -261,6 +270,105 @@ export class OmariProvider extends BasePaymentProvider {
     } catch (error) {
       throw new Error(`Omari mandate revocation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Disburse funds to a customer wallet — Omari advertises B2C payouts
+   * and change disbursement to merchants (USD and ZWG).
+   */
+  async createPayout(input: PayoutInput): Promise<PayoutResult> {
+    this.ensureInitialized();
+
+    const msisdn = this.normalizeMsisdnEpg(input.recipientMsisdn);
+    const externalReference = input.externalReference || `${Date.now()}${Math.floor(Math.random() * 10000)}`;
+
+    const payload = {
+      merchantCode: this.merchantCode,
+      serviceType: input.serviceType === 'change_disbursement'
+        ? 'CHANGEDISBURSEMENT'
+        : input.serviceType === 'enterprise_cash_in'
+          ? 'BULKDISBURSEMENT'
+          : 'B2CPAYOUT',
+      externalReference,
+      amount: String(input.amount),
+      currency: input.currency,
+      msisdn,
+      beneficiaryReference: input.beneficiaryReference || externalReference,
+      transferReference: input.transferReference || 'ZeePay Payout',
+      merchantName: input.merchantName || this.merchantCode,
+      terminalId: input.terminalId,
+      metadata: input.metadata,
+    };
+
+    try {
+      const response = await this.makeRequest('/disbursements', 'POST', payload);
+
+      return {
+        id: uuidv4(),
+        providerReference: response.transactionId || externalReference,
+        externalReference,
+        status: response.responseCode === '00' ? 'succeeded' : this.mapPayoutStatus(response.status),
+        amount: input.amount,
+        currency: input.currency,
+        recipientMsisdn: msisdn,
+        serviceType: input.serviceType,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`Omari payout failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Look up a payout/transaction by external reference.
+   */
+  async getPayout(input: GetPayoutInput): Promise<PayoutResult> {
+    this.ensureInitialized();
+
+    const msisdn = this.normalizeMsisdnEpg(input.msisdn);
+
+    try {
+      const response = await this.makeRequest(
+        `/disbursements/lookup?externalReference=${encodeURIComponent(input.externalTransactionId)}&msisdn=${encodeURIComponent(msisdn)}`,
+        'GET'
+      );
+
+      return {
+        id: uuidv4(),
+        providerReference: response.transactionId || input.externalTransactionId,
+        externalReference: input.externalTransactionId,
+        status: this.mapPayoutStatus(response.status),
+        amount: response.amount ? parseFloat(response.amount) : 0,
+        currency: input.currency,
+        recipientMsisdn: msisdn,
+        serviceType: 'lookup',
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`Omari transaction lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private mapPayoutStatus(status: string): 'pending' | 'processing' | 'succeeded' | 'failed' {
+    const statusMap: Record<string, 'pending' | 'processing' | 'succeeded' | 'failed'> = {
+      'PENDING': 'pending',
+      'PROCESSING': 'processing',
+      'COMPLETED': 'succeeded',
+      'SUCCESS': 'succeeded',
+      'SUCCEEDED': 'succeeded',
+      'FAILED': 'failed',
+      'REJECTED': 'failed',
+    };
+
+    return statusMap[(status || '').toUpperCase()] || 'pending';
+  }
+
+  /**
+   * Omari msisdn: international format (263XXXXXXXXX) — same as the
+   * phone validator already produces for payments.
+   */
+  private normalizeMsisdnEpg(phone?: string): string {
+    return this.validateAndFormatPhoneNumber(phone);
   }
 
   private mapMandateStatus(status: string): 'pending' | 'active' | 'revoked' | 'failed' {
