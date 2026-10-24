@@ -449,3 +449,65 @@ END $$;
 DROP TRIGGER IF EXISTS update_payouts_updated_at ON payouts;
 CREATE TRIGGER update_payouts_updated_at BEFORE UPDATE ON payouts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
+-- Seed: payment providers (idempotent upserts)
+-- ============================================================
+
+INSERT INTO payment_providers (name, provider_type, supports_test, supports_live, capabilities, config_schema)
+VALUES
+  ('ecocash', 'mobile_money', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": true}',
+   '{
+     "onlineUsername": {"label": "Instant Payment username", "required": true},
+     "onlinePassword": {"label": "Instant Payment password", "required": true, "secret": true},
+     "merchantCode": {"label": "Merchant code", "required": true},
+     "merchantNumber": {"label": "Merchant MSISDN (263...)", "required": true},
+     "merchantPin": {"label": "Merchant PIN", "required": true, "secret": true},
+     "clientId": {"label": "EPG X-Client-Id", "required": false},
+     "clientSecret": {"label": "EPG X-Client-Secret", "required": false, "secret": true},
+     "username": {"label": "EPG channel API user", "required": false},
+     "password": {"label": "EPG channel password", "required": false, "secret": true},
+     "encryptionKey": {"label": "EPG encryption key", "required": false, "secret": true},
+     "terminalId": {"label": "Terminal ID", "required": false},
+     "location": {"label": "Merchant location", "required": false},
+     "merchantName": {"label": "Merchant display name", "required": false}
+   }')
+ON CONFLICT (name) DO UPDATE SET
+  provider_type = EXCLUDED.provider_type,
+  capabilities = EXCLUDED.capabilities,
+  config_schema = EXCLUDED.config_schema;
+
+INSERT INTO payment_providers (name, provider_type, supports_test, supports_live, capabilities, config_schema)
+VALUES
+  ('innbucks', 'mobile_money', true, false,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": false}',
+   '{
+     "apiKey": {"label": "API key", "required": true, "secret": true},
+     "merchantId": {"label": "Merchant ID", "required": true}
+   }'),
+  ('omari', 'mobile_money', true, false,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": true}',
+   '{
+     "apiKey": {"label": "API key", "required": true, "secret": true},
+     "merchantCode": {"label": "Merchant code", "required": true}
+   }'),
+  ('visa', 'card', true, false,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": false}',
+   '{
+     "apiKey": {"label": "API key", "required": true, "secret": true},
+     "merchantId": {"label": "Merchant ID", "required": true}
+   }'),
+  ('mastercard', 'card', true, false,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": false}',
+   '{
+     "apiKey": {"label": "API key", "required": true, "secret": true},
+     "merchantId": {"label": "Merchant ID", "required": true}
+   }'),
+  ('mock', 'mock', true, false,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": false}',
+   '{}')
+ON CONFLICT (name) DO UPDATE SET
+  provider_type = EXCLUDED.provider_type,
+  capabilities = EXCLUDED.capabilities,
+  config_schema = EXCLUDED.config_schema;
