@@ -207,6 +207,7 @@ function BootstrapDashboardLayoutContent({
       name: "Merchant Governance",
       icon: "bi-shop",
       items: [
+        { name: "Governance Overview", path: "/super-admin/governance/merchants", icon: "bi-grid" },
         { name: "Account Controls", path: "/super-admin/merchants/controls", icon: "bi-sliders" },
         { name: "-Onboarding Policies", path: "/super-admin/merchants/onboarding", icon: "bi-file-earmark-check" },
         { name: "Limits & Restrictions", path: "/super-admin/merchants/limits", icon: "bi-exclamation-circle" },
@@ -217,6 +218,7 @@ function BootstrapDashboardLayoutContent({
       name: "Provider Governance",
       icon: "bi-bank",
       items: [
+        { name: "Governance Overview", path: "/super-admin/governance/providers", icon: "bi-grid" },
         { name: "Provider Activation", path: "/super-admin/providers/activation", icon: "bi-toggle-on" },
         { name: "Country Availability", path: "/super-admin/providers/countries", icon: "bi-globe" },
         { name: "Credentials Status", path: "/super-admin/providers/credentials", icon: "bi-key-fill" },
@@ -277,6 +279,7 @@ function BootstrapDashboardLayoutContent({
       name: "Audit & Approvals",
       icon: "bi-journal-text",
       items: [
+        { name: "Approvals Queue", path: "/super-admin/approvals/queue", icon: "bi-inbox" },
         { name: "Audit Records", path: "/super-admin/audit/records", icon: "bi-file-earmark-text" },
         { name: "Approval Queues", path: "/super-admin/audit/queues", icon: "bi-list-task" },
         { name: "Change History", path: "/super-admin/audit/history", icon: "bi-clock" },
