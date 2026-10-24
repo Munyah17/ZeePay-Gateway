@@ -16,6 +16,7 @@ import {
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
+import { config } from '../../config';
 
 /**
  * EcoCash payment provider for Zimbabwe mobile money payments.
@@ -139,7 +140,6 @@ export class EcoCashProvider extends BasePaymentProvider {
           channel: 'WEB',
           purchaseCategoryCode: 'Online Payment',
           onBeHalfOf: this.superMerchantName,
-          ...(input.metadata?.notifyUrl ? { notifyUrl: input.metadata.notifyUrl } : {}),
         },
       },
       merchantCode: this.merchantCode,
@@ -150,7 +150,12 @@ export class EcoCashProvider extends BasePaymentProvider {
       location: this.location,
       superMerchantName: this.superMerchantName,
       merchantName: this.merchantName,
-      ...(input.returnUrl ? { notifyUrl: input.returnUrl } : {}),
+      // Top-level callback URL — EcoCash posts wallet state lifecycle events
+      // here. Defaults to ZeePay's inbound webhook receiver so PIN-prompt
+      // completions resolve automatically; merchants can override via metadata.
+      notifyUrl:
+        input.metadata?.notifyUrl ||
+        `${config.app.baseUrl}/api/v1/provider-webhooks/ecocash`,
     };
 
     try {
@@ -515,13 +520,21 @@ export class EcoCashProvider extends BasePaymentProvider {
     const data = text ? JSON.parse(text) : {};
 
     if (!response.ok) {
-      const code = data.responseCode ? ` (${data.responseCode})` : '';
-      throw new Error(`EcoCash API error: ${response.status}${code} - ${data.message || text || response.statusText}`);
+      // Instant Payment API errors carry { statusCode: 'E0xx', statusMessage }
+      const code = data.statusCode || data.responseCode;
+      const message = data.statusMessage || data.message || data.responseMessage || text || response.statusText;
+      const err = new Error(`EcoCash API error: ${response.status}${code ? ` (${code})` : ''} - ${message}`) as Error & { code?: string };
+      err.code = code;
+      throw err;
     }
 
     // Online Payments reports business failures via responseCode in a 200/422 body
     if (data.responseCode && data.responseCode !== '00') {
-      throw new Error(`EcoCash declined (${data.responseCode}): ${data.message || data.responseMessage || 'transaction failed'}`);
+      const err = new Error(
+        `EcoCash declined (${data.responseCode}): ${data.message || data.responseMessage || 'transaction failed'}`
+      ) as Error & { code?: string };
+      err.code = data.responseCode;
+      throw err;
     }
 
     return data;

@@ -10,5 +10,8 @@ export const config = {
   encryption: {
     key: process.env.ENCRYPTION_KEY || 'dev-encryption-key-change-in-production',
   },
+  app: {
+    baseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
+  },
   environment: process.env.NODE_ENV || 'development',
 } as const;
