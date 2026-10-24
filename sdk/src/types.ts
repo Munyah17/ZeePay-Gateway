@@ -153,3 +153,54 @@ export interface ListSubscriptionsResponse {
     count: number;
   };
 }
+
+// --- Payouts (disbursements) ---
+
+export type PayoutServiceType =
+  | 'enterprise_cash_in'
+  | 'change_disbursement'
+  | 'merchant_to_subscriber';
+
+export interface CreatePayoutInput {
+  serviceType: PayoutServiceType;
+  amount: number;
+  currency: string;
+  recipientMsisdn: string;
+  externalReference?: string;
+  beneficiaryReference?: string;
+  transferReference?: string;
+  terminalId?: string;
+  merchantName?: string;
+  walletId?: string;
+  providerName?: string;
+  metadata?: Record<string, any>;
+  idempotencyKey?: string;
+}
+
+export interface Payout {
+  id: string;
+  externalReference: string;
+  providerReference?: string;
+  serviceType: string;
+  amount: number;
+  currency: string;
+  recipientMsisdn: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface ListPayoutsOptions {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  serviceType?: string;
+}
+
+export interface ListPayoutsResponse {
+  data: Payout[];
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
+}

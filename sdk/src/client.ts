@@ -12,6 +12,10 @@ import {
   Subscription,
   ListSubscriptionsOptions,
   ListSubscriptionsResponse,
+  CreatePayoutInput,
+  Payout,
+  ListPayoutsOptions,
+  ListPayoutsResponse,
   ApiResponse,
 } from './types';
 
@@ -249,6 +253,41 @@ export class ZeePayClient {
       body: JSON.stringify({ action: 'cancel', reason }),
     });
   }
+
+  /**
+   * Create a payout — disburse funds into a customer's wallet.
+   * serviceType: enterprise_cash_in | change_disbursement | merchant_to_subscriber.
+   * externalReference is the idempotency key.
+   */
+  async createPayout(input: CreatePayoutInput): Promise<Payout> {
+    return this.request<Payout>('/payouts', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  /**
+   * Look up a payout by its externalReference
+   */
+  async getPayout(externalReference: string): Promise<Payout> {
+    return this.request<Payout>(`/payouts/${externalReference}`);
+  }
+
+  /**
+   * List payouts for the merchant
+   */
+  async listPayouts(options?: ListPayoutsOptions): Promise<ListPayoutsResponse> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.offset) params.append('offset', options.offset.toString());
+    if (options?.status) params.append('status', options.status);
+    if (options?.serviceType) params.append('serviceType', options.serviceType);
+
+    const queryString = params.toString();
+    const endpoint = `/payouts${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<ListPayoutsResponse>(endpoint);
+  }
 }
 
 /**
@@ -356,5 +395,24 @@ export class Subscriptions {
 
   async cancel(subscriptionId: string, reason?: string): Promise<Subscription> {
     return this.client.cancelSubscription(subscriptionId, reason);
+  }
+}
+
+/**
+ * Payouts resource — disbursements to customer wallets
+ */
+export class Payouts {
+  constructor(private client: ZeePayClient) {}
+
+  async create(input: CreatePayoutInput): Promise<Payout> {
+    return this.client.createPayout(input);
+  }
+
+  async get(externalReference: string): Promise<Payout> {
+    return this.client.getPayout(externalReference);
+  }
+
+  async list(options?: ListPayoutsOptions): Promise<ListPayoutsResponse> {
+    return this.client.listPayouts(options);
   }
 }

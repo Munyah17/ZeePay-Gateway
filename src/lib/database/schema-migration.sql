@@ -409,3 +409,43 @@ CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions
 DROP TRIGGER IF EXISTS update_subscription_charges_updated_at ON subscription_charges;
 CREATE TRIGGER update_subscription_charges_updated_at BEFORE UPDATE ON subscription_charges
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
+-- Payouts (disbursements to customer wallets)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS payouts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id),
+  provider_name VARCHAR(50) NOT NULL,
+  service_type VARCHAR(50) NOT NULL,
+  external_reference VARCHAR(255) NOT NULL,
+  provider_reference VARCHAR(255),
+  amount DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  recipient_msisdn VARCHAR(20) NOT NULL,
+  beneficiary_reference VARCHAR(255),
+  status VARCHAR(50) NOT NULL DEFAULT 'pending',
+  error_message TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(merchant_id, external_reference)
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_payouts_merchant_id') THEN
+    CREATE INDEX idx_payouts_merchant_id ON payouts(merchant_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_payouts_status') THEN
+    CREATE INDEX idx_payouts_status ON payouts(status);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_payouts_external_reference') THEN
+    CREATE INDEX idx_payouts_external_reference ON payouts(external_reference);
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS update_payouts_updated_at ON payouts;
+CREATE TRIGGER update_payouts_updated_at BEFORE UPDATE ON payouts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

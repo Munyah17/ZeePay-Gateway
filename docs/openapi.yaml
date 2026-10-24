@@ -47,6 +47,8 @@ tags:
     description: Webhook configuration and management
   - name: Subscriptions
     description: Recurring billing with auto-deduct
+  - name: Payouts
+    description: Disbursements to customer wallets
 
 paths:
   /payments:
@@ -600,6 +602,99 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /payouts:
+    post:
+      tags: [Payouts]
+      summary: Create a payout
+      description: |
+        Disburse funds into a customer's wallet via the provider's disbursement
+        service (EcoCash Enterprise Cash-In, Disburse Change, or Merchant to
+        Subscriber). The call is synchronous — the result returns on the same
+        request. `externalReference` is the idempotency key: resending the same
+        reference returns the original transaction.
+      operationId: createPayout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePayoutRequest'
+      responses:
+        '201':
+          description: Payout created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payout'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags: [Payouts]
+      summary: List payouts
+      operationId: listPayouts
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, succeeded, failed]
+        - name: serviceType
+          in: query
+          schema:
+            type: string
+            enum: [enterprise_cash_in, change_disbursement, merchant_to_subscriber]
+      responses:
+        '200':
+          description: List of payouts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayoutListResponse'
+
+  /payouts/{reference}:
+    get:
+      tags: [Payouts]
+      summary: Look up a payout
+      description: |
+        Retrieve a payout by its `externalReference`. Syncs the latest state
+        from the provider's transaction lookup when the payout has not reached
+        a terminal status.
+      operationId: getPayout
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The externalReference used when creating the payout
+      responses:
+        '200':
+          description: Payout details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payout'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /webhooks/{id}/deliveries:
     get:
       tags:
@@ -1015,6 +1110,90 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Subscription'
+        pagination:
+          type: object
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            count:
+              type: integer
+
+    CreatePayoutRequest:
+      type: object
+      required: [serviceType, amount, currency, recipientMsisdn]
+      properties:
+        serviceType:
+          type: string
+          enum: [enterprise_cash_in, change_disbursement, merchant_to_subscriber]
+          description: |
+            Disbursement service: enterprise_cash_in (bulk), change_disbursement
+            (POS change), merchant_to_subscriber (single payout)
+        amount:
+          type: number
+        currency:
+          type: string
+          enum: [USD, ZWG]
+        recipientMsisdn:
+          type: string
+          description: Customer wallet number (263XXXXXXXXX or 07XXXXXXXX)
+        externalReference:
+          type: string
+          description: Merchant-generated idempotency key — resending returns the original transaction
+        beneficiaryReference:
+          type: string
+        transferReference:
+          type: string
+        terminalId:
+          type: string
+          description: POS terminal id (change_disbursement)
+        merchantName:
+          type: string
+          description: Name shown in the customer's SMS (change_disbursement)
+        walletId:
+          type: string
+          default: '12'
+        providerName:
+          type: string
+          default: ecocash
+        metadata:
+          type: object
+        idempotencyKey:
+          type: string
+
+    Payout:
+      type: object
+      properties:
+        id:
+          type: string
+        externalReference:
+          type: string
+        providerReference:
+          type: string
+          description: Provider transaction id (e.g. CI260807.0934.T6335049)
+        serviceType:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        recipientMsisdn:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, succeeded, failed]
+        createdAt:
+          type: string
+          format: date-time
+
+    PayoutListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payout'
         pagination:
           type: object
           properties:

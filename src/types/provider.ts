@@ -93,6 +93,49 @@ export interface RevokeMandateInput {
   reason?: string;
 }
 
+// --- Payouts (disbursements to customer wallets) ---
+
+export type PayoutServiceType =
+  | 'enterprise_cash_in'      // Bulk disbursement into customer wallets
+  | 'change_disbursement'     // POS change paid into the wallet
+  | 'merchant_to_subscriber'; // Merchant payout to a subscriber
+
+/**
+ * Input for a disbursement — sending money out to a customer.
+ */
+export interface PayoutInput {
+  serviceType: PayoutServiceType;
+  amount: number;
+  currency: string;
+  recipientMsisdn: string;
+  externalReference?: string;
+  beneficiaryReference?: string;
+  transferReference?: string;
+  terminalId?: string;
+  merchantName?: string;
+  walletId?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface PayoutResult {
+  id: string;
+  providerReference: string;
+  externalReference: string;
+  status: 'pending' | 'processing' | 'succeeded' | 'failed';
+  amount: number;
+  currency: string;
+  recipientMsisdn: string;
+  serviceType: string;
+  metadata?: Record<string, any>;
+  providerResponse?: Record<string, any>;
+}
+
+export interface GetPayoutInput {
+  externalTransactionId: string;
+  msisdn: string;
+  currency: string;
+}
+
 export interface ProviderCredentials {
   [key: string]: string | number | boolean;
 }
@@ -108,4 +151,6 @@ export interface PaymentProviderCapabilities {
   refundPayment: boolean;
   supportsWebhooks: boolean;
   supportsRecurring: boolean;
+  /** Provider can send money out to customers (disbursements) */
+  createPayout?: boolean;
 }

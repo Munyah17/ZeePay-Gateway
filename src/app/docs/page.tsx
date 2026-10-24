@@ -17,6 +17,9 @@ const endpoints = [
   { method: 'GET', path: '/v1/subscriptions/:id', description: 'Retrieve a subscription' },
   { method: 'PATCH', path: '/v1/subscriptions/:id', description: 'Pause, resume, or cancel' },
   { method: 'POST', path: '/v1/subscriptions/:id/approve', description: 'Approve a mandate (sandbox)' },
+  { method: 'POST', path: '/v1/payouts', description: 'Disburse funds to a customer wallet' },
+  { method: 'GET', path: '/v1/payouts', description: 'List payouts' },
+  { method: 'GET', path: '/v1/payouts/:ref', description: 'Look up a payout by externalReference' },
 ];
 
 const events = [
@@ -32,6 +35,8 @@ const events = [
   { event: 'subscription.charge_failed', description: 'Recurring debit failed (will retry)' },
   { event: 'subscription.updated', description: 'Subscription paused or resumed' },
   { event: 'subscription.cancelled', description: 'Subscription ended' },
+  { event: 'payout.succeeded', description: 'Disbursement credited to the customer' },
+  { event: 'payout.failed', description: 'Disbursement failed' },
 ];
 
 export default function DocsPage() {
@@ -59,6 +64,7 @@ export default function DocsPage() {
                 <li className="nav-item"><a href="#auth" className="nav-link px-0 text-dark">Authentication</a></li>
                 <li className="nav-item"><a href="#api" className="nav-link px-0 text-dark">API Reference</a></li>
                 <li className="nav-item"><a href="#subscriptions" className="nav-link px-0 text-dark">Subscriptions</a></li>
+                <li className="nav-item"><a href="#payouts" className="nav-link px-0 text-dark">Payouts</a></li>
                 <li className="nav-item"><a href="#webhooks" className="nav-link px-0 text-dark">Webhooks</a></li>
                 <li className="nav-item"><a href="#errors" className="nav-link px-0 text-dark">Errors & Idempotency</a></li>
               </ul>
@@ -167,6 +173,37 @@ const payment = await zee.payments.create({
   customerPhone: "+263771234567"
 });
 // Redirect customer to sub.approvalUrl to authorize the mandate`}</pre>
+                </div>
+              </div>
+            </section>
+
+            <section id="payouts" className="mb-5">
+              <h2 className="h5 mb-3">Payouts & Disbursements</h2>
+              <p className="small">
+                Send money <em>out</em> to customer wallets via the EcoCash EPG services —
+                synchronous, PIN-free, and idempotent on your <code>externalReference</code>.
+              </p>
+              <div className="table-responsive mb-3">
+                <table className="table table-sm small">
+                  <thead><tr><th>serviceType</th><th>Use case</th></tr></thead>
+                  <tbody>
+                    <tr><td><code>enterprise_cash_in</code></td><td>Bulk disbursement — payroll, growers, grants, claims</td></tr>
+                    <tr><td><code>change_disbursement</code></td><td>POS change paid into the customer's wallet</td></tr>
+                    <tr><td><code>merchant_to_subscriber</code></td><td>Single merchant payout to a subscriber</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="card bg-dark text-light">
+                <div className="card-body">
+                  <pre className="mb-0 small" style={{ color: '#c7d2fe' }}>{`const payout = await zee.payouts.create({
+  serviceType: "enterprise_cash_in",
+  amount: 150.00,
+  currency: "USD",
+  recipientMsisdn: "263777000000",
+  externalReference: "payroll-2024-01-emp042", // idempotency key
+  beneficiaryReference: "Emp042"
+});
+// Result is synchronous — payout.status is "succeeded" immediately`}</pre>
                 </div>
               </div>
             </section>

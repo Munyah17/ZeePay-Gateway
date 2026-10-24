@@ -9,20 +9,64 @@ import {
   MandateResult,
   ChargeMandateInput,
   RevokeMandateInput,
+  PayoutInput,
+  PayoutResult,
   PaymentProviderCapabilities,
+  PaymentStatus,
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 /**
  * EcoCash payment provider for Zimbabwe mobile money payments.
- * 
- * EcoCash is Zimbabwe's largest mobile money platform operated by Econet Wireless.
- * This provider handles payment creation, status checking, and refunds through EcoCash's API.
+ *
+ * Implements the real EcoCash developer API (developers.ecocash.co.zw):
+ *
+ *  - Online Payments (collections): POST /payment/v1/transactions/amount/
+ *    HTTP Basic auth. The customer confirms with a PIN prompt. Refunds and
+ *    reversals share POST /payment/v1/transactions/refund/ (tranType REF/REV).
+ *    Lookup: GET /payment/v1/{endUserId}/transactions/amount/{clientCorrelator}.
+ *
+ *  - EPG services (disbursements + lookup): all POST to one endpoint,
+ *    /api/serviceRequest, selected by the serviceType field:
+ *      ENTERPRISECASHINV2      Enterprise Cash-In (bulk disbursement)
+ *      CHANGEDISBURSEV2        Disburse Change (POS change into wallet)
+ *      MERCHTOSUBV2            Merchant to Subscriber payout
+ *      EXTERNALTRANSACTIONLOOKUP  Transaction lookup by externalReference
+ *    Authenticated by X-Client-Id / X-Client-Secret headers plus a channel
+ *    API user (username + encrypted password) in the body.
+ *
+ * Credentials expected in ProviderConfig.credentials:
+ *   clientId, clientSecret            EPG client credentials (headers)
+ *   username, password                Channel API user for EPG services
+ *   encryptionKey                     Used to encrypt `password` at call time
+ *   onlineUsername, onlinePassword    Basic auth for Online Payments
+ *   merchantCode, merchantPin         Merchant identifier + sandbox PIN
+ *   merchantNumber                    Registered merchant MSISDN
+ *   terminalId, location              POS terminal identifier + merchant location
+ *   merchantName, superMerchantName   Display names
+ *   baseUrl                           Optional override (defaults by environment)
  */
 export class EcoCashProvider extends BasePaymentProvider {
   private baseUrl!: string;
-  private apiKey!: string;
+  private clientId!: string;
+  private clientSecret!: string;
+  private channelUsername!: string;
+  private channelPassword!: string;
+  private encryptionKey?: string;
+  private onlineUsername!: string;
+  private onlinePassword!: string;
   private merchantCode!: string;
+  private merchantPin!: string;
+  private merchantNumber!: string;
+  private terminalId!: string;
+  private location!: string;
+  private merchantName!: string;
+  private superMerchantName!: string;
+
+  // Same-session maps so refund/lookup calls can resolve EcoCash references
+  // (the Online Payments lookup is keyed on endUserId + clientCorrelator).
+  private correlatorIndex: Map<string, { msisdn: string; ecocashReference?: string }> = new Map();
 
   constructor() {
     super('ecocash', 'mobile_money');
@@ -34,9 +78,11 @@ export class EcoCashProvider extends BasePaymentProvider {
       getPayment: true,
       refundPayment: true,
       supportsWebhooks: true,
-      // Recurring is provided via ZeePay mandates (debit-order style
-      // standing authorization) layered on top of EcoCash debits.
+      // EcoCash has no native recurring/debit-order API. Recurring billing is
+      // emulated: the first Online Payments charge acts as the mandate setup,
+      // and each auto-deduct issues a fresh merchant-initiated charge.
       supportsRecurring: true,
+      createPayout: true,
     };
   }
 
@@ -45,42 +91,82 @@ export class EcoCashProvider extends BasePaymentProvider {
       throw new Error('EcoCash provider requires configuration');
     }
 
-    const credentials = this.config.credentials;
-    this.apiKey = credentials.apiKey as string;
-    this.merchantCode = credentials.merchantCode as string;
+    const c = this.config.credentials;
+    this.clientId = (c.clientId || c.apiKey || '') as string;
+    this.clientSecret = (c.clientSecret || '') as string;
+    this.channelUsername = (c.username || '') as string;
+    this.channelPassword = (c.password || '') as string;
+    this.encryptionKey = c.encryptionKey as string | undefined;
+    this.onlineUsername = (c.onlineUsername || c.username || '') as string;
+    this.onlinePassword = (c.onlinePassword || c.password || '') as string;
+    this.merchantCode = (c.merchantCode || '') as string;
+    this.merchantPin = (c.merchantPin || '0000') as string;
+    this.merchantNumber = (c.merchantNumber || '') as string;
+    this.terminalId = (c.terminalId || 'WEB00001') as string;
+    this.location = (c.location || 'Harare') as string;
+    this.merchantName = (c.merchantName || 'ZeePay Merchant') as string;
+    this.superMerchantName = (c.superMerchantName || 'ECOCASH') as string;
 
-    // Set base URL based on environment
-    this.baseUrl = this.config.environment === 'live'
-      ? 'https://api.ecocash.co.zw/v1'
-      : 'https://sandbox.ecocash.co.zw/v1';
+    this.baseUrl =
+      (c.baseUrl as string) ||
+      (this.config.environment === 'live'
+        ? 'https://epg.ecocash.co.zw'
+        : 'https://developers.ecocash.co.zw');
   }
+
+  // ------------------------------------------------------------------
+  // Collections — Online Payments API
+  // ------------------------------------------------------------------
 
   async createPayment(input: CreatePaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
 
-    // Validate phone number for EcoCash (Zimbabwe format)
-    const phoneNumber = this.validateAndFormatPhoneNumber(input.customerPhone);
+    const correlator = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const endUserId = this.normalizeMsisdn(input.customerPhone);
 
-    const payload = {
+    const body = {
+      clientCorrelator: correlator,
+      referenceCode: input.reference,
+      tranType: 'MER',
+      endUserId,
+      paymentAmount: {
+        charginginformation: {
+          amount: input.amount,
+          currency: input.currency || 'USD',
+          description: (input.metadata?.description as string) || 'ZeePay Online Payment',
+        },
+        chargeMetaData: {
+          channel: 'WEB',
+          purchaseCategoryCode: 'Online Payment',
+          onBeHalfOf: this.superMerchantName,
+          ...(input.metadata?.notifyUrl ? { notifyUrl: input.metadata.notifyUrl } : {}),
+        },
+      },
       merchantCode: this.merchantCode,
-      amount: input.amount,
-      currency: input.currency || 'USD',
-      reference: input.reference,
-      customerPhone: phoneNumber,
-      customerEmail: input.customerEmail,
-      returnUrl: input.returnUrl,
-      cancelUrl: input.cancelUrl,
-      metadata: input.metadata,
+      merchantPin: this.merchantPin,
+      merchantNumber: this.merchantNumber,
+      countryCode: 'ZW',
+      terminalID: this.terminalId,
+      location: this.location,
+      superMerchantName: this.superMerchantName,
+      merchantName: this.merchantName,
+      ...(input.returnUrl ? { notifyUrl: input.returnUrl } : {}),
     };
 
     try {
-      const response = await this.makeRequest('/payments', 'POST', payload);
-      
+      const response = await this.onlineRequest('/transactions/amount/', 'POST', body);
+
+      this.correlatorIndex.set(correlator, {
+        msisdn: endUserId,
+        ecocashReference: response.ecocashReference,
+      });
+
       return {
-        id: response.transactionId || uuidv4(),
-        providerReference: response.reference,
-        status: this.mapEcoCashStatus(response.status),
-        checkoutUrl: response.checkoutUrl,
+        id: uuidv4(),
+        // Composite reference: correlator|msisdn so later lookups can resolve
+        // the customer number the Online Payments lookup endpoint requires.
+        providerReference: `${correlator}|${endUserId}`,
+        status: this.mapOnlineStatus(response),
         amount: input.amount,
         currency: input.currency,
         metadata: input.metadata,
@@ -94,15 +180,20 @@ export class EcoCashProvider extends BasePaymentProvider {
   async getPayment(input: GetPaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
 
+    const { correlator, msisdn } = this.resolveCorrelator(input.providerReference);
+
     try {
-      const response = await this.makeRequest(`/payments/${input.providerReference}`, 'GET');
-      
+      const response = await this.onlineRequest(
+        `/${msisdn}/transactions/amount/${correlator}`,
+        'GET'
+      );
+
       return {
-        id: response.transactionId,
-        providerReference: response.reference,
-        status: this.mapEcoCashStatus(response.status),
-        amount: response.amount,
-        currency: response.currency,
+        id: uuidv4(),
+        providerReference: input.providerReference,
+        status: this.mapOnlineStatus(response),
+        amount: response.paymentAmount?.charginginformation?.amount ?? 0,
+        currency: response.paymentAmount?.charginginformation?.currency || 'USD',
         metadata: response.metadata,
         providerResponse: response,
       };
@@ -114,21 +205,53 @@ export class EcoCashProvider extends BasePaymentProvider {
   async refundPayment(input: RefundPaymentInput): Promise<RefundResult> {
     this.ensureInitialized();
 
-    const payload = {
-      originalReference: input.paymentReference,
-      amount: input.amount,
-      currency: input.currency,
-      reason: input.reason,
-      metadata: input.metadata,
+    const { correlator, msisdn } = this.resolveCorrelator(input.paymentReference);
+
+    // The refund endpoint needs the original ecocashReference (MP…), which we
+    // resolve via the transaction lookup when it isn't cached in-process.
+    let originalEcocashReference = this.correlatorIndex.get(correlator)?.ecocashReference
+      || input.metadata?.originalEcocashReference;
+
+    if (!originalEcocashReference) {
+      const original = await this.getPayment({ providerReference: input.paymentReference });
+      originalEcocashReference = original.providerResponse?.ecocashReference;
+    }
+    if (!originalEcocashReference) {
+      throw new Error('Cannot refund: original EcoCash reference could not be resolved');
+    }
+
+    const refundCorrelator = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const body = {
+      clientCorrelator: refundCorrelator,
+      referenceCode: `REF-${correlator}`,
+      tranType: 'REF',
+      endUserId: msisdn,
+      originalEcocashReference,
+      paymentAmount: {
+        charginginformation: {
+          amount: input.amount,
+          currency: input.currency,
+          description: input.reason || 'ZeePay Refund',
+        },
+        chargeMetaData: { channel: 'WEB' },
+      },
+      merchantCode: this.merchantCode,
+      merchantPin: this.merchantPin,
+      merchantNumber: this.merchantNumber,
+      countryCode: 'ZW',
+      terminalID: this.terminalId,
+      location: this.location,
+      superMerchantName: this.superMerchantName,
+      merchantName: this.merchantName,
     };
 
     try {
-      const response = await this.makeRequest('/refunds', 'POST', payload);
-      
+      const response = await this.onlineRequest('/transactions/refund/', 'POST', body);
+
       return {
-        id: response.refundId || uuidv4(),
-        providerReference: response.reference,
-        status: this.mapRefundStatus(response.status),
+        id: uuidv4(),
+        providerReference: refundCorrelator,
+        status: response.transactionOperationStatus === 'Refunded' ? 'succeeded' : 'pending',
         amount: input.amount,
         currency: input.currency,
         metadata: input.metadata,
@@ -139,17 +262,199 @@ export class EcoCashProvider extends BasePaymentProvider {
     }
   }
 
+  // ------------------------------------------------------------------
+  // Disbursements — EPG serviceRequest endpoint
+  // ------------------------------------------------------------------
+
+  /**
+   * Send money out to a customer wallet.
+   * serviceType selects the EPG service:
+   *   'enterprise_cash_in'     → ENTERPRISECASHINV2  (channel 700002)
+   *   'change_disbursement'    → CHANGEDISBURSEV2    (channel 800002)
+   *   'merchant_to_subscriber' → MERCHTOSUBV2        (channel 800004)
+   */
+  async createPayout(input: PayoutInput): Promise<PayoutResult> {
+    this.ensureInitialized();
+
+    const service = this.payoutServiceConfig(input.serviceType);
+    const msisdn = this.normalizeMsisdnEpg(input.recipientMsisdn);
+    const externalReference = input.externalReference || `${Date.now()}${Math.floor(Math.random() * 10000)}`;
+
+    const base = {
+      serviceType: service.code,
+      externalReference,
+      amount: String(input.amount),
+      currency: input.currency,
+      transferReference: input.transferReference || 'ZeePay Payout',
+      username: this.channelUsername,
+      password: this.encryptedChannelPassword(),
+      channelCode: service.channelCode,
+    };
+
+    let body: Record<string, any>;
+    switch (service.code) {
+      case 'ENTERPRISECASHINV2':
+        body = {
+          ...base,
+          beneficiaryReference: input.beneficiaryReference || externalReference,
+          msisdn,
+          walletId: input.walletId || '12',
+        };
+        break;
+      case 'CHANGEDISBURSEV2':
+        body = {
+          ...base,
+          receiverNumber: msisdn,
+          terminalId: input.terminalId || this.terminalId,
+          merchantName: input.merchantName || this.merchantName,
+        };
+        break;
+      case 'MERCHTOSUBV2':
+      default:
+        body = {
+          ...base,
+          msisdn,
+          beneficiaryReference: input.beneficiaryReference || externalReference,
+          walletId: input.walletId || '12',
+        };
+        break;
+    }
+
+    try {
+      const response = await this.epgRequest(body);
+
+      return {
+        id: uuidv4(),
+        providerReference: response.transactionId || externalReference,
+        externalReference,
+        status: response.responseCode === '00' ? 'succeeded' : 'failed',
+        amount: input.amount,
+        currency: input.currency,
+        recipientMsisdn: msisdn,
+        serviceType: service.code,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`EcoCash payout failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Look up an EPG transaction by the externalReference used when it was
+   * created (EXTERNALTRANSACTIONLOOKUP — client credentials only).
+   */
+  async getPayout(input: { externalTransactionId: string; msisdn: string; currency: string }): Promise<PayoutResult> {
+    this.ensureInitialized();
+
+    const body = {
+      serviceType: 'EXTERNALTRANSACTIONLOOKUP',
+      externalReference: `${Date.now()}${Math.floor(Math.random() * 10000)}`,
+      externalTransactionId: input.externalTransactionId,
+      currency: input.currency,
+      msisdn: this.normalizeMsisdnEpg(input.msisdn),
+    };
+
+    try {
+      const response = await this.epgRequest(body);
+
+      if (response.responseCode === '888803') {
+        throw new Error(`Transaction ${input.externalTransactionId} not found`);
+      }
+
+      return {
+        id: uuidv4(),
+        providerReference: response.transactionId || input.externalTransactionId,
+        externalReference: input.externalTransactionId,
+        status: response.statusCode === 'TS' || response.responseCode === '00' ? 'succeeded' : 'failed',
+        amount: response.amount ? parseFloat(response.amount) : 0,
+        currency: input.currency,
+        recipientMsisdn: this.normalizeMsisdnEpg(input.msisdn),
+        serviceType: 'EXTERNALTRANSACTIONLOOKUP',
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`EcoCash transaction lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Mandates — recurring auto-deduct (emulated)
+  // ------------------------------------------------------------------
+
+  /**
+   * EcoCash has no standing-mandate API. A mandate is modelled as a first
+   * Online Payments charge which the customer approves with their PIN —
+   * that approval doubles as their consent to the subscription. Subsequent
+   * auto-deducts issue fresh merchant-initiated charges.
+   */
+  async createMandate(input: CreateMandateInput): Promise<MandateResult> {
+    this.ensureInitialized();
+
+    const result = await this.createPayment({
+      amount: input.amount,
+      currency: input.currency,
+      reference: input.reference,
+      customerEmail: input.customerEmail,
+      customerPhone: input.customerPhone,
+      returnUrl: input.returnUrl,
+      cancelUrl: input.cancelUrl,
+      metadata: { ...input.metadata, mandateSetup: true, interval: input.interval },
+    });
+
+    const { correlator, msisdn } = this.resolveCorrelator(result.providerReference);
+    const mandateReference = `ecm_${correlator}`;
+
+    return {
+      id: uuidv4(),
+      providerReference: `${mandateReference}|${msisdn}`,
+      status: 'pending',
+      metadata: {
+        ...input.metadata,
+        chargeCorrelator: result.providerReference,
+        note: 'Customer approves via the PIN prompt for the initial charge',
+      },
+    };
+  }
+
+  /**
+   * Debit a mandate — a merchant-initiated Online Payments charge.
+   * Note: real EcoCash still prompts the customer's PIN on each charge;
+   * ZeePay surfaces this so merchants understand the live behaviour.
+   */
+  async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
+    this.ensureInitialized();
+
+    const { msisdn } = this.resolveCorrelator(input.mandateReference);
+
+    return this.createPayment({
+      amount: input.amount,
+      currency: input.currency,
+      reference: input.reference,
+      customerPhone: msisdn,
+      metadata: { ...input.metadata, initiator: 'merchant', recurring: true },
+    });
+  }
+
+  async revokeMandate(input: RevokeMandateInput): Promise<void> {
+    this.ensureInitialized();
+    // EcoCash mandates are ZeePay-side records; nothing to cancel provider-side.
+  }
+
+  // ------------------------------------------------------------------
+  // Webhooks / health
+  // ------------------------------------------------------------------
+
   verifyWebhook(payload: string, signature: string, secret: string): boolean {
-    const crypto = require('crypto');
     const expectedSignature = crypto
       .createHmac('sha256', secret)
       .update(payload)
       .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    try {
+      return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+    } catch {
+      return false;
+    }
   }
 
   parseWebhook(payload: string): {
@@ -159,10 +464,10 @@ export class EcoCashProvider extends BasePaymentProvider {
   } {
     try {
       const data = JSON.parse(payload);
-      
+
       return {
         eventType: data.eventType || 'payment.updated',
-        providerReference: data.reference,
+        providerReference: data.clientCorrelator || data.reference || data.externalReference,
         data,
       };
     } catch (error) {
@@ -173,198 +478,184 @@ export class EcoCashProvider extends BasePaymentProvider {
   async healthCheck(): Promise<boolean> {
     try {
       this.ensureInitialized();
-      await this.makeRequest('/health', 'GET');
       return true;
     } catch (error) {
       return false;
     }
   }
 
-  /**
-   * Create an EcoCash debit-order mandate.
-   * The customer authorizes future debits once (USSD/PIN prompt),
-   * after which the merchant can debit without further interaction.
-   */
-  async createMandate(input: CreateMandateInput): Promise<MandateResult> {
-    this.ensureInitialized();
+  // ------------------------------------------------------------------
+  // Helpers
+  // ------------------------------------------------------------------
 
-    const phoneNumber = this.validateAndFormatPhoneNumber(input.customerPhone);
-
-    const payload = {
-      merchantCode: this.merchantCode,
-      amount: input.amount,
-      currency: input.currency || 'USD',
-      reference: input.reference,
-      interval: input.interval,
-      customerPhone: phoneNumber,
-      customerEmail: input.customerEmail,
-      returnUrl: input.returnUrl,
-      cancelUrl: input.cancelUrl,
-      metadata: input.metadata,
-    };
-
-    try {
-      const response = await this.makeRequest('/mandates', 'POST', payload);
-
-      return {
-        id: response.mandateId || uuidv4(),
-        providerReference: response.reference,
-        status: this.mapMandateStatus(response.status),
-        approvalUrl: response.approvalUrl,
-        metadata: input.metadata,
-        providerResponse: response,
-      };
-    } catch (error) {
-      throw new Error(`EcoCash mandate creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+  private onlinePathPrefix(): string {
+    return this.config?.environment === 'live' ? '/payment/v1' : '/sandbox/payment/v1';
   }
 
   /**
-   * Debit an active mandate — merchant-initiated transaction (auto-deduct).
+   * Online Payments request — HTTP Basic auth.
    */
-  async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
-    this.ensureInitialized();
+  private async onlineRequest(endpoint: string, method: string, body?: any): Promise<any> {
+    const url = `${this.baseUrl}${this.onlinePathPrefix()}${endpoint}`;
+    const basic = Buffer.from(`${this.onlineUsername}:${this.onlinePassword}`).toString('base64');
 
-    const payload = {
-      merchantCode: this.merchantCode,
-      amount: input.amount,
-      currency: input.currency,
-      reference: input.reference,
-      initiator: 'merchant',
-      metadata: input.metadata,
+    const options: RequestInit = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${basic}`,
+      },
     };
-
-    try {
-      const response = await this.makeRequest(`/mandates/${input.mandateReference}/debit`, 'POST', payload);
-
-      return {
-        id: response.transactionId || uuidv4(),
-        providerReference: response.reference,
-        status: this.mapEcoCashStatus(response.status),
-        amount: input.amount,
-        currency: input.currency,
-        metadata: input.metadata,
-        providerResponse: response,
-      };
-    } catch (error) {
-      throw new Error(`EcoCash mandate debit failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (body) {
+      options.body = JSON.stringify(body);
     }
-  }
 
-  async revokeMandate(input: RevokeMandateInput): Promise<void> {
-    this.ensureInitialized();
+    const response = await fetch(url, options);
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
 
-    try {
-      await this.makeRequest(`/mandates/${input.mandateReference}`, 'DELETE', {
-        reason: input.reason,
-      });
-    } catch (error) {
-      throw new Error(`EcoCash mandate revocation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (!response.ok) {
+      const code = data.responseCode ? ` (${data.responseCode})` : '';
+      throw new Error(`EcoCash API error: ${response.status}${code} - ${data.message || text || response.statusText}`);
     }
-  }
 
-  private mapMandateStatus(status: string): 'pending' | 'active' | 'revoked' | 'failed' {
-    const statusMap: Record<string, 'pending' | 'active' | 'revoked' | 'failed'> = {
-      'PENDING': 'pending',
-      'PENDING_APPROVAL': 'pending',
-      'ACTIVE': 'active',
-      'APPROVED': 'active',
-      'REVOKED': 'revoked',
-      'CANCELLED': 'revoked',
-      'FAILED': 'failed',
-      'REJECTED': 'failed',
-    };
+    // Online Payments reports business failures via responseCode in a 200/422 body
+    if (data.responseCode && data.responseCode !== '00') {
+      throw new Error(`EcoCash declined (${data.responseCode}): ${data.message || data.responseMessage || 'transaction failed'}`);
+    }
 
-    return statusMap[status.toUpperCase()] || 'pending';
+    return data;
   }
 
   /**
-   * Validate and format Zimbabwe phone number for EcoCash
-   * Accepts formats: +2637XX, 2637XX, 07XX, 7XX
+   * EPG serviceRequest — all disbursement services + transaction lookup
+   * share this single endpoint, selected by serviceType.
    */
-  private validateAndFormatPhoneNumber(phone?: string): string {
+  private async epgRequest(body: Record<string, any>): Promise<any> {
+    const url = `${this.baseUrl}/api/serviceRequest`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Client-Id': this.clientId,
+        'X-Client-Secret': this.clientSecret,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
+
+    if (!response.ok) {
+      const code = data.responseCode ? ` (${data.responseCode})` : '';
+      throw new Error(`EcoCash EPG error: ${response.status}${code} - ${data.message || data.responseMessage || text || response.statusText}`);
+    }
+
+    return data;
+  }
+
+  /**
+   * The channel API user password is sent encrypted against the issued
+   * encryption key — a correctly-encrypted value is accepted each call.
+   * If no key is configured the password is sent as provided (assuming it
+   * is already in encrypted form).
+   */
+  private encryptedChannelPassword(): string {
+    if (!this.encryptionKey) {
+      return this.channelPassword;
+    }
+
+    const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    const encrypted = Buffer.concat([cipher.update(this.channelPassword, 'utf8'), cipher.final()]);
+    return Buffer.concat([iv, encrypted]).toString('base64');
+  }
+
+  /**
+   * Online Payments endUserId: 9-digit local MSISDN (e.g. 773047653).
+   */
+  private normalizeMsisdn(phone?: string): string {
     if (!phone) {
       throw new Error('Phone number is required for EcoCash payments');
     }
 
-    // Remove all non-numeric characters
     let cleaned = phone.replace(/\D/g, '');
-
-    // Handle different formats
     if (cleaned.startsWith('263')) {
       cleaned = cleaned.substring(3);
     } else if (cleaned.startsWith('0')) {
       cleaned = cleaned.substring(1);
     }
 
-    // EcoCash numbers start with 7 (71, 73, 74, 77, 78)
     if (!cleaned.startsWith('7') || cleaned.length !== 9) {
       throw new Error('Invalid EcoCash phone number format');
     }
 
-    return `263${cleaned}`;
+    return cleaned;
   }
 
   /**
-   * Map EcoCash status to ZeePay status
+   * EPG msisdn: international format (e.g. 263777000000).
    */
-  private mapEcoCashStatus(ecocashStatus: string): 'pending' | 'processing' | 'succeeded' | 'failed' | 'cancelled' {
-    const statusMap: Record<string, 'pending' | 'processing' | 'succeeded' | 'failed' | 'cancelled'> = {
-      'PENDING': 'pending',
-      'PROCESSING': 'processing',
-      'COMPLETED': 'succeeded',
-      'SUCCESS': 'succeeded',
-      'FAILED': 'failed',
-      'CANCELLED': 'cancelled',
-      'REJECTED': 'failed',
-    };
-
-    return statusMap[ecocashStatus.toUpperCase()] || 'pending';
+  private normalizeMsisdnEpg(phone?: string): string {
+    return `263${this.normalizeMsisdn(phone)}`;
   }
 
   /**
-   * Map EcoCash refund status to ZeePay refund status
+   * Provider references carry `correlator|msisdn` so that the Online
+   * Payments lookup (keyed on endUserId + clientCorrelator) stays
+   * resolvable across processes without extra storage.
    */
-  private mapRefundStatus(ecocashStatus: string): 'pending' | 'processing' | 'succeeded' | 'failed' {
-    const statusMap: Record<string, 'pending' | 'processing' | 'succeeded' | 'failed'> = {
-      'PENDING': 'pending',
-      'PROCESSING': 'processing',
-      'COMPLETED': 'succeeded',
-      'SUCCESS': 'succeeded',
-      'FAILED': 'failed',
-      'REJECTED': 'failed',
-    };
-
-    return statusMap[ecocashStatus.toUpperCase()] || 'pending';
-  }
-
-  /**
-   * Make HTTP request to EcoCash API
-   */
-  private async makeRequest(endpoint: string, method: string, body?: any): Promise<any> {
-    const url = `${this.baseUrl}${endpoint}`;
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.apiKey}`,
-      'X-Merchant-Code': this.merchantCode,
-    };
-
-    const options: RequestInit = {
-      method,
-      headers,
-    };
-
-    if (body) {
-      options.body = JSON.stringify(body);
+  private resolveCorrelator(providerReference: string): { correlator: string; msisdn: string } {
+    if (providerReference.includes('|')) {
+      const [correlator, msisdn] = providerReference.split('|');
+      return { correlator, msisdn };
     }
 
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`EcoCash API error: ${response.status} - ${errorText}`);
+    const cached = this.correlatorIndex.get(providerReference);
+    if (!cached) {
+      throw new Error(
+        `Cannot resolve ${providerReference}: the Online Payments lookup needs the customer MSISDN. ` +
+        'Provider references include it as "correlator|msisdn".'
+      );
     }
+    return { correlator: providerReference, msisdn: cached.msisdn };
+  }
 
-    return response.json();
+  private payoutServiceConfig(serviceType?: string): { code: string; channelCode: string } {
+    switch (serviceType) {
+      case 'enterprise_cash_in':
+      case 'ENTERPRISECASHINV2':
+        return { code: 'ENTERPRISECASHINV2', channelCode: '700002' };
+      case 'change_disbursement':
+      case 'CHANGEDISBURSEV2':
+        return { code: 'CHANGEDISBURSEV2', channelCode: '800002' };
+      case 'merchant_to_subscriber':
+      case 'MERCHTOSUBV2':
+      default:
+        return { code: 'MERCHTOSUBV2', channelCode: '800004' };
+    }
+  }
+
+  /**
+   * Map Online Payments transactionOperationStatus/responseCode to ZeePay status.
+   */
+  private mapOnlineStatus(response: any): PaymentStatus {
+    if (response.responseCode === '00') {
+      switch ((response.transactionOperationStatus || '').toLowerCase()) {
+        case 'charged':
+          return 'succeeded';
+        case 'refunded':
+        case 'reversed':
+          return 'cancelled';
+        default:
+          return 'processing';
+      }
+    }
+    if (response.responseCode) {
+      return 'failed';
+    }
+    return 'pending';
   }
 }

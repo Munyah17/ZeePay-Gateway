@@ -51,6 +51,12 @@ Payment state transitions are managed by a state machine in `src/lib/services/st
 ### Webhook Delivery
 Webhooks are delivered with retries using exponential backoff. Signatures are verified using HMAC-SHA256. Implementation in `src/lib/webhooks/delivery.ts`.
 
+### EcoCash Provider (real API)
+`src/lib/providers/ecocash/ecocash-provider.ts` implements the real EcoCash developer API: Online Payments (Basic auth, `/payment/v1/transactions/amount/` + `/refund/`, lookup keyed on `endUserId`+`clientCorrelator`) for collections, and the shared EPG `/api/serviceRequest` endpoint (`X-Client-Id`/`X-Client-Secret` headers + channel API user) for disbursements — `ENTERPRISECASHINV2`, `CHANGEDISBURSEV2`, `MERCHTOSUBV2`, `EXTERNALTRANSACTIONLOOKUP`. Provider references encode `correlator|msisdn` for lookups. Merchant provider credentials live in `merchant_provider_accounts.credentials_encrypted` (AES-256-GCM via `src/lib/utils/crypto.ts`).
+
+### Payouts / Disbursements
+`src/lib/services/payout-service.ts` + `POST/GET /api/v1/payouts` (+`/payouts/:externalReference` lookup). `externalReference` is the idempotency key (unique per merchant).
+
 ### Subscriptions / Auto-Deduct
 Recurring billing is implemented via **payment mandates** — standing authorizations the customer approves once, after which ZeePay debits automatically (including mobile money methods with no native recurring support). Service: `src/lib/services/subscription-service.ts`. Provider mandate methods: `createMandate`, `chargeMandate`, `revokeMandate` on the `PaymentProvider` interface. The billing engine runs via `POST /api/v1/subscriptions/process-due` (secured by `CRON_SECRET` env, schedule hourly).
 

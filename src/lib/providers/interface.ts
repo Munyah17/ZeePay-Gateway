@@ -8,6 +8,9 @@ import {
   MandateResult,
   ChargeMandateInput,
   RevokeMandateInput,
+  PayoutInput,
+  PayoutResult,
+  GetPayoutInput,
   ProviderConfig,
   PaymentProviderCapabilities,
 } from '@/types/provider';
@@ -92,4 +95,17 @@ export interface PaymentProvider {
    * Optional - only providers supporting recurring payments implement this.
    */
   revokeMandate?(input: RevokeMandateInput): Promise<void>;
+
+  /**
+   * Create a payout — disburse funds to a customer's wallet
+   * (e.g. EcoCash Enterprise Cash-In, Disburse Change, Merchant to Subscriber).
+   * Optional - only providers supporting disbursements implement this.
+   */
+  createPayout?(input: PayoutInput): Promise<PayoutResult>;
+
+  /**
+   * Look up a payout/transaction by the merchant's external reference.
+   * Optional - only providers supporting disbursements implement this.
+   */
+  getPayout?(input: GetPayoutInput): Promise<PayoutResult>;
 }

@@ -12,6 +12,9 @@ import {
   MandateResult,
   ChargeMandateInput,
   RevokeMandateInput,
+  PayoutInput,
+  PayoutResult,
+  GetPayoutInput,
   PaymentProviderCapabilities,
 } from '@/types/provider';
 
@@ -75,6 +78,14 @@ export abstract class BasePaymentProvider implements PaymentProvider {
 
   async revokeMandate?(input: RevokeMandateInput): Promise<void> {
     throw new Error(`Mandate revocation not supported by provider ${this.name}`);
+  }
+
+  async createPayout?(input: PayoutInput): Promise<PayoutResult> {
+    throw new Error(`Payouts not supported by provider ${this.name}`);
+  }
+
+  async getPayout?(input: GetPayoutInput): Promise<PayoutResult> {
+    throw new Error(`Payout lookup not supported by provider ${this.name}`);
   }
 
   verifyWebhook?(payload: string, signature: string, secret: string): boolean {

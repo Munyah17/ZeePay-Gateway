@@ -193,6 +193,26 @@ CREATE TABLE subscription_charges (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Payouts table (disbursements to customer wallets)
+CREATE TABLE payouts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id),
+  provider_name VARCHAR(50) NOT NULL, -- ecocash, etc.
+  service_type VARCHAR(50) NOT NULL, -- enterprise_cash_in, change_disbursement, merchant_to_subscriber
+  external_reference VARCHAR(255) NOT NULL,
+  provider_reference VARCHAR(255), -- Provider's transaction id (e.g. CI260807.…)
+  amount DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  recipient_msisdn VARCHAR(20) NOT NULL,
+  beneficiary_reference VARCHAR(255),
+  status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, processing, succeeded, failed
+  error_message TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(merchant_id, external_reference)
+);
+
 -- Webhook endpoints table
 CREATE TABLE webhook_endpoints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -281,6 +301,9 @@ CREATE INDEX idx_subscriptions_merchant_id ON subscriptions(merchant_id);
 CREATE INDEX idx_subscriptions_status ON subscriptions(status);
 CREATE INDEX idx_subscriptions_next_billing ON subscriptions(next_billing_date) WHERE status = 'active';
 CREATE INDEX idx_subscription_charges_subscription_id ON subscription_charges(subscription_id);
+CREATE INDEX idx_payouts_merchant_id ON payouts(merchant_id);
+CREATE INDEX idx_payouts_status ON payouts(status);
+CREATE INDEX idx_payouts_external_reference ON payouts(external_reference);
 CREATE INDEX idx_payment_attempts_payment_id ON payment_attempts(payment_id);
 CREATE INDEX idx_payment_attempts_provider_reference ON payment_attempts(provider_reference);
 CREATE INDEX idx_webhook_deliveries_endpoint_id ON webhook_deliveries(webhook_endpoint_id);
@@ -328,6 +351,9 @@ CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_subscription_charges_updated_at BEFORE UPDATE ON subscription_charges
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_payouts_updated_at BEFORE UPDATE ON payouts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_webhook_endpoints_updated_at BEFORE UPDATE ON webhook_endpoints
