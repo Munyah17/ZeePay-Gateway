@@ -416,3 +416,16 @@ ON CONFLICT (name) DO UPDATE SET
   provider_type = EXCLUDED.provider_type,
   capabilities = EXCLUDED.capabilities,
   config_schema = EXCLUDED.config_schema;
+
+INSERT INTO payment_providers (name, provider_type, supports_test, supports_live, capabilities, config_schema)
+VALUES
+  ('zimswitch', 'card', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": false}',
+   '{
+     "entityId": {"label": "Entity ID (issued by acquiring bank)", "required": true},
+     "accessToken": {"label": "Bearer access token", "required": true, "secret": true}
+   }')
+ON CONFLICT (name) DO UPDATE SET
+  provider_type = EXCLUDED.provider_type,
+  capabilities = EXCLUDED.capabilities,
+  config_schema = EXCLUDED.config_schema;

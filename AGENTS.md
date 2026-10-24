@@ -54,6 +54,9 @@ Webhooks are delivered with retries using exponential backoff. Signatures are ve
 ### EcoCash Provider (real API)
 `src/lib/providers/ecocash/ecocash-provider.ts` implements the real EcoCash developer API: Online Payments (Basic auth, `/payment/v1/transactions/amount/` + `/refund/`, lookup keyed on `endUserId`+`clientCorrelator`) for collections, and the shared EPG `/api/serviceRequest` endpoint (`X-Client-Id`/`X-Client-Secret` headers + channel API user) for disbursements — `ENTERPRISECASHINV2`, `CHANGEDISBURSEV2`, `MERCHTOSUBV2`, `EXTERNALTRANSACTIONLOOKUP`. Provider references encode `correlator|msisdn` for lookups. Merchant provider credentials live in `merchant_provider_accounts.credentials_encrypted` (AES-256-GCM via `src/lib/utils/crypto.ts`).
 
+### Card Processing (ZimSwitch Online)
+`src/lib/providers/cards/zimswitch-provider.ts` implements the ZimSwitch Online gateway API (ACI/OPE-style): `POST /v1/checkouts` → hosted COPYandPAY widget (low PCI scope), `GET /v1/checkouts/{id}/payment` verify, `POST /v1/payments/{id}` RF refunds, `createRegistration` tokenization + `/v1/registrations/{id}/payments` for recurring MIT debits. Auth: Bearer token + `entityId` — both issued by an acquiring bank. ZimSwitch Online handles domestic ZimSwitch cards + international Visa/Mastercard through one integration.
+
 ### Payouts / Disbursements
 `src/lib/services/payout-service.ts` + `POST/GET /api/v1/payouts` (+`/payouts/:externalReference` lookup). `externalReference` is the idempotency key (unique per merchant).
 

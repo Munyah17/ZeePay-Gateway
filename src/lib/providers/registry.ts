@@ -5,6 +5,7 @@ import { InnBucksProvider } from './innbucks/innbucks-provider';
 import { OmariProvider } from './omari/omari-provider';
 import { VisaProvider } from './cards/visa-provider';
 import { MastercardProvider } from './cards/mastercard-provider';
+import { ZimSwitchProvider } from './cards/zimswitch-provider';
 
 /**
  * Registry for managing payment providers.
@@ -23,6 +24,7 @@ export class PaymentProviderRegistry {
     this.register(new OmariProvider());
     this.register(new VisaProvider());
     this.register(new MastercardProvider());
+    this.register(new ZimSwitchProvider());
   }
 
   /**
