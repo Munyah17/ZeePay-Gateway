@@ -4,111 +4,35 @@ interface StatusBadgeProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-export default function StatusBadge({ status, type = 'default', size = 'sm' }: StatusBadgeProps) {
-  const getStatusConfig = () => {
-    const normalizedStatus = status.toLowerCase().replace(/[_\s-]/g, '');
+export type StatusTone = 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'primary';
 
-    // Payment statuses
-    if (type === 'payment') {
-      const paymentStatuses: Record<string, { color: string; label: string }> = {
-        created: { color: 'bg-secondary', label: 'Created' },
-        pending: { color: 'bg-warning text-dark', label: 'Pending' },
-        processing: { color: 'bg-info text-dark', label: 'Processing' },
-        succeeded: { color: 'bg-success', label: 'Succeeded' },
-        failed: { color: 'bg-danger', label: 'Failed' },
-        cancelled: { color: 'bg-secondary', label: 'Cancelled' },
-        expired: { color: 'bg-secondary', label: 'Expired' },
-      };
-      return paymentStatuses[normalizedStatus] || { color: 'bg-secondary', label: status };
-    }
+const TONES: Record<StatusTone, string[]> = {
+  success: ['active', 'succeeded', 'success', 'completed', 'complete', 'approved', 'paid', 'reconciled', 'connected', 'resolved', 'healthy', 'operational', 'enabled', 'on', 'verified', 'live', 'passed', 'delivered', 'settled', 'online', 'compliant', 'up', 'granted', 'published', 'won', 'low'],
+  danger: ['failed', 'failure', 'rejected', 'suspended', 'blocked', 'unavailable', 'exception', 'critical', 'error', 'down', 'declined', 'revoked', 'lost', 'breach', 'terminated', 'fraud', 'high', 'exhausted', 'overdue', 'denied', 'locked', 'banned'],
+  warning: ['pending', 'pendingreview', 'pendingapproval', 'underreview', 'review', 'degraded', 'restricted', 'warning', 'medium', 'awaiting', 'processing', 'investigating', 'escalated', 'open', 'additionalinformationrequired', 'expiring', 'atrisk', 'partial', 'onhold', 'paused', 'flagged', 'retrying', 'due', 'draft'],
+  info: ['created', 'requested', 'submitted', 'expected', 'sandbox', 'scheduled', 'new', 'invited', 'test', 'beta', 'inprogress', 'queued', 'running', 'testing', 'monitoring', 'info', 'rollout'],
+  primary: ['superadmin', 'admin', 'owner', 'primary', 'default'],
+  neutral: ['inactive', 'cancelled', 'canceled', 'expired', 'closed', 'disabled', 'off', 'planned', 'archived', 'deprecated', 'none', 'n/a'],
+};
 
-    // Refund statuses
-    if (type === 'refund') {
-      const refundStatuses: Record<string, { color: string; label: string }> = {
-        requested: { color: 'bg-info text-dark', label: 'Requested' },
-        pending: { color: 'bg-warning text-dark', label: 'Pending' },
-        succeeded: { color: 'bg-success', label: 'Succeeded' },
-        failed: { color: 'bg-danger', label: 'Failed' },
-        rejected: { color: 'bg-danger', label: 'Rejected' },
-      };
-      return refundStatuses[normalizedStatus] || { color: 'bg-secondary', label: status };
-    }
+export function statusTone(status: string): StatusTone {
+  const n = String(status ?? '').toLowerCase().replace(/[_\s-]/g, '');
+  for (const tone of Object.keys(TONES) as StatusTone[]) {
+    if (TONES[tone].includes(n)) return tone;
+  }
+  for (const tone of ['danger', 'warning', 'success', 'info'] as StatusTone[]) {
+    if (TONES[tone].some((k) => k.length > 3 && n.includes(k))) return tone;
+  }
+  return 'neutral';
+}
 
-    // Merchant statuses
-    if (type === 'merchant') {
-      const merchantStatuses: Record<string, { color: string; label: string }> = {
-        application: { color: 'bg-info text-dark', label: 'Application' },
-        underreview: { color: 'bg-warning text-dark', label: 'Under Review' },
-        active: { color: 'bg-success', label: 'Active' },
-        restricted: { color: 'bg-warning text-dark', label: 'Restricted' },
-        suspended: { color: 'bg-danger', label: 'Suspended' },
-        closed: { color: 'bg-secondary', label: 'Closed' },
-      };
-      return merchantStatuses[normalizedStatus] || { color: 'bg-secondary', label: status };
-    }
-
-    // Provider statuses
-    if (type === 'provider') {
-      const providerStatuses: Record<string, { color: string; label: string }> = {
-        planned: { color: 'bg-secondary', label: 'Planned' },
-        pendingapproval: { color: 'bg-warning text-dark', label: 'Pending Approval' },
-        sandbox: { color: 'bg-info text-dark', label: 'Sandbox' },
-        connected: { color: 'bg-success', label: 'Connected' },
-        degraded: { color: 'bg-warning text-dark', label: 'Degraded' },
-        unavailable: { color: 'bg-danger', label: 'Unavailable' },
-        suspended: { color: 'bg-danger', label: 'Suspended' },
-      };
-      return providerStatuses[normalizedStatus] || { color: 'bg-secondary', label: status };
-    }
-
-    // Settlement statuses
-    if (type === 'settlement') {
-      const settlementStatuses: Record<string, { color: string; label: string }> = {
-        expected: { color: 'bg-info text-dark', label: 'Expected' },
-        pending: { color: 'bg-warning text-dark', label: 'Pending' },
-        reconciled: { color: 'bg-success', label: 'Reconciled' },
-        exception: { color: 'bg-danger', label: 'Exception' },
-        paid: { color: 'bg-success', label: 'Paid' },
-        failed: { color: 'bg-danger', label: 'Failed' },
-      };
-      return settlementStatuses[normalizedStatus] || { color: 'bg-secondary', label: status };
-    }
-
-    // Application statuses
-    if (type === 'application') {
-      const applicationStatuses: Record<string, { color: string; label: string }> = {
-        draft: { color: 'bg-secondary', label: 'Draft' },
-        submitted: { color: 'bg-info text-dark', label: 'Submitted' },
-        underreview: { color: 'bg-warning text-dark', label: 'Under Review' },
-        additionalinformationrequired: { color: 'bg-warning text-dark', label: 'Additional Info Required' },
-        approved: { color: 'bg-success', label: 'Approved' },
-        rejected: { color: 'bg-danger', label: 'Rejected' },
-      };
-      return applicationStatuses[normalizedStatus] || { color: 'bg-secondary', label: status };
-    }
-
-    // Default fallback
-    const defaultStatuses: Record<string, { color: string; label: string }> = {
-      active: { color: 'bg-success', label: 'Active' },
-      inactive: { color: 'bg-secondary', label: 'Inactive' },
-      pending: { color: 'bg-warning text-dark', label: 'Pending' },
-      completed: { color: 'bg-success', label: 'Completed' },
-      failed: { color: 'bg-danger', label: 'Failed' },
-      cancelled: { color: 'bg-secondary', label: 'Cancelled' },
-    };
-    return defaultStatuses[normalizedStatus] || { color: 'bg-secondary', label: status };
-  };
-
-  const config = getStatusConfig();
-  const sizeClasses = {
-    sm: 'small',
-    md: '',
-    lg: 'fs-6',
-  };
-
+export default function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
+  const label = String(status ?? '');
+  const tone = statusTone(label);
   return (
-    <span className={`badge ${config.color} ${sizeClasses[size]}`}>
-      {config.label}
+    <span className={`zp-badge zp-badge-${tone} ${size === 'lg' ? 'zp-badge-lg' : ''}`}>
+      <span className="zp-badge-dot" />
+      {label.charAt(0).toUpperCase() + label.slice(1)}
     </span>
   );
 }

@@ -100,7 +100,7 @@ export default function DeveloperPlatform() {
               <Link href="/dashboard/settings" className="card text-decoration-none text-dark h-100">
                 <div className="card-body">
                   <div className="text-primary mb-2">
-                    <i className="bi bi-webhook fs-4"></i>
+                    <i className="bi bi-broadcast fs-4"></i>
                   </div>
                   <h6 className="mb-1">Webhooks</h6>
                   <p className="text-muted small mb-0">Configure webhook endpoints</p>

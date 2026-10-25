@@ -327,7 +327,7 @@ function TransactionInvestigationContent() {
                           Review Refund
                         </button>
                         <button className="btn btn-outline-primary text-start">
-                          <i className="bi bi-webhook me-2"></i>
+                          <i className="bi bi-broadcast me-2"></i>
                           Inspect Webhooks
                         </button>
                       </div>

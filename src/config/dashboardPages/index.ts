@@ -16,5 +16,5 @@ export function getPageConfig(route: string): PageConfig {
   if (!config) {
     throw new Error(`No dashboard page config for route: ${route}`);
   }
-  return config;
+  return { ...config, id: config.id || route };
 }

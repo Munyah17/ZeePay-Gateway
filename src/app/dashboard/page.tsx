@@ -125,7 +125,7 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="mb-4">
-            <h2 className="h4">Good afternoon, {user?.name?.split(' ')[0] || 'John'} 👋</h2>
+            <h2 className="h4">Good afternoon, {user?.name?.split(' ')[0] || 'John'}</h2>
             <p className="text-muted">Here's what's happening with your payments</p>
           </div>
 
