@@ -4,11 +4,36 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+
+interface Card {
+  id: string;
+  type: string;
+  last4: string;
+  expiry: string | null;
+  holder: string;
+  balance: number;
+  currency: string;
+  status: string;
+  isDefault: boolean;
+  color: string;
+  icon: string;
+}
 
 export default function Cards() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [managing, setManaging] = useState<Card | null>(null);
+  const [removing, setRemoving] = useState<Card | null>(null);
+  const [lockConfirm, setLockConfirm] = useState<Card | null>(null);
+  const [form, setForm] = useState({ type: 'Visa', number: '', expiry: '', cvv: '', holder: '', setDefault: false });
+
+  const persist = (next: Card[]) => {
+    setCards(next);
+    try { localStorage.setItem('zeepay_user_cards', JSON.stringify(next)); } catch { /* noop */ }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -18,10 +43,56 @@ export default function Cards() {
         return;
       }
     }
+    try {
+      const saved = localStorage.getItem('zeepay_user_cards');
+      setCards(saved ? JSON.parse(saved) : seedCards);
+    } catch {
+      setCards(seedCards);
+    }
     setLoading(false);
   }, [router]);
 
-  const cards = [
+  const addCard = () => {
+    const digits = form.number.replace(/\D/g, '');
+    if (digits.length < 12 || !form.expiry.trim() || !form.holder.trim()) {
+      toast('Enter a valid card number, expiry and holder name', 'warning');
+      return;
+    }
+    const card: Card = {
+      id: `card_${Math.random().toString(36).slice(2, 6)}`,
+      type: form.type,
+      last4: digits.slice(-4),
+      expiry: form.expiry.trim(),
+      holder: form.holder.trim(),
+      balance: 0,
+      currency: 'USD',
+      status: 'Active',
+      isDefault: form.setDefault,
+      color: form.type === 'Visa' ? 'bg-primary' : form.type === 'Mastercard' ? 'bg-danger' : 'bg-dark',
+      icon: '💳',
+    };
+    const next = form.setDefault ? cards.map((c) => ({ ...c, isDefault: false })) : [...cards];
+    persist([card, ...next]);
+    setShowAddModal(false);
+    setForm({ type: 'Visa', number: '', expiry: '', cvv: '', holder: '', setDefault: false });
+    toast(`${card.type} •••• ${card.last4} added`);
+  };
+
+  const toggleLock = (card: Card) => {
+    const next = card.status === 'Blocked' ? 'Active' : 'Blocked';
+    persist(cards.map((c) => (c.id === card.id ? { ...c, status: next } : c)));
+    setLockConfirm(null);
+    toast(`${card.type} •••• ${card.last4} ${next === 'Blocked' ? 'locked' : 'unlocked'}`, next === 'Blocked' ? 'warning' : 'success');
+  };
+
+  const confirmRemove = () => {
+    if (!removing) return;
+    persist(cards.filter((c) => c.id !== removing.id));
+    setRemoving(null);
+    toast('Card removed', 'info');
+  };
+
+  const seedCards: Card[] = [
     {
       id: 'card_001',
       type: 'Visa',
@@ -82,7 +153,7 @@ export default function Cards() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">My Cards</h2>
         <p className="text-muted">Manage your payment cards and wallets</p>
@@ -139,9 +210,14 @@ export default function Cards() {
                   <div className={`card-body ${card.color} text-white`}>
                     <div className="d-flex justify-content-between align-items-start mb-4">
                       <span className="fs-3">{card.icon}</span>
-                      {card.isDefault && (
-                        <span className="badge bg-light text-dark">Default</span>
-                      )}
+                      <div className="d-flex gap-1">
+                        {card.isDefault && (
+                          <span className="badge bg-light text-dark">Default</span>
+                        )}
+                        {card.status === 'Blocked' && (
+                          <span className="badge bg-dark">Locked</span>
+                        )}
+                      </div>
                     </div>
                     <div className="mb-4">
                       <p className="text-white-50 small mb-1">Balance</p>
@@ -164,7 +240,24 @@ export default function Cards() {
                         <h6 className="mb-0 small fw-medium">{card.type}</h6>
                         <small className="text-muted">{card.holder}</small>
                       </div>
-                      <StatusBadge status={card.status} type="default" size="sm" />
+                      <div className="d-flex align-items-center gap-1">
+                        <StatusBadge status={card.status} type="default" size="sm" />
+                        <div className="btn-group btn-group-sm">
+                          <button
+                            className="btn btn-outline-secondary"
+                            title={card.status === 'Blocked' ? 'Unlock' : 'Lock'}
+                            onClick={() => setLockConfirm(card)}
+                          >
+                            <i className={`bi ${card.status === 'Blocked' ? 'bi-unlock' : 'bi-lock'}`}></i>
+                          </button>
+                          <button className="btn btn-outline-secondary" title="Details" onClick={() => setManaging(card)}>
+                            <i className="bi bi-eye"></i>
+                          </button>
+                          <button className="btn btn-outline-danger" title="Remove" onClick={() => setRemoving(card)}>
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -238,7 +331,11 @@ export default function Cards() {
                   <div className="modal-body">
                     <div className="mb-3">
                       <label className="form-label">Card Type</label>
-                      <select className="form-select">
+                      <select
+                        className="form-select"
+                        value={form.type}
+                        onChange={(e) => setForm({ ...form, type: e.target.value })}
+                      >
                         <option>Visa</option>
                         <option>Mastercard</option>
                         <option>American Express</option>
@@ -246,24 +343,55 @@ export default function Cards() {
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Card Number *</label>
-                      <input type="text" className="form-control" placeholder="1234 5678 9012 3456" />
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="1234 5678 9012 3456"
+                        value={form.number}
+                        onChange={(e) => setForm({ ...form, number: e.target.value })}
+                      />
                     </div>
                     <div className="row g-3 mb-3">
                       <div className="col-6">
                         <label className="form-label">Expiry Date *</label>
-                        <input type="text" className="form-control" placeholder="MM/YY" />
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="MM/YY"
+                          value={form.expiry}
+                          onChange={(e) => setForm({ ...form, expiry: e.target.value })}
+                        />
                       </div>
                       <div className="col-6">
                         <label className="form-label">CVV *</label>
-                        <input type="text" className="form-control" placeholder="123" />
+                        <input
+                          type="password"
+                          className="form-control"
+                          placeholder="123"
+                          maxLength={4}
+                          value={form.cvv}
+                          onChange={(e) => setForm({ ...form, cvv: e.target.value.replace(/\D/g, '') })}
+                        />
                       </div>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Cardholder Name *</label>
-                      <input type="text" className="form-control" placeholder="Name on card" />
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Name on card"
+                        value={form.holder}
+                        onChange={(e) => setForm({ ...form, holder: e.target.value })}
+                      />
                     </div>
                     <div className="form-check mb-3">
-                      <input className="form-check-input" type="checkbox" id="setDefault" />
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="setDefault"
+                        checked={form.setDefault}
+                        onChange={(e) => setForm({ ...form, setDefault: e.target.checked })}
+                      />
                       <label className="form-check-label" htmlFor="setDefault">
                         Set as default payment method
                       </label>
@@ -273,7 +401,7 @@ export default function Cards() {
                     <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                       Cancel
                     </button>
-                    <button type="button" className="btn btn-primary" onClick={() => setShowAddModal(false)}>
+                    <button type="button" className="btn btn-primary" onClick={addCard}>
                       Add Card
                     </button>
                   </div>
@@ -290,28 +418,106 @@ export default function Cards() {
             <div className="card-body">
               <div className="row g-3">
                 <div className="col-md-4">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    onClick={() => {
+                      const def = cards.find((c) => c.isDefault) || cards[0];
+                      if (def) setLockConfirm(def);
+                      else toast('No cards to lock', 'info');
+                    }}
+                  >
                     <i className="bi bi-lock me-2"></i>
                     Lock Card
                   </button>
                 </div>
                 <div className="col-md-4">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    onClick={() => {
+                      const def = cards.find((c) => c.isDefault) || cards[0];
+                      if (def) setManaging(def);
+                      else toast('No cards to manage', 'info');
+                    }}
+                  >
                     <i className="bi bi-gear me-2"></i>
                     Card Settings
                   </button>
                 </div>
                 <div className="col-md-4">
-                  <button className="btn btn-outline-primary w-100">
+                  <Link href="/user/history" className="btn btn-outline-primary w-100">
                     <i className="bi bi-file-earmark-text me-2"></i>
                     View Statements
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
           </div>
         </>
       )}
-    </>
+
+      {/* Card details modal */}
+      {managing && (
+        <Modal title={`${managing.type} •••• ${managing.last4}`} onClose={() => setManaging(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Holder</span>
+              <span className="small fw-medium">{managing.holder}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Balance</span>
+              <span className="small fw-medium">{managing.currency} {managing.balance.toFixed(2)}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Expiry</span>
+              <span className="small">{managing.expiry || 'N/A'}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <StatusBadge status={managing.status} type="default" size="sm" />
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Default</span>
+              <span className="small">{managing.isDefault ? 'Yes' : 'No'}</span>
+            </li>
+          </ul>
+          {!managing.isDefault && (
+            <button
+              className="btn btn-outline-primary btn-sm mt-3 w-100"
+              onClick={() => {
+                persist(cards.map((c) => ({ ...c, isDefault: c.id === managing.id })));
+                setManaging(null);
+                toast('Default payment method updated');
+              }}
+            >
+              Set as default
+            </button>
+          )}
+        </Modal>
+      )}
+
+      {/* Lock confirm */}
+      {lockConfirm && (
+        <ConfirmDialog
+          title={lockConfirm.status === 'Blocked' ? 'Unlock card' : 'Lock card'}
+          message={`${lockConfirm.status === 'Blocked' ? 'Unlock' : 'Lock'} ${lockConfirm.type} •••• ${lockConfirm.last4}? ${lockConfirm.status === 'Blocked' ? '' : 'It cannot be used for payments while locked.'}`}
+          confirmLabel={lockConfirm.status === 'Blocked' ? 'Unlock' : 'Lock'}
+          tone="warning"
+          onConfirm={() => toggleLock(lockConfirm)}
+          onCancel={() => setLockConfirm(null)}
+        />
+      )}
+
+      {/* Remove confirm */}
+      {removing && (
+        <ConfirmDialog
+          title="Remove card"
+          message={`Remove ${removing.type} •••• ${removing.last4} from your account?`}
+          confirmLabel="Remove"
+          tone="danger"
+          onConfirm={confirmRemove}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
+    </ToastProvider>
   );
 }

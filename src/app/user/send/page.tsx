@@ -11,6 +11,34 @@ export default function SendMoney() {
   const [recipient, setRecipient] = useState('');
   const [selectedMethod, setSelectedMethod] = useState('ecocash');
   const [step, setStep] = useState(1);
+  const [sending, setSending] = useState(false);
+  const [sentRef, setSentRef] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+
+  const confirmSend = () => {
+    const method = paymentMethods.find((m) => m.id === selectedMethod);
+    if (method && parseFloat(amount) > method.balance) {
+      setStep(2);
+      alert(`Insufficient balance in ${method.name}`);
+      return;
+    }
+    setSending(true);
+    setTimeout(() => {
+      setSending(false);
+      setSentRef(`txn_${Math.random().toString(36).slice(2, 10).toUpperCase()}`);
+      setStep(4);
+    }, 1500);
+  };
+
+  const resetFlow = () => {
+    setStep(1);
+    setAmount('');
+    setRecipient('');
+    setRecipientName('');
+    setNote('');
+    setSentRef(null);
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -111,7 +139,13 @@ export default function SendMoney() {
 
                       <div className="mb-3">
                         <label className="form-label">Recipient Name (Optional)</label>
-                        <input type="text" className="form-control" placeholder="Enter recipient name" />
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Enter recipient name"
+                          value={recipientName}
+                          onChange={(e) => setRecipientName(e.target.value)}
+                        />
                       </div>
 
                       <button className="btn btn-primary w-100" onClick={() => setStep(2)} disabled={!recipient}>
@@ -176,7 +210,13 @@ export default function SendMoney() {
                       {/* Note */}
                       <div className="mb-4">
                         <label className="form-label">Note (Optional)</label>
-                        <textarea className="form-control" rows={2} placeholder="What's this for?"></textarea>
+                        <textarea
+                          className="form-control"
+                          rows={2}
+                          placeholder="What's this for?"
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                        ></textarea>
                       </div>
 
                       <div className="d-flex gap-2">
@@ -235,11 +275,35 @@ export default function SendMoney() {
                         <button className="btn btn-outline-secondary flex-grow-1" onClick={() => setStep(2)}>
                           Back
                         </button>
-                        <button className="btn btn-success flex-grow-1" onClick={() => setStep(1)}>
-                          Confirm & Send
+                        <button className="btn btn-success flex-grow-1" onClick={confirmSend} disabled={sending}>
+                          {sending ? 'Sending…' : 'Confirm & Send'}
                         </button>
                       </div>
                     </>
+                  )}
+
+                  {step === 4 && sentRef && (
+                    <div className="text-center py-4">
+                      <div className="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px' }}>
+                        <i className="bi bi-check-lg fs-2"></i>
+                      </div>
+                      <h5>Transfer Sent</h5>
+                      <p className="text-muted small mb-1">
+                        ${parseFloat(amount).toFixed(2)} sent to {recipientName || recipient}
+                      </p>
+                      <p className="text-muted small">
+                        Reference: <code>{sentRef}</code>
+                      </p>
+                      {note && <p className="small text-muted fst-italic">“{note}”</p>}
+                      <div className="d-flex gap-2 justify-content-center mt-4">
+                        <button className="btn btn-outline-primary" onClick={resetFlow}>
+                          Send another
+                        </button>
+                        <Link href="/user/history" className="btn btn-primary">
+                          View history
+                        </Link>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

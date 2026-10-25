@@ -4,12 +4,32 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { ToastProvider, toast } from '@/components/ui';
+
+interface Approval {
+  id: string;
+  type: string;
+  queue: string;
+  title: string;
+  description: string;
+  submittedBy: string;
+  submittedDate: string;
+  priority: string;
+  status: string;
+  assignedTo: string | null;
+  estimatedReviewTime: string;
+  data: Record<string, string | number>;
+}
 
 export default function ApprovalQueues() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [selectedQueue, setSelectedQueue] = useState('all');
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState('All Priorities');
+  const [statusFilter, setStatusFilter] = useState('All Status');
+  const [autoApproving, setAutoApproving] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -19,8 +39,14 @@ export default function ApprovalQueues() {
         return;
       }
     }
+    setApprovals(seedApprovals);
     setLoading(false);
   }, [router]);
+
+  const setStatus = (id: string, status: string, msg: string) => {
+    setApprovals((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    toast(msg, status === 'Rejected' ? 'warning' : 'success');
+  };
 
   const approvalQueues = [
     {
@@ -60,7 +86,7 @@ export default function ApprovalQueues() {
     },
   ];
 
-  const allApprovals = [
+  const seedApprovals: Approval[] = [
     {
       id: 'app_001',
       type: 'Merchant Application',
@@ -153,9 +179,12 @@ export default function ApprovalQueues() {
     },
   ];
 
-  const filteredApprovals = selectedQueue === 'all' 
-    ? allApprovals 
-    : allApprovals.filter(app => app.queue === selectedQueue);
+  const filteredApprovals = approvals.filter(
+    (app) =>
+      (selectedQueue === 'all' || app.queue === selectedQueue) &&
+      (priorityFilter === 'All Priorities' || app.priority === priorityFilter) &&
+      (statusFilter === 'All Status' || app.status === statusFilter),
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -179,7 +208,7 @@ export default function ApprovalQueues() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Approval Queues</h2>
         <p className="text-muted">Review and approve pending requests across all platform areas</p>
@@ -199,7 +228,7 @@ export default function ApprovalQueues() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Total Pending</p>
-                  <p className="h3 mb-0 text-warning">{allApprovals.filter(a => a.status === 'Pending').length}</p>
+                  <p className="h3 mb-0 text-warning">{approvals.filter(a => a.status === 'Pending').length}</p>
                 </div>
               </div>
             </div>
@@ -207,7 +236,7 @@ export default function ApprovalQueues() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">In Review</p>
-                  <p className="h3 mb-0 text-info">{allApprovals.filter(a => a.status === 'In Review').length}</p>
+                  <p className="h3 mb-0 text-info">{approvals.filter(a => a.status === 'In Review').length}</p>
                 </div>
               </div>
             </div>
@@ -215,7 +244,7 @@ export default function ApprovalQueues() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Critical Priority</p>
-                  <p className="h3 mb-0 text-danger">{allApprovals.filter(a => a.priority === 'Critical').length}</p>
+                  <p className="h3 mb-0 text-danger">{approvals.filter(a => a.priority === 'Critical').length}</p>
                 </div>
               </div>
             </div>
@@ -239,7 +268,7 @@ export default function ApprovalQueues() {
                 <div className="card-body text-center">
                   <i className="bi bi-inbox fs-3 mb-2"></i>
                   <h6 className="mb-0">All Queues</h6>
-                  <p className="text-muted small mb-0">{allApprovals.length} items</p>
+                  <p className="text-muted small mb-0">{approvals.length} items</p>
                 </div>
               </button>
             </div>
@@ -267,19 +296,30 @@ export default function ApprovalQueues() {
                 {selectedQueue === 'all' ? 'All Approvals' : approvalQueues.find(q => q.id === selectedQueue)?.name}
               </h5>
               <div className="d-flex gap-2">
-                <select className="form-select form-select-sm" style={{ width: '120px' }}>
+                <select
+                  className="form-select form-select-sm"
+                  style={{ width: '120px' }}
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                >
                   <option>All Priorities</option>
                   <option>Critical</option>
                   <option>High</option>
                   <option>Medium</option>
                   <option>Low</option>
                 </select>
-                <select className="form-select form-select-sm" style={{ width: '120px' }}>
+                <select
+                  className="form-select form-select-sm"
+                  style={{ width: '120px' }}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
                   <option>All Status</option>
                   <option>Pending</option>
                   <option>In Review</option>
                   <option>Approved</option>
                   <option>Rejected</option>
+                  <option>On Hold</option>
                 </select>
               </div>
             </div>
@@ -326,10 +366,18 @@ export default function ApprovalQueues() {
                             <button className="btn btn-outline-primary" onClick={() => setSelectedItem(approval.id)}>
                               <i className="bi bi-eye"></i>
                             </button>
-                            <button className="btn btn-outline-success">
+                            <button
+                              className="btn btn-outline-success"
+                              title="Approve"
+                              onClick={() => setStatus(approval.id, 'Approved', `${approval.title} approved`)}
+                            >
                               <i className="bi bi-check-circle"></i>
                             </button>
-                            <button className="btn btn-outline-danger">
+                            <button
+                              className="btn btn-outline-danger"
+                              title="Reject"
+                              onClick={() => setStatus(approval.id, 'Rejected', `${approval.title} rejected`)}
+                            >
                               <i className="bi bi-x-circle"></i>
                             </button>
                           </div>
@@ -353,7 +401,7 @@ export default function ApprovalQueues() {
               </div>
               <div className="card-body">
                 {(() => {
-                  const approval = allApprovals.find(a => a.id === selectedItem);
+                  const approval = approvals.find(a => a.id === selectedItem);
                   if (!approval) return null;
                   return (
                     <div className="row g-4">
@@ -415,8 +463,16 @@ export default function ApprovalQueues() {
                         </div>
                         <div className="mt-3">
                           <label className="form-label small">Assign To</label>
-                          <select className="form-select form-select-sm">
-                            <option>Select reviewer...</option>
+                          <select
+                            className="form-select form-select-sm"
+                            value={approval.assignedTo || ''}
+                            onChange={(e) => {
+                              const assignedTo = e.target.value || null;
+                              setApprovals((prev) => prev.map((a) => (a.id === approval.id ? { ...a, assignedTo } : a)));
+                              if (assignedTo) toast(`Assigned to ${assignedTo}`, 'info');
+                            }}
+                          >
+                            <option value="">Select reviewer...</option>
                             <option>Sarah Johnson</option>
                             <option>Mike Davis</option>
                             <option>John Smith</option>
@@ -427,19 +483,22 @@ export default function ApprovalQueues() {
                       <div className="col-md-6">
                         <h6 className="mb-3">Review Actions</h6>
                         <div className="d-grid gap-2">
-                          <button className="btn btn-success">
+                          <button className="btn btn-success" onClick={() => setStatus(approval.id, 'Approved', `${approval.title} approved`)}>
                             <i className="bi bi-check-circle me-2"></i>
                             Approve
                           </button>
-                          <button className="btn btn-danger">
+                          <button className="btn btn-danger" onClick={() => setStatus(approval.id, 'Rejected', `${approval.title} rejected`)}>
                             <i className="bi bi-x-circle me-2"></i>
                             Reject
                           </button>
-                          <button className="btn btn-warning">
+                          <button className="btn btn-warning" onClick={() => setStatus(approval.id, 'On Hold', `${approval.title} put on hold`)}>
                             <i className="bi bi-pause-circle me-2"></i>
                             Put on Hold
                           </button>
-                          <button className="btn btn-outline-primary">
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => toast(`Info request sent to ${approval.submittedBy}`, 'info')}
+                          >
                             <i className="bi bi-chat-text me-2"></i>
                             Request More Info
                           </button>
@@ -460,25 +519,42 @@ export default function ApprovalQueues() {
             <div className="card-body">
               <div className="row g-3">
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    onClick={() => {
+                      setApprovals((prev) => prev.map((a) => (a.status === 'Pending' && !a.assignedTo ? { ...a, assignedTo: 'Sarah Johnson' } : a)));
+                      toast('Unassigned items assigned to Sarah Johnson', 'info');
+                    }}
+                  >
                     <i className="bi bi-people me-2"></i>
                     Assign Reviewers
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    disabled={autoApproving}
+                    onClick={() => {
+                      setAutoApproving(true);
+                      setTimeout(() => {
+                        setApprovals((prev) => prev.map((a) => (a.status === 'Pending' && a.priority === 'Low' ? { ...a, status: 'Approved' } : a)));
+                        setAutoApproving(false);
+                        toast('Low-risk pending items auto-approved');
+                      }, 1000);
+                    }}
+                  >
                     <i className="bi bi-lightning me-2"></i>
-                    Auto-Approve Low Risk
+                    {autoApproving ? 'Approving…' : 'Auto-Approve Low Risk'}
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button className="btn btn-outline-primary w-100" onClick={() => toast('Escalation rules are managed in governance settings', 'info')}>
                     <i className="bi bi-bell me-2"></i>
                     Set Escalation Rules
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button className="btn btn-outline-primary w-100" onClick={() => toast('Approval analytics coming soon', 'info')}>
                     <i className="bi bi-file-earmark-bar-graph me-2"></i>
                     Approval Analytics
                   </button>
@@ -488,6 +564,6 @@ export default function ApprovalQueues() {
           </div>
         </>
       )}
-    </>
+    </ToastProvider>
   );
 }

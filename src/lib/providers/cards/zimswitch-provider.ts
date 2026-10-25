@@ -11,6 +11,8 @@ import {
   RevokeMandateInput,
   PaymentProviderCapabilities,
   PaymentStatus,
+  CreatePaymentLinkInput,
+  PaymentLinkResult,
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../../config';
@@ -41,6 +43,26 @@ import { config } from '../../config';
  *   entityId      — merchant entity ID (issued by acquiring bank)
  *   accessToken   — Bearer access token (issued by acquiring bank)
  *   baseUrl       — optional override; defaults to ZimSwitch sandbox/live
+ *
+ * SECURITY REQUIREMENTS:
+ *
+ * COPYandPAY (hosted checkout, SAQ-A compliance):
+ *   - Never expose bearer tokens or entity ID in frontend JavaScript
+ *   - Prepare checkout and verify status on server-side only
+ *   - Never store or log full PAN, CVV, or PIN on your systems
+ *   - Use HTTPS for all checkout and callback URLs
+ *   - Always verify payment status server-side; redirect alone is not proof of payment
+ *   - Mask card references in logs; store only gateway transaction IDs
+ *   - Checkout IDs expire after 30 minutes or after successful payment
+ *
+ * Server-to-Server (direct card handling, PCI DSS required):
+ *   - PCI DSS compliance is MANDATORY if collecting, processing or transmitting card data
+ *   - Use COPYandPAY instead to minimise PCI scope
+ *   - Never log or persist full PAN, CVV or magnetic-stripe data
+ *   - Use TLS 1.2+ for all API communication
+ *   - Restrict access tokens to backend services with secrets management
+ *   - Validate amount, currency and merchant transaction ID on every status response
+ *   - Implement idempotent fulfilment to handle duplicate callbacks or retries
  */
 export class ZimSwitchProvider extends BasePaymentProvider {
   private baseUrl!: string;
@@ -60,6 +82,8 @@ export class ZimSwitchProvider extends BasePaymentProvider {
       // Tokenised registrations power recurring billing (MIT debits).
       supportsRecurring: true,
       createPayout: false,
+      // Pay by Link requires separate enablement from acquiring bank
+      createPaymentLink: true,
     };
   }
 
@@ -79,13 +103,37 @@ export class ZimSwitchProvider extends BasePaymentProvider {
   }
 
   /**
-   * Create a payment via the hosted-checkout flow (COPYandPAY).
-   * Returns a checkout URL — the merchant renders the widget (or redirects
-   * the shopper) there; card data never touches ZeePay's servers, keeping
-   * PCI scope minimal (SAQ A).
+   * Create a payment via COPYandPAY (hosted checkout) or server-to-server.
+   *
+   * COPYandPAY flow (default, SAQ-A compliance):
+   *   - No card data in request
+   *   - Returns checkout URL for hosted widget
+   *   - Card data never touches ZeePay servers
+   *
+   * Server-to-server flow (PCI DSS required):
+   *   - Requires cardData in input
+   *   - Direct POST to /v1/payments with card details
+   *   - Supports DB (debit), PA (pre-auth) payment types
+   *   - May return redirect parameters for async flows
    */
   async createPayment(input: CreatePaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+
+    // Server-to-server flow with card data (PCI DSS compliance required)
+    if (input.cardData) {
+      return this.createServerToServerPayment(input);
+    }
+
+    // COPYandPAY hosted checkout flow (default, SAQ-A compliance)
+    return this.createCheckoutPayment(input);
+  }
+
+  /**
+   * COPYandPAY hosted checkout flow — lowest PCI scope (SAQ-A).
+   * Card data is entered on gateway-hosted widget.
+   */
+  private async createCheckoutPayment(input: CreatePaymentInput): Promise<PaymentResult> {
+    const isTest = this.config?.environment === 'test';
 
     const params = new URLSearchParams({
       entityId: this.entityId,
@@ -93,15 +141,27 @@ export class ZimSwitchProvider extends BasePaymentProvider {
       currency: input.currency || 'USD',
       paymentType: 'DB',
       merchantTransactionId: input.reference,
-      shopperResultUrl: input.returnUrl || `${config.app.baseUrl}/checkout/complete`,
+      // testMode: 'EXTERNAL' for UAT sandbox, omit for production
+      ...(isTest ? { testMode: 'EXTERNAL' } : {}),
       ...(input.metadata?.paymentBrand ? { paymentBrand: input.metadata.paymentBrand } : {}),
       ...(input.metadata?.createRegistration ? { createRegistration: 'true' } : {}),
+      // shopperResultUrl is set on the paymentWidgets form (recommended pattern)
+      // but can be sent here as fallback if needed via metadata
+      ...(input.metadata?.shopperResultUrl ? { shopperResultUrl: input.metadata.shopperResultUrl } : {}),
     });
 
     try {
       const response = await this.request('/v1/checkouts', params);
 
-      const checkoutId = response.id;
+      if (!response) {
+        throw new Error('ZimSwitch API returned invalid response: null response');
+      }
+
+      const checkoutId = response.id as string | undefined;
+      if (!checkoutId) {
+        throw new Error('ZimSwitch API returned invalid response: missing checkout ID');
+      }
+
       return {
         id: uuidv4(),
         providerReference: checkoutId,
@@ -115,6 +175,82 @@ export class ZimSwitchProvider extends BasePaymentProvider {
       };
     } catch (error) {
       throw new Error(`ZimSwitch checkout creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Server-to-server payment flow — PCI DSS compliance required.
+   * Direct POST to /v1/payments with card details.
+   * Supports DB (debit), PA (pre-auth) payment types.
+   * May return redirect parameters for async flows (3DS, issuer validation).
+   */
+  private async createServerToServerPayment(input: CreatePaymentInput): Promise<PaymentResult> {
+    const isTest = this.config?.environment === 'test';
+    const paymentType = input.paymentType || 'DB';
+
+    const params = new URLSearchParams({
+      entityId: this.entityId,
+      amount: input.amount.toFixed(2),
+      currency: input.currency || 'USD',
+      paymentType,
+      merchantTransactionId: input.reference,
+      ...(isTest ? { testMode: 'EXTERNAL' } : {}),
+      ...(input.metadata?.paymentBrand ? { paymentBrand: input.metadata.paymentBrand } : {}),
+      // shopperResultUrl required for async flows
+      ...(input.returnUrl ? { shopperResultUrl: input.returnUrl } : {}),
+    });
+
+    // Add card data (PCI DSS compliance required)
+    if (input.cardData) {
+      params.append('card.number', input.cardData.number);
+      params.append('card.holder', input.cardData.holder);
+      params.append('card.expiryMonth', input.cardData.expiryMonth);
+      params.append('card.expiryYear', input.cardData.expiryYear);
+      params.append('card.cvv', input.cardData.cvv);
+    }
+
+    try {
+      const response = await this.request('/v1/payments', params);
+
+      if (!response) {
+        throw new Error('ZimSwitch API returned invalid response: null response');
+      }
+
+      const paymentId = response.id as string | undefined;
+      if (!paymentId) {
+        throw new Error('ZimSwitch API returned invalid response: missing payment ID');
+      }
+
+      // Check for async redirect (3DS, issuer validation)
+      if (response.redirect) {
+        return {
+          id: uuidv4(),
+          providerReference: paymentId,
+          status: 'processing',
+          checkoutUrl: response.redirect.url,
+          amount: input.amount,
+          currency: input.currency,
+          metadata: {
+            ...input.metadata,
+            redirectMethod: response.redirect.method,
+            redirectParameters: response.redirect.parameters,
+          },
+          providerResponse: response,
+        };
+      }
+
+      // Synchronous response
+      return {
+        id: uuidv4(),
+        providerReference: paymentId,
+        status: this.mapResultCode(response.result?.code),
+        amount: input.amount,
+        currency: input.currency,
+        metadata: input.metadata,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`ZimSwitch server-to-server payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -178,6 +314,90 @@ export class ZimSwitchProvider extends BasePaymentProvider {
       };
     } catch (error) {
       throw new Error(`ZimSwitch refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Capture a pre-authorised payment — POST /v1/payments/{id} with paymentType=CP.
+   * Used after PA (pre-authorisation) to settle reserved funds.
+   * paymentReference should be the payment ID from the original PA transaction.
+   */
+  async capturePayment(paymentReference: string, amount: number, currency: string, metadata?: Record<string, any>): Promise<PaymentResult> {
+    this.ensureInitialized();
+
+    const params = new URLSearchParams({
+      entityId: this.entityId,
+      amount: amount.toFixed(2),
+      currency,
+      paymentType: 'CP',
+    });
+
+    try {
+      const response = await this.request(`/v1/payments/${paymentReference}`, params);
+
+      return {
+        id: uuidv4(),
+        providerReference: response.id || paymentReference,
+        status: this.isSuccessCode(response.result?.code) ? 'succeeded' : 'failed',
+        amount,
+        currency,
+        metadata,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`ZimSwitch capture failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create a Pay by Link — shareable payment link for invoices, campaigns, events.
+   * Requires separate enablement from acquiring bank.
+   * Customer pays on a branded hosted page; merchant verifies status before fulfilment.
+   */
+  async createPaymentLink(input: CreatePaymentLinkInput): Promise<PaymentLinkResult> {
+    this.ensureInitialized();
+
+    const isTest = this.config?.environment === 'test';
+
+    const params = new URLSearchParams({
+      entityId: this.entityId,
+      amount: input.amount.toFixed(2),
+      currency: input.currency || 'USD',
+      paymentType: 'DB',
+      merchantTransactionId: input.reference,
+      ...(isTest ? { testMode: 'EXTERNAL' } : {}),
+      ...(input.description ? { description: input.description } : {}),
+      ...(input.expiryDate ? { expiryDate: input.expiryDate } : {}),
+      ...(input.customerEmail ? { customerEmail: input.customerEmail } : {}),
+      ...(input.customerPhone ? { customerPhone: input.customerPhone } : {}),
+    });
+
+    try {
+      // Pay by Link uses checkout endpoint with link-specific parameters
+      const response = await this.request('/v1/checkouts', params);
+
+      const checkoutId = response.id as string | undefined;
+      if (!checkoutId) {
+        throw new Error('ZimSwitch API returned invalid response: missing checkout ID');
+      }
+
+      // Generate payment link URL from checkout ID
+      const linkUrl = `${this.baseUrl}v1/paymentLinks/${checkoutId}`;
+
+      return {
+        id: uuidv4(),
+        providerReference: checkoutId,
+        linkUrl,
+        status: 'active',
+        amount: input.amount,
+        currency: input.currency,
+        reference: input.reference,
+        expiryDate: input.expiryDate,
+        metadata: input.metadata,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`ZimSwitch Pay by Link creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

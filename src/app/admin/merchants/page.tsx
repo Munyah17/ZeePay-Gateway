@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { downloadCSV } from '@/utils/actions';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
 
 interface Merchant {
   name: string;
@@ -16,6 +18,14 @@ export default function AdminMerchantsPage() {
   const router = useRouter();
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [managing, setManaging] = useState<Merchant | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<Merchant | null>(null);
+
+  const updateStatus = (m: Merchant, status: string, msg: string) => {
+    setMerchants((prev) => prev.map((x) => (x.email === m.email ? { ...x, status } : x)));
+    setManaging(null);
+    toast(msg);
+  };
 
   useEffect(() => {
     const authed = localStorage.getItem('zeepay_authed');
@@ -63,13 +73,14 @@ export default function AdminMerchantsPage() {
   };
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14">
             <div className="flex items-center gap-8">
               <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
+              <div className="hidden md:flex gap-6">
                 <Link href="/admin" className="text-xs text-gray-600 hover:text-gray-900">Platform overview</Link>
                 <Link href="/admin/merchants" className="text-xs text-gray-900">Merchants</Link>
                 <Link href="/admin/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
@@ -79,7 +90,7 @@ export default function AdminMerchantsPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">admin@zeepay.co.zw</span>
+              <span className="hidden md:inline text-xs text-gray-600">admin@zeepay.co.zw</span>
               <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
                 Sign out
               </button>
@@ -89,12 +100,21 @@ export default function AdminMerchantsPage() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-8 flex flex-wrap gap-3 justify-between items-center">
           <div>
             <h1 className="text-sm font-semibold text-gray-900">Merchants</h1>
             <p className="text-xs text-gray-600 mt-1">Review onboarding, monitor accounts, and manage access</p>
           </div>
-          <button className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50">
+          <button
+            className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50"
+            onClick={() => {
+              downloadCSV(
+                'merchants',
+                merchants.map((m) => ({ name: m.name, email: m.email, status: m.status, volume: m.volume, joined: m.joined })),
+              );
+              toast(`Exported ${merchants.length} merchants`);
+            }}
+          >
             ⇩ Export CSV
           </button>
         </div>
@@ -153,7 +173,9 @@ export default function AdminMerchantsPage() {
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{merchant.joined}</td>
                       <td className="px-4 py-3 text-xs">
-                        <button className="text-gray-600 hover:text-gray-900">Manage</button>
+                        <button className="text-gray-600 hover:text-gray-900" onClick={() => setManaging(merchant)}>
+                          Manage
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -163,6 +185,80 @@ export default function AdminMerchantsPage() {
           </div>
         )}
       </main>
-    </div>
+
+        {/* Manage modal */}
+        {managing && (
+          <Modal title={managing.name} onClose={() => setManaging(null)}>
+            <ul className="list-group list-group-flush">
+              <li className="list-group-item d-flex justify-content-between px-0">
+                <span className="small text-muted">Contact email</span>
+                <span className="small">{managing.email}</span>
+              </li>
+              <li className="list-group-item d-flex justify-content-between px-0">
+                <span className="small text-muted">Volume</span>
+                <span className="small fw-medium">${managing.volume.toLocaleString()}</span>
+              </li>
+              <li className="list-group-item d-flex justify-content-between px-0">
+                <span className="small text-muted">Status</span>
+                <span className="small">{managing.status}</span>
+              </li>
+              <li className="list-group-item d-flex justify-content-between px-0">
+                <span className="small text-muted">Joined</span>
+                <span className="small">{managing.joined}</span>
+              </li>
+            </ul>
+            <div className="d-flex gap-2 mt-3">
+              {managing.status === 'Pending review' && (
+                <>
+                  <button
+                    className="btn btn-success btn-sm flex-grow-1"
+                    onClick={() => updateStatus(managing, 'Active', `${managing.name} approved`)}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    className="btn btn-outline-danger btn-sm flex-grow-1"
+                    onClick={() => updateStatus(managing, 'Rejected', `${managing.name} rejected`)}
+                  >
+                    Reject
+                  </button>
+                </>
+              )}
+              {managing.status === 'Active' && (
+                <button
+                  className="btn btn-outline-danger btn-sm w-100"
+                  onClick={() => setSuspendTarget(managing)}
+                >
+                  Suspend merchant
+                </button>
+              )}
+              {managing.status === 'Suspended' && (
+                <button
+                  className="btn btn-success btn-sm w-100"
+                  onClick={() => updateStatus(managing, 'Active', `${managing.name} reactivated`)}
+                >
+                  Reactivate
+                </button>
+              )}
+            </div>
+          </Modal>
+        )}
+
+        {/* Suspend confirm */}
+        {suspendTarget && (
+          <ConfirmDialog
+            title="Suspend merchant"
+            message={`Suspend ${suspendTarget.name}? Their payments will be blocked until reactivated.`}
+            confirmLabel="Suspend"
+            tone="danger"
+            onConfirm={() => {
+              updateStatus(suspendTarget, 'Suspended', `${suspendTarget.name} suspended`);
+              setSuspendTarget(null);
+            }}
+            onCancel={() => setSuspendTarget(null)}
+          />
+        )}
+      </div>
+    </ToastProvider>
   );
 }

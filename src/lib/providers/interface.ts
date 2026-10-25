@@ -13,6 +13,8 @@ import {
   GetPayoutInput,
   ProviderConfig,
   PaymentProviderCapabilities,
+  CreatePaymentLinkInput,
+  PaymentLinkResult,
 } from '@/types/provider';
 
 // Re-export ProviderConfig for use in base class
@@ -108,4 +110,10 @@ export interface PaymentProvider {
    * Optional - only providers supporting disbursements implement this.
    */
   getPayout?(input: GetPayoutInput): Promise<PayoutResult>;
+
+  /**
+   * Create a payment link — shareable URL for invoices, campaigns, events.
+   * Optional - only providers supporting Pay by Link implement this.
+   */
+  createPaymentLink?(input: CreatePaymentLinkInput): Promise<PaymentLinkResult>;
 }

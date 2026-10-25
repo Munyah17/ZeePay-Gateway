@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { downloadCSV } from '@/utils/actions';
+import { ToastProvider, toast } from '@/components/ui';
 
 interface Transaction {
   id: string;
@@ -18,6 +20,7 @@ export default function AdminTransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const authed = localStorage.getItem('zeepay_authed');
@@ -64,18 +67,39 @@ export default function AdminTransactionsPage() {
     }
   };
 
-  const filteredTransactions = filter === 'All' 
-    ? transactions 
-    : transactions.filter(t => t.status === filter);
+  const filteredTransactions = transactions.filter(
+    (t) =>
+      (filter === 'All' || t.status === filter) &&
+      (!search ||
+        t.id.toLowerCase().includes(search.toLowerCase()) ||
+        t.merchant.toLowerCase().includes(search.toLowerCase()) ||
+        t.method.toLowerCase().includes(search.toLowerCase())),
+  );
+
+  const exportCsv = () => {
+    downloadCSV(
+      'admin-transactions',
+      filteredTransactions.map((t) => ({
+        id: t.id,
+        merchant: t.merchant,
+        amount: t.amount.toFixed(2),
+        method: t.method,
+        status: t.status,
+        date: t.date,
+      })),
+    );
+    toast(`Exported ${filteredTransactions.length} transactions`);
+  };
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14">
             <div className="flex items-center gap-8">
               <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
+              <div className="hidden md:flex gap-6">
                 <Link href="/admin" className="text-xs text-gray-600 hover:text-gray-900">Platform overview</Link>
                 <Link href="/admin/merchants" className="text-xs text-gray-600 hover:text-gray-900">Merchants</Link>
                 <Link href="/admin/transactions" className="text-xs text-gray-900">Transactions</Link>
@@ -85,7 +109,7 @@ export default function AdminTransactionsPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">admin@zeepay.co.zw</span>
+              <span className="hidden md:inline text-xs text-gray-600">admin@zeepay.co.zw</span>
               <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
                 Sign out
               </button>
@@ -106,12 +130,19 @@ export default function AdminTransactionsPage() {
           </div>
         ) : (
           <div className="border border-gray-200 rounded p-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-wrap gap-3 justify-between items-center mb-6">
               <div>
                 <h2 className="text-xs font-semibold text-gray-900">All platform transactions</h2>
                 <p className="text-xs text-gray-500 mt-1">{filteredTransactions.length} records · Demo data</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search ID, merchant, method…"
+                  className="border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-gray-500 w-48"
+                />
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
@@ -122,7 +153,10 @@ export default function AdminTransactionsPage() {
                   <option value="Pending">Pending</option>
                   <option value="Failed">Failed</option>
                 </select>
-                <button className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50">
+                <button
+                  className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50"
+                  onClick={exportCsv}
+                >
                   ⇩ Export CSV
                 </button>
               </div>
@@ -141,7 +175,11 @@ export default function AdminTransactionsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {filteredTransactions.map((tx) => (
-                    <tr key={tx.id}>
+                    <tr
+                      key={tx.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/admin/transactions/${tx.id}`)}
+                    >
                       <td className="px-4 py-3 text-xs text-gray-900 font-mono">{tx.id}</td>
                       <td className="px-4 py-3 text-xs text-gray-900">{tx.merchant}</td>
                       <td className="px-4 py-3 text-xs text-gray-900">${tx.amount.toFixed(2)}</td>
@@ -161,5 +199,6 @@ export default function AdminTransactionsPage() {
         )}
       </main>
     </div>
+    </ToastProvider>
   );
 }

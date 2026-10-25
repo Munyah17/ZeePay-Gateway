@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
 import DataTable from '@/components/DataTable';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
 
 interface Subscription {
   id: string;
@@ -23,6 +24,43 @@ export default function SubscriptionsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [cancelling, setCancelling] = useState<Subscription | null>(null);
+  const [form, setForm] = useState({ customer: '', method: 'EcoCash', amount: '', interval: 'monthly' });
+
+  const persist = (next: Subscription[]) => {
+    setSubscriptions(next);
+    try { localStorage.setItem('zeepay_subscriptions', JSON.stringify(next)); } catch { /* noop */ }
+  };
+
+  const updateStatus = (sub: Subscription, status: string, msg: string) => {
+    persist(subscriptions.map((s) => (s.id === sub.id ? { ...s, status } : s)));
+    toast(msg);
+  };
+
+  const createSubscription = () => {
+    const amount = parseFloat(form.amount);
+    if (!form.customer.trim() || !amount || amount <= 0) {
+      toast('Customer and a valid amount are required', 'warning');
+      return;
+    }
+    const sub: Subscription = {
+      id: `sub_${Math.random().toString(36).slice(2, 6)}`,
+      customer: form.customer.trim(),
+      method: form.method,
+      amount,
+      currency: 'USD',
+      interval: form.interval,
+      status: 'pending',
+      nextBilling: '—',
+      lastBilled: '—',
+      failedAttempts: 0,
+    };
+    persist([sub, ...subscriptions]);
+    setShowCreateModal(false);
+    setForm({ customer: '', method: 'EcoCash', amount: '', interval: 'monthly' });
+    toast(`Mandate sent to ${sub.customer} for approval`);
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -33,8 +71,7 @@ export default function SubscriptionsPage() {
       }
     }
 
-    // Demo data — in production this comes from GET /api/v1/subscriptions
-    setSubscriptions([
+    const seed: Subscription[] = [
       {
         id: 'sub_8x21',
         customer: 'Tendai Mukono',
@@ -95,7 +132,13 @@ export default function SubscriptionsPage() {
         lastBilled: '2023-12-15',
         failedAttempts: 3,
       },
-    ]);
+    ];
+    try {
+      const saved = localStorage.getItem('zeepay_subscriptions');
+      setSubscriptions(saved ? JSON.parse(saved) : seed);
+    } catch {
+      setSubscriptions(seed);
+    }
     setLoading(false);
   }, [router]);
 
@@ -126,13 +169,13 @@ export default function SubscriptionsPage() {
   ];
 
   return (
-    <>
+    <ToastProvider>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="h4 mb-1">Subscriptions</h2>
           <p className="text-muted mb-0">Recurring billing with auto-deduct on EcoCash, InnBucks, Omari and cards</p>
         </div>
-        <button className="btn btn-primary btn-sm">
+        <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
           <i className="bi bi-plus-circle me-2"></i>
           New Subscription
         </button>
@@ -203,6 +246,8 @@ export default function SubscriptionsPage() {
                 data={subscriptions}
                 searchable
                 searchableFields={['customer', 'method', 'id']}
+                exportable
+                exportName="subscriptions"
                 filters={[
                   {
                     key: 'status',
@@ -216,19 +261,39 @@ export default function SubscriptionsPage() {
                     ],
                   },
                 ]}
-                rowActions={(row) => (
+                rowActions={(row: Subscription) => (
                   <div className="d-flex gap-1 justify-content-end">
                     {row.status === 'active' && (
-                      <button className="btn btn-sm btn-outline-warning">Pause</button>
+                      <button
+                        className="btn btn-sm btn-outline-warning"
+                        onClick={() => updateStatus(row, 'paused', `${row.id} paused`)}
+                      >
+                        Pause
+                      </button>
                     )}
                     {row.status === 'paused' && (
-                      <button className="btn btn-sm btn-outline-success">Resume</button>
+                      <button
+                        className="btn btn-sm btn-outline-success"
+                        onClick={() => updateStatus(row, 'active', `${row.id} resumed`)}
+                      >
+                        Resume
+                      </button>
                     )}
                     {(row.status === 'active' || row.status === 'past_due' || row.status === 'paused') && (
-                      <button className="btn btn-sm btn-outline-danger">Cancel</button>
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => setCancelling(row)}
+                      >
+                        Cancel
+                      </button>
                     )}
                     {row.status === 'pending' && (
-                      <button className="btn btn-sm btn-outline-primary">Resend approval</button>
+                      <button
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => toast(`Approval request resent to ${row.customer}`)}
+                      >
+                        Resend approval
+                      </button>
                     )}
                   </div>
                 )}
@@ -283,6 +348,87 @@ export default function SubscriptionsPage() {
           </div>
         </>
       )}
-    </>
+
+      {/* Create subscription modal */}
+      {showCreateModal && (
+        <Modal
+          title="New Subscription"
+          onClose={() => setShowCreateModal(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowCreateModal(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={createSubscription}>Create & send mandate</button>
+            </>
+          }
+        >
+          <div className="mb-3">
+            <label className="form-label small">Customer name *</label>
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              value={form.customer}
+              onChange={(e) => setForm({ ...form, customer: e.target.value })}
+            />
+          </div>
+          <div className="mb-3">
+            <label className="form-label small">Auto-deduct via</label>
+            <select
+              className="form-select form-select-sm"
+              value={form.method}
+              onChange={(e) => setForm({ ...form, method: e.target.value })}
+            >
+              <option>EcoCash</option>
+              <option>InnBucks</option>
+              <option>Omari</option>
+              <option>Visa</option>
+              <option>Mastercard</option>
+            </select>
+          </div>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label small">Amount (USD) *</label>
+              <input
+                type="number"
+                className="form-control form-control-sm"
+                step="0.01"
+                min="0.01"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label small">Interval</label>
+              <select
+                className="form-select form-select-sm"
+                value={form.interval}
+                onChange={(e) => setForm({ ...form, interval: e.target.value })}
+              >
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-muted small mt-3 mb-0">
+            The customer will receive a mandate approval request. Billing starts once approved.
+          </p>
+        </Modal>
+      )}
+
+      {/* Cancel confirm */}
+      {cancelling && (
+        <ConfirmDialog
+          title="Cancel subscription"
+          message={`Cancel ${cancelling.id} for ${cancelling.customer}? The mandate will be revoked and no further debits will occur.`}
+          confirmLabel="Cancel subscription"
+          tone="danger"
+          onConfirm={() => {
+            updateStatus(cancelling, 'cancelled', `${cancelling.id} cancelled`);
+            setCancelling(null);
+          }}
+          onCancel={() => setCancelling(null)}
+        />
+      )}
+    </ToastProvider>
   );
 }

@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Modal, ToastProvider } from '@/components/ui';
+
+interface RecentTx { name: string; amount: number; date: string; icon: string; color: string }
 
 export default function UserDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState(0);
+  const [viewing, setViewing] = useState<RecentTx | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -116,7 +120,13 @@ export default function UserDashboard() {
                       { name: 'Received from John', amount: 100.00, date: '2 days ago', icon: 'bi-arrow-down-left', color: 'text-success' },
                       { name: 'NetOne Airtime', amount: -5.00, date: '3 days ago', icon: 'bi-phone', color: 'text-success' },
                     ].map((tx, i) => (
-                      <div key={i} className="list-group-item d-flex justify-content-between align-items-center">
+                      <div
+                        key={i}
+                        className="list-group-item d-flex justify-content-between align-items-center"
+                        role="button"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setViewing(tx)}
+                      >
                         <div className="d-flex align-items-center gap-3">
                           <div className={`bg-light rounded-circle d-flex align-items-center justify-content-center ${tx.color}`}
                                style={{ width: '40px', height: '40px' }}>
@@ -166,6 +176,32 @@ export default function UserDashboard() {
             </div>
           </div>
         </>
+      )}
+
+      {viewing && (
+        <ToastProvider>
+          <Modal title={viewing.name} onClose={() => setViewing(null)}>
+            <ul className="list-group list-group-flush">
+              <li className="list-group-item d-flex justify-content-between px-0">
+                <span className="small text-muted">Amount</span>
+                <span className={`small fw-medium ${viewing.amount > 0 ? 'text-success' : 'text-danger'}`}>
+                  {viewing.amount > 0 ? '+' : ''}${viewing.amount.toFixed(2)}
+                </span>
+              </li>
+              <li className="list-group-item d-flex justify-content-between px-0">
+                <span className="small text-muted">Date</span>
+                <span className="small">{viewing.date}</span>
+              </li>
+              <li className="list-group-item d-flex justify-content-between px-0">
+                <span className="small text-muted">Status</span>
+                <span className="badge bg-success">Completed</span>
+              </li>
+            </ul>
+            <Link href="/user/history" className="btn btn-outline-primary btn-sm w-100 mt-3">
+              View full history
+            </Link>
+          </Modal>
+        </ToastProvider>
       )}
     </>
   );

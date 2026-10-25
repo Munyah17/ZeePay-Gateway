@@ -4,11 +4,32 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { copyToClipboard as copyText } from '@/utils/actions';
+
+interface Webhook {
+  id: string;
+  url: string;
+  description: string;
+  events: string[];
+  status: string;
+  secret: string;
+  createdAt: string;
+  lastTriggered: string;
+  successRate: number;
+}
 
 export default function Webhooks() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [viewing, setViewing] = useState<Webhook | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Webhook | null>(null);
+  const [form, setForm] = useState({ url: '', description: '', events: [] as string[], retry: 'Automatic retry (up to 3 times)' });
+  const [formSecret, setFormSecret] = useState(`whsec_${Math.random().toString(36).slice(2, 14)}`);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -18,10 +39,69 @@ export default function Webhooks() {
         return;
       }
     }
+    try {
+      const saved = localStorage.getItem('zeepay_webhooks');
+      setWebhooks(saved ? JSON.parse(saved) : seedWebhooks);
+    } catch {
+      setWebhooks(seedWebhooks);
+    }
     setLoading(false);
   }, [router]);
 
-  const webhooks = [
+  const persist = (next: Webhook[]) => {
+    setWebhooks(next);
+    try { localStorage.setItem('zeepay_webhooks', JSON.stringify(next)); } catch { /* noop */ }
+  };
+
+  const filtered = webhooks.filter((w) => !statusFilter || w.status === statusFilter);
+
+  const createWebhook = () => {
+    const url = form.url.trim();
+    if (!/^https:\/\/.+/.test(url)) {
+      toast('Enter a valid HTTPS endpoint URL', 'warning');
+      return;
+    }
+    if (form.events.length === 0) {
+      toast('Select at least one event', 'warning');
+      return;
+    }
+    const wh: Webhook = {
+      id: `wh_${Math.random().toString(36).slice(2, 6)}`,
+      url,
+      description: form.description.trim() || 'Webhook endpoint',
+      events: form.events,
+      status: 'Active',
+      secret: formSecret,
+      createdAt: new Date().toISOString().slice(0, 10),
+      lastTriggered: '—',
+      successRate: 100,
+    };
+    persist([wh, ...webhooks]);
+    setShowCreateModal(false);
+    setForm({ url: '', description: '', events: [], retry: 'Automatic retry (up to 3 times)' });
+    setFormSecret(`whsec_${Math.random().toString(36).slice(2, 14)}`);
+    toast(`Webhook ${wh.id} created`);
+  };
+
+  const toggleWebhook = (wh: Webhook) => {
+    const next = wh.status === 'Active' ? 'Paused' : 'Active';
+    persist(webhooks.map((w) => (w.id === wh.id ? { ...w, status: next } : w)));
+    setMenuFor(null);
+    toast(`${wh.id} ${next === 'Paused' ? 'paused' : 'resumed'}`);
+  };
+
+  const testWebhook = (wh: Webhook) => {
+    toast(`Test event sent to ${wh.url}`, 'info');
+  };
+
+  const confirmDelete = () => {
+    if (!deleting) return;
+    persist(webhooks.filter((w) => w.id !== deleting.id));
+    setDeleting(null);
+    toast('Webhook deleted', 'info');
+  };
+
+  const seedWebhooks: Webhook[] = [
     {
       id: 'wh_001',
       url: 'https://acme.com/api/webhooks/payments',
@@ -120,7 +200,7 @@ export default function Webhooks() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Webhooks</h2>
         <p className="text-muted">Configure webhooks to receive real-time payment notifications</p>
@@ -148,7 +228,7 @@ export default function Webhooks() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Active</p>
-                  <p className="h3 mb-0 text-success">{webhooks.filter(w => w.status === 'Active').length}</p>
+                  <p className="h3 mb-0 text-success">{filtered.filter(w => w.status === 'Active').length}</p>
                 </div>
               </div>
             </div>
@@ -157,7 +237,7 @@ export default function Webhooks() {
                 <div className="card-body">
                   <p className="text-muted small mb-1">Avg Success Rate</p>
                   <p className="h3 mb-0 text-primary">
-                    {(webhooks.reduce((sum, w) => sum + w.successRate, 0) / webhooks.length).toFixed(1)}%
+                    {webhooks.length ? (webhooks.reduce((sum, w) => sum + w.successRate, 0) / webhooks.length).toFixed(1) : '0.0'}%
                   </p>
                 </div>
               </div>
@@ -177,11 +257,16 @@ export default function Webhooks() {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center">
                 <div className="d-flex gap-2">
-                  <select className="form-select form-select-sm" style={{ width: '150px' }}>
-                    <option>All Status</option>
-                    <option>Active</option>
-                    <option>Paused</option>
-                    <option>Disabled</option>
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ width: '150px' }}
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="">All Status</option>
+                    <option value="Active">Active</option>
+                    <option value="Paused">Paused</option>
+                    <option value="Disabled">Disabled</option>
                   </select>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
@@ -213,7 +298,7 @@ export default function Webhooks() {
                         </tr>
                       </thead>
                       <tbody>
-                        {webhooks.map((webhook) => (
+                        {filtered.map((webhook) => (
                           <tr key={webhook.id}>
                             <td>
                               <div className="text-truncate" style={{ maxWidth: '200px' }}>
@@ -237,15 +322,47 @@ export default function Webhooks() {
                             <td className="small">{webhook.successRate.toFixed(1)}%</td>
                             <td>
                               <div className="btn-group btn-group-sm">
-                                <button className="btn btn-outline-primary" title="View">
+                                <button className="btn btn-outline-primary" title="View" onClick={() => setViewing(webhook)}>
                                   <i className="bi bi-eye"></i>
                                 </button>
-                                <button className="btn btn-outline-primary" title="Test">
+                                <button className="btn btn-outline-primary" title="Send test event" onClick={() => testWebhook(webhook)}>
                                   <i className="bi bi-play-circle"></i>
                                 </button>
-                                <button className="btn btn-outline-secondary" title="More">
-                                  <i className="bi bi-three-dots"></i>
-                                </button>
+                                <div className="position-relative">
+                                  <button
+                                    className="btn btn-outline-secondary"
+                                    title="More"
+                                    onClick={() => setMenuFor(menuFor === webhook.id ? null : webhook.id)}
+                                  >
+                                    <i className="bi bi-three-dots"></i>
+                                  </button>
+                                  {menuFor === webhook.id && (
+                                    <ul className="dropdown-menu show" style={{ position: 'absolute', right: 0, zIndex: 1050 }}>
+                                      <li>
+                                        <button className="dropdown-item small" onClick={() => toggleWebhook(webhook)}>
+                                          <i className={`bi ${webhook.status === 'Active' ? 'bi-pause' : 'bi-play'} me-2`}></i>
+                                          {webhook.status === 'Active' ? 'Pause' : 'Resume'}
+                                        </button>
+                                      </li>
+                                      <li>
+                                        <button
+                                          className="dropdown-item small"
+                                          onClick={() => { copyText(webhook.secret); setMenuFor(null); toast('Secret copied'); }}
+                                        >
+                                          <i className="bi bi-clipboard me-2"></i>Copy secret
+                                        </button>
+                                      </li>
+                                      <li>
+                                        <button
+                                          className="dropdown-item small text-danger"
+                                          onClick={() => { setDeleting(webhook); setMenuFor(null); }}
+                                        >
+                                          <i className="bi bi-trash me-2"></i>Delete
+                                        </button>
+                                      </li>
+                                    </ul>
+                                  )}
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -307,19 +424,44 @@ export default function Webhooks() {
                   <div className="modal-body">
                     <div className="mb-3">
                       <label className="form-label">Endpoint URL *</label>
-                      <input type="url" className="form-control" placeholder="https://yourdomain.com/api/webhooks" />
+                      <input
+                        type="url"
+                        className="form-control"
+                        placeholder="https://yourdomain.com/api/webhooks"
+                        value={form.url}
+                        onChange={(e) => setForm({ ...form, url: e.target.value })}
+                      />
                       <small className="text-muted">Must be publicly accessible HTTPS endpoint</small>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Description</label>
-                      <input type="text" className="form-control" placeholder="What is this webhook for?" />
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="What is this webhook for?"
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      />
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Events to Send *</label>
                       <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                         {availableEvents.map((event) => (
                           <div className="form-check" key={event}>
-                            <input className="form-check-input" type="checkbox" id={`evt-${event}`} />
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id={`evt-${event}`}
+                              checked={form.events.includes(event)}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  events: e.target.checked
+                                    ? [...form.events, event]
+                                    : form.events.filter((ev) => ev !== event),
+                                })
+                              }
+                            />
                             <label className="form-check-label" htmlFor={`evt-${event}`}>
                               {event}
                             </label>
@@ -330,8 +472,12 @@ export default function Webhooks() {
                     <div className="mb-3">
                       <label className="form-label">Webhook Secret</label>
                       <div className="input-group">
-                        <input type="text" className="form-control" value="whsec_xxxxxxxxxxxx" readOnly />
-                        <button className="btn btn-outline-secondary">
+                        <input type="text" className="form-control" value={formSecret} readOnly />
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => { setFormSecret(`whsec_${Math.random().toString(36).slice(2, 14)}`); toast('New secret generated'); }}
+                          title="Regenerate"
+                        >
                           <i className="bi bi-arrow-repeat"></i>
                         </button>
                       </div>
@@ -339,7 +485,11 @@ export default function Webhooks() {
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Retry Policy</label>
-                      <select className="form-select">
+                      <select
+                        className="form-select"
+                        value={form.retry}
+                        onChange={(e) => setForm({ ...form, retry: e.target.value })}
+                      >
                         <option>Automatic retry (up to 3 times)</option>
                         <option>Automatic retry (up to 5 times)</option>
                         <option>Automatic retry (up to 10 times)</option>
@@ -351,13 +501,59 @@ export default function Webhooks() {
                     <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
                       Cancel
                     </button>
-                    <button type="button" className="btn btn-primary" onClick={() => setShowCreateModal(false)}>
+                    <button type="button" className="btn btn-primary" onClick={createWebhook}>
                       Create Webhook
                     </button>
                   </div>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* View webhook modal */}
+          {viewing && (
+            <Modal title={`Webhook ${viewing.id}`} onClose={() => setViewing(null)}>
+              <ul className="list-group list-group-flush">
+                <li className="list-group-item px-0">
+                  <p className="small text-muted mb-1">Endpoint</p>
+                  <code className="small">{viewing.url}</code>
+                </li>
+                <li className="list-group-item d-flex justify-content-between px-0">
+                  <span className="small text-muted">Status</span>
+                  <span className={`badge ${getStatusColor(viewing.status)}`}>{viewing.status}</span>
+                </li>
+                <li className="list-group-item d-flex justify-content-between px-0">
+                  <span className="small text-muted">Success rate</span>
+                  <span className="small fw-medium">{viewing.successRate.toFixed(1)}%</span>
+                </li>
+                <li className="list-group-item px-0">
+                  <p className="small text-muted mb-1">Events</p>
+                  <div className="d-flex flex-wrap gap-1">
+                    {viewing.events.map((e) => (
+                      <span key={e} className="badge bg-light text-dark small">{e}</span>
+                    ))}
+                  </div>
+                </li>
+                <li className="list-group-item d-flex justify-content-between px-0 align-items-center">
+                  <span className="small text-muted">Secret</span>
+                  <button className="btn btn-link btn-sm p-0 small" onClick={() => { copyText(viewing.secret); toast('Secret copied'); }}>
+                    {viewing.secret}
+                  </button>
+                </li>
+              </ul>
+            </Modal>
+          )}
+
+          {/* Delete confirm */}
+          {deleting && (
+            <ConfirmDialog
+              title="Delete webhook"
+              message={`Delete endpoint ${deleting.url}? You will stop receiving its events.`}
+              confirmLabel="Delete"
+              tone="danger"
+              onConfirm={confirmDelete}
+              onCancel={() => setDeleting(null)}
+            />
           )}
 
           {/* Webhook Guide */}
@@ -405,6 +601,6 @@ export default function Webhooks() {
           </div>
         </>
       )}
-    </>
+    </ToastProvider>
   );
 }

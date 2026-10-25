@@ -4,12 +4,19 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ToastProvider, toast } from '@/components/ui';
+import { downloadJSON } from '@/utils/actions';
 
 function TransactionInvestigationContent() {
   const router = useRouter();
   const params = useParams();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [notes, setNotes] = useState<{ id: string; author: string; content: string; createdAt: string }[]>([]);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [viewingPayload, setViewingPayload] = useState<string | null>(null);
+  const [viewingRefund, setViewingRefund] = useState<{ id: string; amount: number; status: string; reason: string; createdAt: string } | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -22,19 +29,31 @@ function TransactionInvestigationContent() {
     setLoading(false);
   }, [router]);
 
+  const transactionSeeds: Record<string, { merchant: string; merchantId: string; amount: number; paymentMethod: string; status: string; customerEmail: string }> = {
+    pay_8x2k91: { merchant: 'Acme Solutions', merchantId: 'MCH-001', amount: 10.00, paymentMethod: 'EcoCash', status: 'Succeeded', customerEmail: 'customer@example.com' },
+    pay_7m4422: { merchant: 'Acme Solutions', merchantId: 'MCH-001', amount: 50.00, paymentMethod: 'Visa', status: 'Succeeded', customerEmail: 'billing@acme.com' },
+    pay_9q0678: { merchant: 'TechGlobal Ltd', merchantId: 'MCH-002', amount: 15.00, paymentMethod: 'Omari', status: 'Failed', customerEmail: 'ops@techglobal.co.zw' },
+    pay_5k3124: { merchant: 'Acme Solutions', merchantId: 'MCH-001', amount: 100.00, paymentMethod: 'Mastercard', status: 'Succeeded', customerEmail: 'finance@acme.com' },
+    pay_6n8104: { merchant: 'GreenTech', merchantId: 'MCH-003', amount: 25.00, paymentMethod: 'EcoCash', status: 'Succeeded', customerEmail: 'accounts@greentech.co.zw' },
+  };
+
+  const routeId = typeof params?.id === 'string' ? params.id : 'pay_8x2k91';
+  const seed = transactionSeeds[routeId] || transactionSeeds.pay_8x2k91;
+  const fee = +(seed.amount * 0.045).toFixed(2);
+
   const transaction = {
-    id: 'pay_8x2k91',
-    merchantRef: 'INV-1042',
-    amount: 10.00,
+    id: routeId,
+    merchantRef: `INV-${routeId.slice(-4)}`,
+    amount: seed.amount,
     currency: 'USD',
-    fee: 0.45,
-    netAmount: 9.55,
-    merchant: 'Acme Solutions',
-    merchantId: 'MCH-001',
-    customerEmail: 'customer@example.com',
-    paymentMethod: 'EcoCash',
-    provider: 'EcoCash Direct',
-    status: 'Succeeded',
+    fee,
+    netAmount: +(seed.amount - fee).toFixed(2),
+    merchant: seed.merchant,
+    merchantId: seed.merchantId,
+    customerEmail: seed.customerEmail,
+    paymentMethod: seed.paymentMethod,
+    provider: `${seed.paymentMethod} Direct`,
+    status: seed.status,
     createdAt: '2024-01-15T10:30:00Z',
     completedAt: '2024-01-15T10:30:15Z',
     ipAddress: '192.168.1.100',
@@ -83,7 +102,7 @@ function TransactionInvestigationContent() {
     },
   ];
 
-  const internalNotes = [
+  const seedNotes = [
     {
       id: 'note_001',
       author: 'John D.',
@@ -92,8 +111,34 @@ function TransactionInvestigationContent() {
     },
   ];
 
+  useEffect(() => {
+    setNotes(seedNotes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const addNote = () => {
+    if (!noteDraft.trim()) {
+      toast('Enter a note first', 'warning');
+      return;
+    }
+    setNotes((prev) => [
+      { id: `note_${Date.now()}`, author: 'You', content: noteDraft.trim(), createdAt: new Date().toISOString() },
+      ...prev,
+    ]);
+    setNoteDraft('');
+    toast('Note added');
+  };
+
+  const retryInvestigation = () => {
+    setRetrying(true);
+    setTimeout(() => {
+      setRetrying(false);
+      toast('Investigation re-run — no new findings (demo)', 'info');
+    }, 1200);
+  };
+
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-2">
@@ -122,7 +167,13 @@ function TransactionInvestigationContent() {
               </div>
               <div className="d-flex gap-2">
                 <StatusBadge status={transaction.status} type="payment" size="md" />
-                <button className="btn btn-sm btn-outline-secondary">
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => {
+                    downloadJSON(`transaction-${transaction.id}`, transaction);
+                    toast('Transaction exported');
+                  }}
+                >
                   <i className="bi bi-download me-1"></i>
                   Export
                 </button>
@@ -290,7 +341,7 @@ function TransactionInvestigationContent() {
                                   <td className="small">{refund.reason}</td>
                                   <td className="text-muted small">{new Date(refund.createdAt).toLocaleDateString()}</td>
                                   <td>
-                                    <button className="btn btn-sm btn-outline-primary">View</button>
+                                    <button className="btn btn-sm btn-outline-primary" onClick={() => setViewingRefund(refund)}>View</button>
                                   </td>
                                 </tr>
                               ))}
@@ -310,24 +361,27 @@ function TransactionInvestigationContent() {
                     </div>
                     <div className="card-body">
                       <div className="d-grid gap-2">
-                        <button className="btn btn-outline-primary text-start">
+                        <button className="btn btn-outline-primary text-start" onClick={retryInvestigation} disabled={retrying}>
                           <i className="bi bi-arrow-repeat me-2"></i>
-                          Retry Investigation
+                          {retrying ? 'Running…' : 'Retry Investigation'}
                         </button>
-                        <button className="btn btn-outline-primary text-start">
+                        <Link href="/admin/providers" className="btn btn-outline-primary text-start text-decoration-none">
                           <i className="bi bi-bank me-2"></i>
                           View Provider
-                        </button>
+                        </Link>
                         <Link href="/admin/merchants" className="btn btn-outline-primary text-start text-decoration-none">
                           <i className="bi bi-shop me-2"></i>
                           Open Merchant
                         </Link>
-                        <button className="btn btn-outline-primary text-start">
+                        <button
+                          className="btn btn-outline-primary text-start"
+                          onClick={() => { setActiveTab('overview'); relatedRefunds[0] && setViewingRefund(relatedRefunds[0]); }}
+                        >
                           <i className="bi bi-arrow-counterclockwise me-2"></i>
                           Review Refund
                         </button>
-                        <button className="btn btn-outline-primary text-start">
-                          <i className="bi bi-broadcast me-2"></i>
+                        <button className="btn btn-outline-primary text-start" onClick={() => setActiveTab('webhooks')}>
+                          <i className="bi bi-webhook me-2"></i>
                           Inspect Webhooks
                         </button>
                       </div>
@@ -466,7 +520,9 @@ function TransactionInvestigationContent() {
                             <td className="text-muted small">{new Date(event.deliveredAt).toLocaleString()}</td>
                             <td className="font-monospace small">{event.responseCode}</td>
                             <td>
-                              <button className="btn btn-sm btn-outline-primary">View Payload</button>
+                              <button className="btn btn-sm btn-outline-primary" onClick={() => setViewingPayload(event.id)}>
+                                View Payload
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -486,11 +542,11 @@ function TransactionInvestigationContent() {
                       <h5 className="card-title mb-0">Internal Notes</h5>
                     </div>
                     <div className="card-body">
-                      {internalNotes.length === 0 ? (
+                      {notes.length === 0 ? (
                         <p className="text-muted text-center py-4">No notes added yet</p>
                       ) : (
                         <div className="list-group list-group-flush">
-                          {internalNotes.map((note) => (
+                          {notes.map((note) => (
                             <div key={note.id} className="list-group-item">
                               <div className="d-flex justify-content-between mb-2">
                                 <strong>{note.author}</strong>
@@ -514,8 +570,10 @@ function TransactionInvestigationContent() {
                         className="form-control mb-3"
                         rows={4}
                         placeholder="Enter your note..."
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
                       ></textarea>
-                      <button className="btn btn-primary w-100">Add Note</button>
+                      <button className="btn btn-primary w-100" onClick={addNote}>Add Note</button>
                     </div>
                   </div>
                 </div>
@@ -524,7 +582,47 @@ function TransactionInvestigationContent() {
           </div>
         </>
       )}
-    </>
+
+      {/* Webhook payload modal */}
+      {viewingPayload && (
+        <Modal title={`Event ${viewingPayload}`} onClose={() => setViewingPayload(null)} size="lg">
+          <pre className="bg-light rounded p-3 small mb-0">{JSON.stringify(
+            {
+              id: viewingPayload,
+              type: 'payment.succeeded',
+              data: { object: { id: transaction.id, amount: transaction.amount, currency: transaction.currency, status: transaction.status } },
+              created: transaction.createdAt,
+            },
+            null,
+            2,
+          )}</pre>
+        </Modal>
+      )}
+
+      {/* Refund detail modal */}
+      {viewingRefund && (
+        <Modal title={`Refund ${viewingRefund.id}`} onClose={() => setViewingRefund(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Amount</span>
+              <span className="small fw-medium">{transaction.currency} {viewingRefund.amount.toFixed(2)}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <StatusBadge status={viewingRefund.status} type="refund" size="sm" />
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Reason</span>
+              <span className="small">{viewingRefund.reason}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Created</span>
+              <span className="small">{new Date(viewingRefund.createdAt).toLocaleString()}</span>
+            </li>
+          </ul>
+        </Modal>
+      )}
+    </ToastProvider>
   );
 }
 

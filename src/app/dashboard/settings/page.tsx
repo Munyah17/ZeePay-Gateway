@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Modal, ToastProvider, toast } from '@/components/ui';
+import { copyToClipboard as copyText } from '@/utils/actions';
 
 interface ApiKey {
   id: string;
@@ -28,6 +30,8 @@ export default function SettingsPage() {
   const [showNewKeyModal, setShowNewKeyModal] = useState(false);
   const [newKeyEnvironment, setNewKeyEnvironment] = useState<'test' | 'live'>('test');
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [showWebhookModal, setShowWebhookModal] = useState(false);
+  const [webhookForm, setWebhookForm] = useState({ url: '', events: 'payment.succeeded, payment.failed' });
 
   useEffect(() => {
     fetchSettings();
@@ -54,18 +58,70 @@ export default function SettingsPage() {
     try {
       const mockKey = `zp_${newKeyEnvironment}_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
       setGeneratedKey(mockKey);
+      setApiKeys((prev) => [
+        {
+          id: String(Date.now()),
+          keyPrefix: mockKey.slice(0, 12),
+          environment: newKeyEnvironment,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
       setShowNewKeyModal(false);
+      toast('API key generated');
     } catch (error) {
       console.error('Failed to generate API key:', error);
     }
   };
 
+  const toggleKey = (id: string) => {
+    setApiKeys((prev) => prev.map((k) => (k.id === id ? { ...k, isActive: !k.isActive } : k)));
+    toast('Key status updated');
+  };
+
+  const deleteKey = (id: string) => {
+    setApiKeys((prev) => prev.filter((k) => k.id !== id));
+    toast('API key deleted', 'info');
+  };
+
+  const addWebhook = () => {
+    const url = webhookForm.url.trim();
+    if (!/^https:\/\/.+/.test(url)) {
+      toast('Enter a valid HTTPS URL', 'warning');
+      return;
+    }
+    setWebhooks((prev) => [
+      {
+        id: String(Date.now()),
+        url,
+        events: webhookForm.events.split(',').map((e) => e.trim()).filter(Boolean),
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+    setShowWebhookModal(false);
+    setWebhookForm({ url: '', events: 'payment.succeeded, payment.failed' });
+    toast('Webhook endpoint added');
+  };
+
+  const toggleWebhook = (id: string) => {
+    setWebhooks((prev) => prev.map((w) => (w.id === id ? { ...w, isActive: !w.isActive } : w)));
+    toast('Webhook status updated');
+  };
+
+  const deleteWebhook = (id: string) => {
+    setWebhooks((prev) => prev.filter((w) => w.id !== id));
+    toast('Webhook deleted', 'info');
+  };
+
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+    copyText(text).then((ok) => toast(ok ? 'Copied to clipboard' : 'Copy failed', ok ? 'success' : 'danger'));
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Settings</h2>
         <p className="text-muted">Manage your account settings</p>
@@ -153,9 +209,25 @@ export default function SettingsPage() {
                             </p>
                           )}
                         </div>
-                        <span className={`badge ${key.isActive ? 'bg-success' : 'bg-secondary'}`}>
-                          {key.isActive ? 'Active' : 'Inactive'}
-                        </span>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className={`badge ${key.isActive ? 'bg-success' : 'bg-secondary'}`}>
+                            {key.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            title={key.isActive ? 'Deactivate' : 'Activate'}
+                            onClick={() => toggleKey(key.id)}
+                          >
+                            <i className={`bi ${key.isActive ? 'bi-pause' : 'bi-play'}`}></i>
+                          </button>
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            title="Delete"
+                            onClick={() => deleteKey(key.id)}
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -213,7 +285,7 @@ export default function SettingsPage() {
               <div className="card">
                 <div className="card-header d-flex justify-content-between align-items-center">
                   <h5 className="card-title mb-0">Webhook Endpoints</h5>
-                  <button className="btn btn-primary btn-sm">
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowWebhookModal(true)}>
                     <i className="bi bi-plus-lg me-1"></i> Add Webhook
                   </button>
                 </div>
@@ -227,9 +299,25 @@ export default function SettingsPage() {
                             Events: {webhook.events.join(', ')}
                           </p>
                         </div>
-                        <span className={`badge ${webhook.isActive ? 'bg-success' : 'bg-secondary'}`}>
-                          {webhook.isActive ? 'Active' : 'Inactive'}
-                        </span>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className={`badge ${webhook.isActive ? 'bg-success' : 'bg-secondary'}`}>
+                            {webhook.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            title={webhook.isActive ? 'Deactivate' : 'Activate'}
+                            onClick={() => toggleWebhook(webhook.id)}
+                          >
+                            <i className={`bi ${webhook.isActive ? 'bi-pause' : 'bi-play'}`}></i>
+                          </button>
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            title="Delete"
+                            onClick={() => deleteWebhook(webhook.id)}
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -266,6 +354,39 @@ export default function SettingsPage() {
           )}
         </>
       )}
-    </>
+
+      {showWebhookModal && (
+        <Modal
+          title="Add Webhook Endpoint"
+          onClose={() => setShowWebhookModal(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowWebhookModal(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={addWebhook}>Add webhook</button>
+            </>
+          }
+        >
+          <div className="mb-3">
+            <label className="form-label small">Endpoint URL *</label>
+            <input
+              type="url"
+              className="form-control form-control-sm"
+              placeholder="https://yourapp.com/webhooks"
+              value={webhookForm.url}
+              onChange={(e) => setWebhookForm({ ...webhookForm, url: e.target.value })}
+            />
+          </div>
+          <div className="mb-1">
+            <label className="form-label small">Events (comma separated)</label>
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              value={webhookForm.events}
+              onChange={(e) => setWebhookForm({ ...webhookForm, events: e.target.value })}
+            />
+          </div>
+        </Modal>
+      )}
+    </ToastProvider>
   );
 }

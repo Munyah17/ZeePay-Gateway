@@ -75,3 +75,129 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), 'Segoe UI', system-ui, sans-serif;
 }
+
+/* ---------- Mobile responsiveness ---------- */
+
+/* Never let the document scroll horizontally — wide content scrolls inside its own box */
+html,
+body {
+  overflow-x: clip;
+}
+
+/* Media and code blocks must never push the layout wider than the viewport */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+code {
+  overflow-wrap: anywhere;
+}
+
+/* Flex children can shrink instead of forcing horizontal overflow */
+.flex-grow {
+  min-width: 0;
+}
+main,
+.container-fluid,
+.card {
+  min-width: 0;
+}
+
+/* Tables scroll horizontally inside their wrapper, not the page */
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Slide-over sidebar on phones/tablets */
+@media (max-width: 767.98px) {
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100dvh;
+    z-index: 1050;
+    transform: translateX(-105%);
+    transition: transform 0.25s ease;
+    box-shadow: none;
+  }
+  .app-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.45);
+  }
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    animation: zp-fade-in 0.15s ease;
+  }
+}
+@media (min-width: 768px) {
+  .sidebar-backdrop {
+    display: none;
+  }
+}
+@keyframes zp-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Tighter spacing + wrapping controls on small phones */
+@media (max-width: 575.98px) {
+  .p-4 {
+    padding: 1rem !important;
+  }
+  .card-body {
+    padding: 0.75rem;
+  }
+  .card-header {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .btn-group {
+    flex-wrap: wrap;
+  }
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+  h1,
+  .h1 {
+    font-size: 1.6rem;
+  }
+  h2,
+  .h2,
+  .h3 {
+    font-size: 1.25rem;
+  }
+  h3,
+  .h4 {
+    font-size: 1.1rem;
+  }
+  /* Quick-action grids collapse to 2 columns */
+  .row.g-3 > [class*='col-'] {
+    min-width: 0;
+  }
+}
+
+/* Action-bar filter rows wrap cleanly instead of clipping */
+@media (max-width: 767.98px) {
+  .card .d-flex.justify-content-between {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}

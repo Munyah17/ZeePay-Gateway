@@ -4,10 +4,17 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ToastProvider, toast } from '@/components/ui';
+
+interface Task { task: string; priority: string; assigned: string; due: string }
+interface Alert { id: string; type: string; severity: string; message: string; time: string; status: string }
 
 export default function PaymentOperationsCentre() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [feedPaused, setFeedPaused] = useState(false);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
+  const [viewingAlert, setViewingAlert] = useState<Alert | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -140,7 +147,7 @@ export default function PaymentOperationsCentre() {
   ];
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Payment Operations Centre</h2>
         <p className="text-muted">Real-time operational overview and actionable insights</p>
@@ -198,7 +205,12 @@ export default function PaymentOperationsCentre() {
                       </thead>
                       <tbody>
                         {recentAlerts.map((alert) => (
-                          <tr key={alert.id}>
+                          <tr
+                            key={alert.id}
+                            role="button"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => setViewingAlert(alert)}
+                          >
                             <td className="font-monospace small">{alert.id}</td>
                             <td>{alert.type}</td>
                             <td className="small">{alert.message}</td>
@@ -257,9 +269,15 @@ export default function PaymentOperationsCentre() {
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="card-title mb-0">Live Activity Feed</h5>
               <div className="d-flex gap-2">
-                <button className="btn btn-sm btn-outline-secondary">
-                  <i className="bi bi-pause me-1"></i>
-                  Pause
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => {
+                    setFeedPaused(!feedPaused);
+                    toast(feedPaused ? 'Live feed resumed' : 'Live feed paused', 'info');
+                  }}
+                >
+                  <i className={`bi ${feedPaused ? 'bi-play' : 'bi-pause'} me-1`}></i>
+                  {feedPaused ? 'Resume' : 'Pause'}
                 </button>
                 <Link href="/admin/activity" className="btn btn-sm btn-link">
                   View all →
@@ -267,6 +285,11 @@ export default function PaymentOperationsCentre() {
               </div>
             </div>
             <div className="card-body">
+              {feedPaused && (
+                <div className="alert alert-warning small py-2 mb-3">
+                  <i className="bi bi-pause-circle me-2"></i>Feed paused — new events are not being displayed
+                </div>
+              )}
               <div className="list-group list-group-flush">
                 {[
                   { event: 'Payment succeeded', details: 'pay_8x2k91 - $10.00 - EcoCash', time: 'Just now', type: 'success' },
@@ -338,7 +361,10 @@ export default function PaymentOperationsCentre() {
                         <td className="small">{task.assigned}</td>
                         <td className="text-muted small">{task.due}</td>
                         <td>
-                          <button className="btn btn-sm btn-outline-primary">
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => setViewingTask(task)}
+                          >
                             View
                           </button>
                         </td>
@@ -351,6 +377,62 @@ export default function PaymentOperationsCentre() {
           </div>
         </>
       )}
-    </>
+
+      {/* Task detail modal */}
+      {viewingTask && (
+        <Modal title={viewingTask.task} onClose={() => setViewingTask(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Priority</span>
+              <StatusBadge status={viewingTask.priority} type="default" size="sm" />
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Assigned to</span>
+              <span className="small">{viewingTask.assigned}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Due in</span>
+              <span className="small">{viewingTask.due}</span>
+            </li>
+          </ul>
+          <button
+            className="btn btn-success btn-sm w-100 mt-3"
+            onClick={() => { setViewingTask(null); toast('Task marked complete'); }}
+          >
+            Mark complete
+          </button>
+        </Modal>
+      )}
+
+      {/* Alert detail modal */}
+      {viewingAlert && (
+        <Modal title={`${viewingAlert.id} — ${viewingAlert.type}`} onClose={() => setViewingAlert(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item px-0">
+              <p className="small text-muted mb-1">Message</p>
+              <p className="small">{viewingAlert.message}</p>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Severity</span>
+              <StatusBadge status={viewingAlert.severity} type="default" size="sm" />
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <StatusBadge status={viewingAlert.status} type="default" size="sm" />
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Raised</span>
+              <span className="small">{viewingAlert.time}</span>
+            </li>
+          </ul>
+          <button
+            className="btn btn-outline-primary btn-sm w-100 mt-3"
+            onClick={() => { setViewingAlert(null); toast(`${viewingAlert.id} acknowledged`, 'info'); }}
+          >
+            Acknowledge alert
+          </button>
+        </Modal>
+      )}
+    </ToastProvider>
   );
 }

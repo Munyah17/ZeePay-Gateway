@@ -4,12 +4,30 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { ConfirmDialog, Modal, ToastProvider, toast } from '@/components/ui';
+
+interface Role {
+  id: string;
+  name: string;
+  description: string;
+  level: string;
+  users: number;
+  status: string;
+  permissions: string[];
+  createdAt: string;
+  isSystem: boolean;
+}
 
 export default function RolesAndPermissions() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [roleList, setRoleList] = useState<Role[]>([]);
+  const [editing, setEditing] = useState<Role | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
+  const [createForm, setCreateForm] = useState({ name: '', description: '', level: 'Platform', perms: [] as string[] });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -19,10 +37,43 @@ export default function RolesAndPermissions() {
         return;
       }
     }
+    setRoleList(seedRoles);
     setLoading(false);
   }, [router]);
 
-  const roles = [
+  const togglePerm = (id: string) =>
+    setCreateForm((f) => ({ ...f, perms: f.perms.includes(id) ? f.perms.filter((p) => p !== id) : [...f.perms, id] }));
+
+  const createRole = () => {
+    if (!createForm.name.trim()) {
+      toast('Role name required', 'warning');
+      return;
+    }
+    const role: Role = {
+      id: `role_${Math.random().toString(36).slice(2, 6)}`,
+      name: createForm.name.trim(),
+      description: createForm.description || 'Custom role',
+      level: createForm.level,
+      users: 0,
+      status: 'Active',
+      permissions: createForm.perms,
+      createdAt: new Date().toISOString().slice(0, 10),
+      isSystem: false,
+    };
+    setRoleList((prev) => [...prev, role]);
+    setShowCreateModal(false);
+    setCreateForm({ name: '', description: '', level: 'Platform', perms: [] });
+    toast(`${role.name} created`);
+  };
+
+  const toggleRoleStatus = (role: Role) => {
+    const next = role.status === 'Active' ? 'Inactive' : 'Active';
+    setRoleList((prev) => prev.map((r) => (r.id === role.id ? { ...r, status: next } : r)));
+    setMenuFor(null);
+    toast(`${role.name} ${next.toLowerCase()}`, 'info');
+  };
+
+  const seedRoles: Role[] = [
     {
       id: 'role_001',
       name: 'Super Admin',
@@ -112,7 +163,7 @@ export default function RolesAndPermissions() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Roles and Permissions</h2>
         <p className="text-muted">Manage platform-wide access control and permissions</p>
@@ -132,7 +183,7 @@ export default function RolesAndPermissions() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Total Roles</p>
-                  <p className="h3 mb-0">{roles.length}</p>
+                  <p className="h3 mb-0">{roleList.length}</p>
                 </div>
               </div>
             </div>
@@ -140,7 +191,7 @@ export default function RolesAndPermissions() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Active Roles</p>
-                  <p className="h3 mb-0 text-success">{roles.filter(r => r.status === 'Active').length}</p>
+                  <p className="h3 mb-0 text-success">{roleList.filter(r => r.status === 'Active').length}</p>
                 </div>
               </div>
             </div>
@@ -156,7 +207,7 @@ export default function RolesAndPermissions() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">System Roles</p>
-                  <p className="h3 mb-0 text-warning">{roles.filter(r => r.isSystem).length}</p>
+                  <p className="h3 mb-0 text-warning">{roleList.filter(r => r.isSystem).length}</p>
                 </div>
               </div>
             </div>
@@ -187,7 +238,7 @@ export default function RolesAndPermissions() {
                         </tr>
                       </thead>
                       <tbody>
-                        {roles.map((role) => (
+                        {roleList.map((role) => (
                           <tr key={role.id}>
                             <td>
                               <div>
@@ -215,13 +266,36 @@ export default function RolesAndPermissions() {
                                   <i className="bi bi-eye"></i>
                                 </button>
                                 {!role.isSystem && (
-                                  <button className="btn btn-outline-primary">
+                                  <button className="btn btn-outline-primary" onClick={() => setEditing(role)}>
                                     <i className="bi bi-pencil"></i>
                                   </button>
                                 )}
-                                <button className="btn btn-outline-secondary">
-                                  <i className="bi bi-three-dots"></i>
-                                </button>
+                                <div className="position-relative">
+                                  <button className="btn btn-outline-secondary" onClick={() => setMenuFor(menuFor === role.id ? null : role.id)}>
+                                    <i className="bi bi-three-dots"></i>
+                                  </button>
+                                  {menuFor === role.id && (
+                                    <ul className="dropdown-menu show" style={{ position: 'absolute', right: 0, zIndex: 1050 }}>
+                                      {!role.isSystem && (
+                                        <li>
+                                          <button className="dropdown-item small" onClick={() => toggleRoleStatus(role)}>
+                                            {role.status === 'Active' ? 'Deactivate' : 'Activate'}
+                                          </button>
+                                        </li>
+                                      )}
+                                      {!role.isSystem && (
+                                        <li>
+                                          <button className="dropdown-item small text-danger" onClick={() => { setDeleteTarget(role); setMenuFor(null); }}>
+                                            Delete
+                                          </button>
+                                        </li>
+                                      )}
+                                      {role.isSystem && (
+                                        <li><span className="dropdown-item-text small text-muted">System role</span></li>
+                                      )}
+                                    </ul>
+                                  )}
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -278,7 +352,7 @@ export default function RolesAndPermissions() {
               </div>
               <div className="card-body">
                 {(() => {
-                  const role = roles.find(r => r.id === selectedRole);
+                  const role = roleList.find(r => r.id === selectedRole);
                   if (!role) return null;
                   return (
                     <div className="row g-4">
@@ -346,15 +420,15 @@ export default function RolesAndPermissions() {
                   <div className="modal-body">
                     <div className="mb-3">
                       <label className="form-label">Role Name *</label>
-                      <input type="text" className="form-control" placeholder="e.g., Support Agent" />
+                      <input type="text" className="form-control" placeholder="e.g., Support Agent" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Description</label>
-                      <textarea className="form-control" rows={2} placeholder="Describe the role's purpose"></textarea>
+                      <textarea className="form-control" rows={2} placeholder="Describe the role's purpose" value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}></textarea>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Access Level *</label>
-                      <select className="form-select">
+                      <select className="form-select" value={createForm.level} onChange={(e) => setCreateForm({ ...createForm, level: e.target.value })}>
                         <option>Platform</option>
                         <option>Organization</option>
                         <option>Department</option>
@@ -372,7 +446,13 @@ export default function RolesAndPermissions() {
                             <h6 className="small fw-medium mt-2 mb-2">{category}</h6>
                             {perms.map((perm) => (
                               <div className="form-check" key={perm.id}>
-                                <input className="form-check-input" type="checkbox" id={`perm-${perm.id}`} />
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  id={`perm-${perm.id}`}
+                                  checked={createForm.perms.includes(perm.name)}
+                                  onChange={() => togglePerm(perm.name)}
+                                />
                                 <label className="form-check-label small" htmlFor={`perm-${perm.id}`}>
                                   {perm.name} - {perm.description}
                                 </label>
@@ -387,7 +467,7 @@ export default function RolesAndPermissions() {
                     <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
                       Cancel
                     </button>
-                    <button type="button" className="btn btn-primary" onClick={() => setShowCreateModal(false)}>
+                    <button type="button" className="btn btn-primary" onClick={createRole}>
                       Create Role
                     </button>
                   </div>
@@ -432,6 +512,52 @@ export default function RolesAndPermissions() {
           </div>
         </>
       )}
-    </>
+
+      {/* Edit role modal */}
+      {editing && (
+        <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
+          <div className="mb-3">
+            <label className="form-label small">Status</label>
+            <select
+              className="form-select form-select-sm"
+              value={editing.status}
+              onChange={(e) => {
+                const status = e.target.value;
+                setRoleList((prev) => prev.map((r) => (r.id === editing.id ? { ...r, status } : r)));
+                setEditing(null);
+                toast(`${editing.name} → ${status}`, 'info');
+              }}
+            >
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label small">Permissions</label>
+            <div className="d-flex flex-wrap gap-1">
+              {editing.permissions.map((p) => (
+                <span key={p} className="badge bg-light text-dark">{p}</span>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete confirm */}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete role"
+          message={`Delete role "${deleteTarget.name}"? Users assigned to this role will lose its permissions.`}
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={() => {
+            setRoleList((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+            setDeleteTarget(null);
+            toast('Role deleted', 'info');
+          }}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </ToastProvider>
   );
 }

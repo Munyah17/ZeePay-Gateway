@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { downloadCSV } from '@/utils/actions';
+import { Modal, ToastProvider, toast } from '@/components/ui';
 
 interface Settlement {
   id: string;
@@ -16,6 +18,25 @@ export default function AdminSettlementsPage() {
   const router = useRouter();
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reconciling, setReconciling] = useState(false);
+  const [inspecting, setInspecting] = useState<Settlement | null>(null);
+
+  const runReconciliation = () => {
+    setReconciling(true);
+    setTimeout(() => {
+      setSettlements((prev) => prev.map((s) => (s.status === 'Pending' ? { ...s, status: 'Settled' } : s)));
+      setReconciling(false);
+      toast('Reconciliation complete — pending records marked settled (demo)', 'info');
+    }, 1500);
+  };
+
+  const exportReport = () => {
+    downloadCSV(
+      'settlements',
+      settlements.map((s) => ({ id: s.id, provider: s.provider, amount: s.amount, status: s.status, date: s.date })),
+    );
+    toast(`Exported ${settlements.length} settlement records`);
+  };
 
   useEffect(() => {
     const authed = localStorage.getItem('zeepay_authed');
@@ -62,13 +83,14 @@ export default function AdminSettlementsPage() {
   };
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14">
             <div className="flex items-center gap-8">
               <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
+              <div className="hidden md:flex gap-6">
                 <Link href="/admin" className="text-xs text-gray-600 hover:text-gray-900">Platform overview</Link>
                 <Link href="/admin/merchants" className="text-xs text-gray-600 hover:text-gray-900">Merchants</Link>
                 <Link href="/admin/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
@@ -78,7 +100,7 @@ export default function AdminSettlementsPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">admin@zeepay.co.zw</span>
+              <span className="hidden md:inline text-xs text-gray-600">admin@zeepay.co.zw</span>
               <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
                 Sign out
               </button>
@@ -88,17 +110,21 @@ export default function AdminSettlementsPage() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-8 flex flex-wrap gap-3 justify-between items-center">
           <div>
             <h1 className="text-sm font-semibold text-gray-900">Settlements & reconciliation</h1>
             <p className="text-xs text-gray-600 mt-1">Compare provider-reported settlements against payment records</p>
           </div>
           <div className="flex gap-3">
-            <button className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50">
+            <button className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50" onClick={exportReport}>
               ⇩ Export report
             </button>
-            <button className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800">
-              ↻ Run reconciliation
+            <button
+              className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
+              onClick={runReconciliation}
+              disabled={reconciling}
+            >
+              {reconciling ? 'Reconciling…' : '↻ Run reconciliation'}
             </button>
           </div>
         </div>
@@ -138,7 +164,7 @@ export default function AdminSettlementsPage() {
           </div>
         ) : (
           <div className="border border-gray-200 rounded p-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-wrap gap-3 justify-between items-center mb-6">
               <h2 className="text-xs font-semibold text-gray-900">Recent settlement records</h2>
               <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
                 {settlements.length} records
@@ -169,7 +195,9 @@ export default function AdminSettlementsPage() {
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{settlement.date}</td>
                       <td className="px-4 py-3 text-xs">
-                        <button className="text-gray-600 hover:text-gray-900">Inspect</button>
+                        <button className="text-gray-600 hover:text-gray-900" onClick={() => setInspecting(settlement)}>
+                          Inspect
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -179,6 +207,38 @@ export default function AdminSettlementsPage() {
           </div>
         )}
       </main>
+
+      {/* Inspect modal */}
+      {inspecting && (
+        <Modal title={`Settlement ${inspecting.id}`} onClose={() => setInspecting(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Provider</span>
+              <span className="small fw-medium">{inspecting.provider}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Amount</span>
+              <span className="small fw-medium">${inspecting.amount.toLocaleString()}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <span className="small">{inspecting.status}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Settlement date</span>
+              <span className="small">{inspecting.date}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Discrepancies</span>
+              <span className="small">None detected (demo)</span>
+            </li>
+          </ul>
+          <p className="small text-muted mt-3 mb-0">
+            This is mock settlement data for demonstration; real inspection requires provider reports.
+          </p>
+        </Modal>
+      )}
     </div>
+    </ToastProvider>
   );
 }

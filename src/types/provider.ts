@@ -12,6 +12,16 @@ export interface CreatePaymentInput {
   customerEmail?: string;
   customerPhone?: string;
   metadata?: Record<string, any>;
+  // Server-to-server card data (PCI DSS compliance required)
+  cardData?: {
+    number: string;
+    holder: string;
+    expiryMonth: string;
+    expiryYear: string;
+    cvv: string;
+  };
+  // Payment type: DB (debit), PA (pre-auth), CP (capture), RF (refund)
+  paymentType?: 'DB' | 'PA' | 'CP' | 'RF';
 }
 
 export interface PaymentResult {
@@ -35,6 +45,31 @@ export interface RefundPaymentInput {
   currency: string;
   reason?: string;
   metadata?: Record<string, any>;
+}
+
+export interface CreatePaymentLinkInput {
+  amount: number;
+  currency: string;
+  reference: string;
+  description?: string;
+  expiryDate?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface PaymentLinkResult {
+  id: string;
+  providerReference: string;
+  linkUrl: string;
+  qrCode?: string;
+  status: 'active' | 'expired' | 'paid' | 'cancelled';
+  amount: number;
+  currency: string;
+  reference: string;
+  expiryDate?: string;
+  metadata?: Record<string, any>;
+  providerResponse?: Record<string, any>;
 }
 
 export interface RefundResult {
@@ -153,4 +188,6 @@ export interface PaymentProviderCapabilities {
   supportsRecurring: boolean;
   /** Provider can send money out to customers (disbursements) */
   createPayout?: boolean;
+  /** Provider can create shareable payment links */
+  createPaymentLink?: boolean;
 }

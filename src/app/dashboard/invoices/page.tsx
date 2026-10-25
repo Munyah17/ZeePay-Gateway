@@ -4,11 +4,36 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { downloadJSON } from '@/utils/actions';
+
+interface InvoiceItem { description: string; quantity: number; unitPrice: number }
+interface Invoice {
+  id: string;
+  customer: { name: string; email: string };
+  amount: number;
+  currency: string;
+  status: string;
+  dueDate: string;
+  paidDate: string | null;
+  items: InvoiceItem[];
+  paymentMethod: string | null;
+  paymentId: string | null;
+  created: string;
+}
 
 export default function Invoices() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [viewing, setViewing] = useState<Invoice | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Invoice | null>(null);
+  const [form, setForm] = useState({ name: '', email: '', dueDate: '', currency: 'USD', notes: '' });
+  const [formItems, setFormItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unitPrice: 0 }]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -18,10 +43,82 @@ export default function Invoices() {
         return;
       }
     }
+    try {
+      const saved = localStorage.getItem('zeepay_invoices');
+      setInvoices(saved ? JSON.parse(saved) : seedInvoices);
+    } catch {
+      setInvoices(seedInvoices);
+    }
     setLoading(false);
   }, [router]);
 
-  const invoices = [
+  const persist = (next: Invoice[]) => {
+    setInvoices(next);
+    try { localStorage.setItem('zeepay_invoices', JSON.stringify(next)); } catch { /* noop */ }
+  };
+
+  const filtered = invoices.filter(
+    (i) =>
+      (!statusFilter || i.status === statusFilter) &&
+      (!search || i.id.toLowerCase().includes(search.toLowerCase()) || i.customer.name.toLowerCase().includes(search.toLowerCase())),
+  );
+
+  const createInvoice = (asDraft: boolean) => {
+    if (!form.name.trim() || !form.email.trim()) {
+      toast('Customer name and email are required', 'warning');
+      return;
+    }
+    const items = formItems.filter((i) => i.description.trim());
+    const amount = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const nextNum = invoices.reduce((m, i) => {
+      const n = parseInt(i.id.replace('INV-', ''), 10);
+      return Number.isFinite(n) ? Math.max(m, n) : m;
+    }, 1040) + 1;
+    const inv: Invoice = {
+      id: `INV-${nextNum}`,
+      customer: { name: form.name.trim(), email: form.email.trim() },
+      amount,
+      currency: form.currency,
+      status: asDraft ? 'Draft' : 'Pending',
+      dueDate: form.dueDate || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+      paidDate: null,
+      items,
+      paymentMethod: null,
+      paymentId: null,
+      created: new Date().toISOString().slice(0, 10),
+    };
+    persist([inv, ...invoices]);
+    setShowCreateModal(false);
+    setForm({ name: '', email: '', dueDate: '', currency: 'USD', notes: '' });
+    setFormItems([{ description: '', quantity: 1, unitPrice: 0 }]);
+    toast(asDraft ? `Invoice ${inv.id} saved as draft` : `Invoice ${inv.id} created & sent`);
+  };
+
+  const sendInvoice = (inv: Invoice) => {
+    persist(invoices.map((i) => (i.id === inv.id ? { ...i, status: 'Pending' } : i)));
+    toast(`Invoice ${inv.id} sent to ${inv.customer.email}`);
+  };
+
+  const markPaid = (inv: Invoice) => {
+    persist(invoices.map((i) => (i.id === inv.id ? { ...i, status: 'Paid', paidDate: new Date().toISOString().slice(0, 10) } : i)));
+    setMenuFor(null);
+    toast(`${inv.id} marked as paid`);
+  };
+
+  const cancelInvoice = (inv: Invoice) => {
+    persist(invoices.map((i) => (i.id === inv.id ? { ...i, status: 'Cancelled' } : i)));
+    setMenuFor(null);
+    toast(`${inv.id} cancelled`, 'info');
+  };
+
+  const confirmDelete = () => {
+    if (!deleting) return;
+    persist(invoices.filter((i) => i.id !== deleting.id));
+    setDeleting(null);
+    toast('Invoice deleted', 'info');
+  };
+
+  const seedInvoices: Invoice[] = [
     {
       id: 'INV-1045',
       customer: {
@@ -136,7 +233,7 @@ export default function Invoices() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Invoices</h2>
         <p className="text-muted">Create and manage invoices for your customers</p>
@@ -157,7 +254,7 @@ export default function Invoices() {
                 <div className="card-body">
                   <p className="text-muted small mb-1">Total Outstanding</p>
                   <p className="h3 mb-0 text-warning">
-                    {invoices.filter(i => i.status === 'Pending' || i.status === 'Overdue').reduce((sum, i) => sum + i.amount, 0).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+                    {filtered.filter(i => i.status === 'Pending' || i.status === 'Overdue').reduce((sum, i) => sum + i.amount, 0).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
                   </p>
                 </div>
               </div>
@@ -167,7 +264,7 @@ export default function Invoices() {
                 <div className="card-body">
                   <p className="text-muted small mb-1">Paid This Month</p>
                   <p className="h3 mb-0 text-success">
-                    {invoices.filter(i => i.status === 'Paid' && i.paidDate && new Date(i.paidDate).getMonth() === new Date().getMonth()).reduce((sum, i) => sum + i.amount, 0).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+                    {invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.amount, 0).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
                   </p>
                 </div>
               </div>
@@ -176,7 +273,7 @@ export default function Invoices() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Overdue</p>
-                  <p className="h3 mb-0 text-danger">{invoices.filter(i => i.status === 'Overdue').length}</p>
+                  <p className="h3 mb-0 text-danger">{filtered.filter(i => i.status === 'Overdue').length}</p>
                 </div>
               </div>
             </div>
@@ -184,7 +281,7 @@ export default function Invoices() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Draft</p>
-                  <p className="h3 mb-0 text-secondary">{invoices.filter(i => i.status === 'Draft').length}</p>
+                  <p className="h3 mb-0 text-secondary">{filtered.filter(i => i.status === 'Draft').length}</p>
                 </div>
               </div>
             </div>
@@ -195,14 +292,27 @@ export default function Invoices() {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center">
                 <div className="d-flex gap-2">
-                  <select className="form-select form-select-sm" style={{ width: '150px' }}>
-                    <option>All Status</option>
-                    <option>Paid</option>
-                    <option>Pending</option>
-                    <option>Overdue</option>
-                    <option>Draft</option>
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ width: '150px' }}
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="">All Status</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Overdue">Overdue</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Cancelled">Cancelled</option>
                   </select>
-                  <input type="text" className="form-control form-select-sm" placeholder="Search invoices..." style={{ width: '250px' }} />
+                  <input
+                    type="text"
+                    className="form-control form-select-sm"
+                    placeholder="Search invoices..."
+                    style={{ width: '250px' }}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
                   <i className="bi bi-plus-circle me-2"></i>
@@ -230,7 +340,7 @@ export default function Invoices() {
                     </tr>
                   </thead>
                   <tbody>
-                    {invoices.map((invoice) => (
+                    {filtered.map((invoice) => (
                       <tr key={invoice.id}>
                         <td>
                           <div>
@@ -258,15 +368,51 @@ export default function Invoices() {
                         <td className="small">{invoice.paymentMethod || '-'}</td>
                         <td>
                           <div className="btn-group btn-group-sm">
-                            <button className="btn btn-outline-primary" title="View">
+                            <button className="btn btn-outline-primary" title="View" onClick={() => setViewing(invoice)}>
                               <i className="bi bi-eye"></i>
                             </button>
-                            <button className="btn btn-outline-primary" title="Send">
+                            <button className="btn btn-outline-primary" title="Send" onClick={() => sendInvoice(invoice)}>
                               <i className="bi bi-send"></i>
                             </button>
-                            <button className="btn btn-outline-secondary" title="More">
-                              <i className="bi bi-three-dots"></i>
-                            </button>
+                            <div className="position-relative">
+                              <button
+                                className="btn btn-outline-secondary"
+                                title="More"
+                                onClick={() => setMenuFor(menuFor === invoice.id ? null : invoice.id)}
+                              >
+                                <i className="bi bi-three-dots"></i>
+                              </button>
+                              {menuFor === invoice.id && (
+                                <ul className="dropdown-menu show" style={{ position: 'absolute', right: 0, zIndex: 1050 }}>
+                                  <li>
+                                    <button className="dropdown-item small" onClick={() => { markPaid(invoice); }}>
+                                      <i className="bi bi-check2-circle me-2"></i>Mark paid
+                                    </button>
+                                  </li>
+                                  <li>
+                                    <button
+                                      className="dropdown-item small"
+                                      onClick={() => { downloadJSON(`invoice-${invoice.id}`, invoice); setMenuFor(null); toast('Invoice downloaded'); }}
+                                    >
+                                      <i className="bi bi-download me-2"></i>Download
+                                    </button>
+                                  </li>
+                                  <li>
+                                    <button className="dropdown-item small" onClick={() => cancelInvoice(invoice)}>
+                                      <i className="bi bi-x-circle me-2"></i>Cancel invoice
+                                    </button>
+                                  </li>
+                                  <li>
+                                    <button
+                                      className="dropdown-item small text-danger"
+                                      onClick={() => { setDeleting(invoice); setMenuFor(null); }}
+                                    >
+                                      <i className="bi bi-trash me-2"></i>Delete
+                                    </button>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -290,26 +436,47 @@ export default function Invoices() {
                     <div className="row g-3 mb-3">
                       <div className="col-md-6">
                         <label className="form-label">Customer Name *</label>
-                        <input type="text" className="form-control" placeholder="Enter customer name" />
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Enter customer name"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        />
                       </div>
                       <div className="col-md-6">
                         <label className="form-label">Customer Email *</label>
-                        <input type="email" className="form-control" placeholder="customer@example.com" />
+                        <input
+                          type="email"
+                          className="form-control"
+                          placeholder="customer@example.com"
+                          value={form.email}
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        />
                       </div>
                     </div>
                     <div className="row g-3 mb-3">
                       <div className="col-md-6">
                         <label className="form-label">Invoice Number</label>
-                        <input type="text" className="form-control" value="INV-1046" readOnly />
+                        <input type="text" className="form-control" value="Auto-assigned" readOnly />
                       </div>
                       <div className="col-md-6">
                         <label className="form-label">Due Date *</label>
-                        <input type="date" className="form-control" />
+                        <input
+                          type="date"
+                          className="form-control"
+                          value={form.dueDate}
+                          onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                        />
                       </div>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Currency</label>
-                      <select className="form-select">
+                      <select
+                        className="form-select"
+                        value={form.currency}
+                        onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                      >
                         <option>USD</option>
                         <option>ZWL</option>
                         <option>EUR</option>
@@ -330,34 +497,79 @@ export default function Invoices() {
                             </tr>
                           </thead>
                           <tbody>
-                            <tr>
-                              <td><input type="text" className="form-control form-control-sm" placeholder="Item description" /></td>
-                              <td><input type="number" className="form-control form-control-sm" placeholder="1" min="1" /></td>
-                              <td><input type="number" className="form-control form-control-sm" placeholder="0.00" step="0.01" /></td>
-                              <td className="text-muted">$0.00</td>
-                              <td><button className="btn btn-sm btn-outline-danger"><i className="bi bi-trash"></i></button></td>
-                            </tr>
+                            {formItems.map((item, idx) => (
+                              <tr key={idx}>
+                                <td>
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm"
+                                    placeholder="Item description"
+                                    value={item.description}
+                                    onChange={(e) => setFormItems(formItems.map((it, i) => (i === idx ? { ...it, description: e.target.value } : it)))}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    className="form-control form-control-sm"
+                                    placeholder="1"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => setFormItems(formItems.map((it, i) => (i === idx ? { ...it, quantity: parseInt(e.target.value) || 1 } : it)))}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    className="form-control form-control-sm"
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    value={item.unitPrice}
+                                    onChange={(e) => setFormItems(formItems.map((it, i) => (i === idx ? { ...it, unitPrice: parseFloat(e.target.value) || 0 } : it)))}
+                                  />
+                                </td>
+                                <td className="text-muted">${(item.quantity * item.unitPrice).toFixed(2)}</td>
+                                <td>
+                                  <button
+                                    className="btn btn-sm btn-outline-danger"
+                                    onClick={() => setFormItems(formItems.filter((_, i) => i !== idx))}
+                                    disabled={formItems.length === 1}
+                                  >
+                                    <i className="bi bi-trash"></i>
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
-                      <button className="btn btn-sm btn-outline-primary mt-2">
+                      <button
+                        className="btn btn-sm btn-outline-primary mt-2"
+                        onClick={() => setFormItems([...formItems, { description: '', quantity: 1, unitPrice: 0 }])}
+                      >
                         <i className="bi bi-plus me-1"></i>
                         Add Item
                       </button>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Notes (Optional)</label>
-                      <textarea className="form-control" rows={2} placeholder="Payment terms, thank you message, etc."></textarea>
+                      <textarea
+                        className="form-control"
+                        rows={2}
+                        placeholder="Payment terms, thank you message, etc."
+                        value={form.notes}
+                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                      ></textarea>
                     </div>
                   </div>
                   <div className="modal-footer">
                     <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
                       Cancel
                     </button>
-                    <button type="button" className="btn btn-outline-primary me-2" onClick={() => setShowCreateModal(false)}>
+                    <button type="button" className="btn btn-outline-primary me-2" onClick={() => createInvoice(true)}>
                       Save as Draft
                     </button>
-                    <button type="button" className="btn btn-primary" onClick={() => setShowCreateModal(false)}>
+                    <button type="button" className="btn btn-primary" onClick={() => createInvoice(false)}>
                       Create & Send
                     </button>
                   </div>
@@ -370,7 +582,7 @@ export default function Invoices() {
           <div className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="card-title mb-0">Invoice Templates</h5>
-              <button className="btn btn-sm btn-outline-primary">
+              <button className="btn btn-sm btn-outline-primary" onClick={() => toast('Template builder coming soon — create an invoice and reuse it', 'info')}>
                 <i className="bi bi-plus-circle me-1"></i>
                 Create Template
               </button>
@@ -382,7 +594,7 @@ export default function Invoices() {
                     <div className="card-body">
                       <h6 className="mb-2">Standard Invoice</h6>
                       <p className="text-muted small mb-2">Basic invoice template with line items</p>
-                      <button className="btn btn-sm btn-outline-primary w-100">Use Template</button>
+                      <button className="btn btn-sm btn-outline-primary w-100" onClick={() => setShowCreateModal(true)}>Use Template</button>
                     </div>
                   </div>
                 </div>
@@ -391,7 +603,7 @@ export default function Invoices() {
                     <div className="card-body">
                       <h6 className="mb-2">Recurring Invoice</h6>
                       <p className="text-muted small mb-2">For subscription-based billing</p>
-                      <button className="btn btn-sm btn-outline-primary w-100">Use Template</button>
+                      <button className="btn btn-sm btn-outline-primary w-100" onClick={() => setShowCreateModal(true)}>Use Template</button>
                     </div>
                   </div>
                 </div>
@@ -400,15 +612,64 @@ export default function Invoices() {
                     <div className="card-body">
                       <h6 className="mb-2">Project Invoice</h6>
                       <p className="text-muted small mb-2">For milestone-based projects</p>
-                      <button className="btn btn-sm btn-outline-primary w-100">Use Template</button>
+                      <button className="btn btn-sm btn-outline-primary w-100" onClick={() => setShowCreateModal(true)}>Use Template</button>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+          {/* View invoice modal */}
+          {viewing && (
+            <Modal title={`Invoice ${viewing.id}`} onClose={() => setViewing(null)} size="lg">
+              <div className="d-flex justify-content-between mb-3">
+                <div>
+                  <p className="small text-muted mb-0">Bill to</p>
+                  <p className="small fw-medium mb-0">{viewing.customer.name}</p>
+                  <p className="small text-muted">{viewing.customer.email}</p>
+                </div>
+                <span className={`badge ${getStatusColor(viewing.status)} align-self-start`}>{viewing.status}</span>
+              </div>
+              <table className="table table-sm">
+                <thead>
+                  <tr><th>Item</th><th className="text-end">Qty</th><th className="text-end">Unit</th><th className="text-end">Total</th></tr>
+                </thead>
+                <tbody>
+                  {viewing.items.map((it, i) => (
+                    <tr key={i}>
+                      <td className="small">{it.description}</td>
+                      <td className="small text-end">{it.quantity}</td>
+                      <td className="small text-end">{it.unitPrice.toFixed(2)}</td>
+                      <td className="small text-end">{(it.quantity * it.unitPrice).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                  <tr className="fw-medium">
+                    <td colSpan={3} className="text-end">Total</td>
+                    <td className="text-end">{viewing.currency} {viewing.amount.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="small text-muted mb-0">
+                Due {new Date(viewing.dueDate).toLocaleDateString()}
+                {viewing.paidDate && ` · Paid ${new Date(viewing.paidDate).toLocaleDateString()}`}
+                {viewing.paymentMethod && ` · via ${viewing.paymentMethod}`}
+              </p>
+            </Modal>
+          )}
+
+          {/* Delete confirm */}
+          {deleting && (
+            <ConfirmDialog
+              title="Delete invoice"
+              message={`Delete invoice ${deleting.id} for ${deleting.customer.name}? This cannot be undone.`}
+              confirmLabel="Delete"
+              tone="danger"
+              onConfirm={confirmDelete}
+              onCancel={() => setDeleting(null)}
+            />
+          )}
         </>
       )}
-    </>
+    </ToastProvider>
   );
 }

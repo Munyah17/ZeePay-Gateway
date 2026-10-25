@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { downloadCSV } from '@/utils/actions';
 
 interface Refund {
   id: string;
@@ -17,6 +19,9 @@ export default function RefundsPage() {
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [form, setForm] = useState({ paymentId: 'pay_8x2k91', amount: '10', reason: 'Customer request' });
+  const [viewing, setViewing] = useState<Refund | null>(null);
+  const [deleting, setDeleting] = useState<Refund | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -43,12 +48,37 @@ export default function RefundsPage() {
     }
   };
 
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('zeepay_authed');
-      localStorage.removeItem('zeepay_user');
+  const createRefund = () => {
+    const amount = parseFloat(form.amount);
+    if (!amount || amount <= 0) {
+      toast('Enter a valid amount', 'warning');
+      return;
     }
-    router.push('/');
+    const refund: Refund = {
+      id: `ref_${Math.floor(10000 + Math.random() * 90000)}`,
+      paymentId: form.paymentId,
+      amount,
+      status: 'Pending',
+      date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+    };
+    setRefunds((prev) => [refund, ...prev]);
+    setShowCreateModal(false);
+    toast(`Refund ${refund.id} created`);
+  };
+
+  const confirmDelete = () => {
+    if (!deleting) return;
+    setRefunds((prev) => prev.filter((r) => r.id !== deleting.id));
+    setDeleting(null);
+    toast('Refund record removed', 'info');
+  };
+
+  const exportCsv = () => {
+    downloadCSV(
+      'refunds',
+      refunds.map((r) => ({ id: r.id, paymentId: r.paymentId, amount: `$${r.amount.toFixed(2)}`, status: r.status, date: r.date })),
+    );
+    toast(`Exported ${refunds.length} refund(s)`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -65,18 +95,23 @@ export default function RefundsPage() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="h4 mb-0">Refunds</h2>
           <p className="text-muted small mb-0">Track and initiate refunds for supported payment providers</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn btn-primary btn-sm"
-        >
-          <i className="bi bi-plus-lg me-1"></i> Create refund
-        </button>
+        <div className="d-flex gap-2">
+          <button onClick={exportCsv} className="btn btn-outline-secondary btn-sm">
+            <i className="bi bi-download me-1"></i> Export
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn btn-primary btn-sm"
+          >
+            <i className="bi bi-plus-lg me-1"></i> Create refund
+          </button>
+        </div>
       </div>
 
       <div className="alert alert-warning mb-4" role="alert">
@@ -107,6 +142,7 @@ export default function RefundsPage() {
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Date</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -121,6 +157,24 @@ export default function RefundsPage() {
                         </span>
                       </td>
                       <td className="text-muted">{refund.date}</td>
+                      <td>
+                        <div className="btn-group btn-group-sm">
+                          <button
+                            className="btn btn-outline-primary"
+                            title="View"
+                            onClick={() => setViewing(refund)}
+                          >
+                            <i className="bi bi-eye"></i>
+                          </button>
+                          <button
+                            className="btn btn-outline-danger"
+                            title="Remove"
+                            onClick={() => setDeleting(refund)}
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -151,10 +205,14 @@ export default function RefundsPage() {
                 <form>
                   <div className="mb-3">
                     <label className="form-label small">Payment</label>
-                    <select className="form-select form-select-sm">
-                      <option>pay_8x2k91 — $10.00 (invoice_1042)</option>
-                      <option>pay_7m4422 — $50.00 (invoice_1041)</option>
-                      <option>pay_9q0678 — $20.00 (invoice_1040)</option>
+                    <select
+                      className="form-select form-select-sm"
+                      value={form.paymentId}
+                      onChange={(e) => setForm({ ...form, paymentId: e.target.value })}
+                    >
+                      <option value="pay_8x2k91">pay_8x2k91 — $10.00 (invoice_1042)</option>
+                      <option value="pay_7m4422">pay_7m4422 — $50.00 (invoice_1041)</option>
+                      <option value="pay_9q0678">pay_9q0678 — $20.00 (invoice_1040)</option>
                     </select>
                   </div>
                   <div className="mb-3">
@@ -163,13 +221,18 @@ export default function RefundsPage() {
                       type="number"
                       min="0.01"
                       step="0.01"
-                      defaultValue="10"
+                      value={form.amount}
+                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
                       className="form-control form-control-sm"
                     />
                   </div>
                   <div className="mb-3">
                     <label className="form-label small">Reason</label>
-                    <select className="form-select form-select-sm">
+                    <select
+                      className="form-select form-select-sm"
+                      value={form.reason}
+                      onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                    >
                       <option>Customer request</option>
                       <option>Duplicate payment</option>
                       <option>Service not delivered</option>
@@ -190,7 +253,7 @@ export default function RefundsPage() {
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={createRefund}
                 >
                   Create demo refund
                 </button>
@@ -199,6 +262,44 @@ export default function RefundsPage() {
           </div>
         </div>
       )}
-    </>
+
+      {viewing && (
+        <Modal title={`Refund ${viewing.id}`} onClose={() => setViewing(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Refund ID</span>
+              <span className="small fw-medium font-monospace">{viewing.id}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Payment</span>
+              <span className="small fw-medium font-monospace">{viewing.paymentId}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Amount</span>
+              <span className="small fw-medium">${viewing.amount.toFixed(2)}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <span className={`badge ${getStatusBadge(viewing.status)}`}>{viewing.status}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Date</span>
+              <span className="small fw-medium">{viewing.date}</span>
+            </li>
+          </ul>
+        </Modal>
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Remove refund record"
+          message={`Remove ${deleting.id} ($${deleting.amount.toFixed(2)}) from history?`}
+          confirmLabel="Remove"
+          tone="danger"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
+    </ToastProvider>
   );
 }

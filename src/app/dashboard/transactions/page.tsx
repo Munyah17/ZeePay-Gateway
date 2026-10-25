@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Modal, ToastProvider, toast } from '@/components/ui';
+import { downloadCSV, downloadJSON } from '@/utils/actions';
 
 interface Transaction {
   id: string;
@@ -16,6 +18,10 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [viewing, setViewing] = useState<Transaction | null>(null);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     fetchTransactions();
@@ -43,6 +49,28 @@ export default function TransactionsPage() {
     }
   };
 
+  const visible = transactions.filter(
+    (t) =>
+      !search ||
+      t.reference.toLowerCase().includes(search.toLowerCase()) ||
+      t.id.includes(search),
+  );
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const pageRows = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const exportCsv = () => {
+    downloadCSV(
+      'transactions',
+      visible.map((t) => ({
+        reference: t.reference,
+        amount: `${t.currency} ${t.amount.toFixed(2)}`,
+        status: t.status,
+        date: new Date(t.createdAt).toLocaleString(),
+      })),
+    );
+    toast(`Exported ${visible.length} transaction(s)`);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'succeeded':
@@ -59,7 +87,7 @@ export default function TransactionsPage() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Transactions</h2>
         <p className="text-muted">View and manage your payment transactions</p>
@@ -72,7 +100,7 @@ export default function TransactionsPage() {
               <label className="form-label small">Filter by status:</label>
               <select
                 value={filter}
-                onChange={(e) => setFilter(e.target.value)}
+                onChange={(e) => { setFilter(e.target.value); setPage(1); }}
                 className="form-select form-select-sm"
               >
                 <option value="all">All</option>
@@ -82,8 +110,18 @@ export default function TransactionsPage() {
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
-            <div className="col-md-9 text-md-end mt-3 mt-md-0">
-              <button className="btn btn-primary btn-sm">
+            <div className="col-md-4">
+              <label className="form-label small">Search:</label>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Reference or ID..."
+                className="form-control form-control-sm"
+              />
+            </div>
+            <div className="col-md-5 text-md-end mt-3 mt-md-0">
+              <button className="btn btn-primary btn-sm" onClick={exportCsv}>
                 <i className="bi bi-download me-1"></i> Export
               </button>
             </div>
@@ -112,7 +150,7 @@ export default function TransactionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((tx) => (
+                  {pageRows.map((tx) => (
                     <tr key={tx.id}>
                       <td>
                         <span className="fw-medium">{tx.reference}</span>
@@ -126,10 +164,21 @@ export default function TransactionsPage() {
                       <td className="text-muted">{new Date(tx.createdAt).toLocaleDateString()}</td>
                       <td>
                         <div className="btn-group btn-group-sm">
-                          <button className="btn btn-outline-primary">
+                          <button
+                            className="btn btn-outline-primary"
+                            title="View details"
+                            onClick={() => setViewing(tx)}
+                          >
                             <i className="bi bi-eye"></i>
                           </button>
-                          <button className="btn btn-outline-secondary">
+                          <button
+                            className="btn btn-outline-secondary"
+                            title="Download receipt"
+                            onClick={() => {
+                              downloadJSON(`receipt-${tx.reference}`, tx);
+                              toast(`Receipt ${tx.reference} downloaded`);
+                            }}
+                          >
                             <i className="bi bi-download"></i>
                           </button>
                         </div>
@@ -138,7 +187,7 @@ export default function TransactionsPage() {
                   ))}
                 </tbody>
               </table>
-              {transactions.length === 0 && (
+              {visible.length === 0 && (
                 <div className="text-center py-4 text-muted">
                   No transactions found
                 </div>
@@ -149,25 +198,44 @@ export default function TransactionsPage() {
         <div className="card-footer">
           <nav aria-label="Page navigation">
             <ul className="pagination pagination-sm justify-content-end mb-0">
-              <li className="page-item disabled">
-                <a className="page-link" href="#">Previous</a>
+              <li className={`page-item ${page === 1 ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</button>
               </li>
-              <li className="page-item active">
-                <a className="page-link" href="#">1</a>
-              </li>
-              <li className="page-item">
-                <a className="page-link" href="#">2</a>
-              </li>
-              <li className="page-item">
-                <a className="page-link" href="#">3</a>
-              </li>
-              <li className="page-item">
-                <a className="page-link" href="#">Next</a>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                <li key={n} className={`page-item ${page === n ? 'active' : ''}`}>
+                  <button className="page-link" onClick={() => setPage(n)}>{n}</button>
+                </li>
+              ))}
+              <li className={`page-item ${page === totalPages ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next</button>
               </li>
             </ul>
           </nav>
         </div>
       </div>
-    </>
+
+      {viewing && (
+        <Modal title={`Transaction ${viewing.reference}`} onClose={() => setViewing(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Reference</span>
+              <span className="small fw-medium">{viewing.reference}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Amount</span>
+              <span className="small fw-medium">{viewing.currency} {viewing.amount.toFixed(2)}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <span className={`badge ${getStatusBadge(viewing.status)}`}>{viewing.status}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Date</span>
+              <span className="small fw-medium">{new Date(viewing.createdAt).toLocaleString()}</span>
+            </li>
+          </ul>
+        </Modal>
+      )}
+    </ToastProvider>
   );
 }

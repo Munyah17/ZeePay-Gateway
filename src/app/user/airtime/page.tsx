@@ -11,6 +11,24 @@ export default function Airtime() {
   const [amount, setAmount] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('ecocash');
   const [step, setStep] = useState(1);
+  const [buying, setBuying] = useState(false);
+  const [doneRef, setDoneRef] = useState<string | null>(null);
+
+  const confirmBuy = () => {
+    setBuying(true);
+    setTimeout(() => {
+      setBuying(false);
+      setDoneRef(`air_${Math.random().toString(36).slice(2, 10).toUpperCase()}`);
+      setStep(4);
+    }, 1200);
+  };
+
+  const resetFlow = () => {
+    setStep(1);
+    setAmount('');
+    setPhone('');
+    setDoneRef(null);
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -215,11 +233,32 @@ export default function Airtime() {
                         <button className="btn btn-outline-secondary flex-grow-1" onClick={() => setStep(2)}>
                           Back
                         </button>
-                        <button className="btn btn-success flex-grow-1" onClick={() => setStep(1)}>
-                          Confirm & Buy
+                        <button className="btn btn-success flex-grow-1" onClick={confirmBuy} disabled={buying}>
+                          {buying ? 'Processing…' : 'Confirm & Buy'}
                         </button>
                       </div>
                     </>
+                  )}
+
+                  {step === 4 && doneRef && (
+                    <div className="text-center py-4">
+                      <div className="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px' }}>
+                        <i className="bi bi-check-lg fs-2"></i>
+                      </div>
+                      <h5>Airtime Purchased</h5>
+                      <p className="text-muted small mb-1">
+                        ${parseFloat(amount).toFixed(2)} {providers.find(p => p.id === selectedProvider)?.name} airtime sent to {phone}
+                      </p>
+                      <p className="text-muted small">Reference: <code>{doneRef}</code></p>
+                      <div className="d-flex gap-2 justify-content-center mt-4">
+                        <button className="btn btn-outline-primary" onClick={resetFlow}>
+                          Buy more
+                        </button>
+                        <Link href="/user/history" className="btn btn-primary">
+                          View history
+                        </Link>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

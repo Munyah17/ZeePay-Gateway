@@ -4,11 +4,38 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+
+interface RoutingRule {
+  id: string;
+  name: string;
+  priority: number;
+  status: string;
+  conditions: {
+    paymentMethod: string;
+    currency: string[];
+    country: string;
+    minAmount: number;
+    maxAmount: number;
+  };
+  providers: { name: string; weight: number; fallback: boolean }[];
+  createdAt: string;
+  lastModified: string;
+}
 
 export default function RoutingRules() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [selectedRule, setSelectedRule] = useState<string | null>(null);
+  const [ruleList, setRuleList] = useState<RoutingRule[]>([]);
+  const [editing, setEditing] = useState<RoutingRule | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<RoutingRule | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [sim, setSim] = useState({ method: 'EcoCash', currency: 'USD', amount: '100' });
+  const [simResult, setSimResult] = useState<string | null>(null);
+  const [createForm, setCreateForm] = useState({ name: '', method: 'EcoCash', currency: 'USD', minAmount: '1', maxAmount: '10000', provider: 'EcoCash Direct' });
+  const [editPolicy, setEditPolicy] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -18,10 +45,72 @@ export default function RoutingRules() {
         return;
       }
     }
+    setRuleList(seedRules);
     setLoading(false);
   }, [router]);
 
-  const routingRules = [
+  const updateRuleStatus = (rule: RoutingRule, status: string) => {
+    setRuleList((prev) => prev.map((r) => (r.id === rule.id ? { ...r, status, lastModified: new Date().toISOString().slice(0, 10) } : r)));
+    setEditing(null);
+    toast(`${rule.name} → ${status}`, 'info');
+  };
+
+  const createRule = () => {
+    if (!createForm.name.trim()) {
+      toast('Rule name required', 'warning');
+      return;
+    }
+    const maxPriority = ruleList.reduce((m, r) => Math.max(m, r.priority), 0);
+    const rule: RoutingRule = {
+      id: `rule_${Math.random().toString(36).slice(2, 6)}`,
+      name: createForm.name.trim(),
+      priority: maxPriority + 1,
+      status: 'Draft',
+      conditions: {
+        paymentMethod: createForm.method,
+        currency: [createForm.currency],
+        country: 'Zimbabwe',
+        minAmount: parseFloat(createForm.minAmount) || 1,
+        maxAmount: parseFloat(createForm.maxAmount) || 10000,
+      },
+      providers: [{ name: createForm.provider, weight: 100, fallback: false }],
+      createdAt: new Date().toISOString().slice(0, 10),
+      lastModified: new Date().toISOString().slice(0, 10),
+    };
+    setRuleList((prev) => [...prev, rule]);
+    setShowCreate(false);
+    setCreateForm({ name: '', method: 'EcoCash', currency: 'USD', minAmount: '1', maxAmount: '10000', provider: 'EcoCash Direct' });
+    toast(`${rule.name} created as draft`);
+  };
+
+  const deleteRule = () => {
+    if (!deleteTarget) return;
+    setRuleList((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+    setDeleteTarget(null);
+    toast('Rule deleted', 'info');
+  };
+
+  const runSimulation = () => {
+    const match = ruleList.find(
+      (r) =>
+        r.status !== 'Suspended' &&
+        r.conditions.paymentMethod === sim.method &&
+        r.conditions.currency.includes(sim.currency) &&
+        parseFloat(sim.amount) >= r.conditions.minAmount &&
+        parseFloat(sim.amount) <= r.conditions.maxAmount,
+    );
+    if (match) {
+      const primary = match.providers.filter((p) => !p.fallback)[0] || match.providers[0];
+      const fallback = match.providers.find((p) => p.fallback);
+      setSimResult(
+        `Rule "${match.name}" (priority ${match.priority}) would route ${sim.amount} ${sim.currency} via ${primary.name} (${primary.weight}%)${fallback ? ` — fallback: ${fallback.name}` : ''}.`,
+      );
+    } else {
+      setSimResult('No active routing rule matches these parameters.');
+    }
+  };
+
+  const seedRules: RoutingRule[] = [
     {
       id: 'rule_001',
       name: 'EcoCash Primary',
@@ -146,7 +235,7 @@ export default function RoutingRules() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Routing Rules</h2>
         <p className="text-muted">Configure how payments are routed to providers based on conditions</p>
@@ -166,7 +255,7 @@ export default function RoutingRules() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Total Rules</p>
-                  <p className="h3 mb-0">{routingRules.length}</p>
+                  <p className="h3 mb-0">{ruleList.length}</p>
                 </div>
               </div>
             </div>
@@ -174,7 +263,7 @@ export default function RoutingRules() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Active</p>
-                  <p className="h3 mb-0 text-success">{routingRules.filter(r => r.status === 'Active').length}</p>
+                  <p className="h3 mb-0 text-success">{ruleList.filter(r => r.status === 'Active').length}</p>
                 </div>
               </div>
             </div>
@@ -182,7 +271,7 @@ export default function RoutingRules() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Degraded</p>
-                  <p className="h3 mb-0 text-warning">{routingRules.filter(r => r.status === 'Degraded').length}</p>
+                  <p className="h3 mb-0 text-warning">{ruleList.filter(r => r.status === 'Degraded').length}</p>
                 </div>
               </div>
             </div>
@@ -190,7 +279,7 @@ export default function RoutingRules() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">With Fallback</p>
-                  <p className="h3 mb-0 text-info">{routingRules.filter(r => r.providers.some(p => p.fallback)).length}</p>
+                  <p className="h3 mb-0 text-info">{ruleList.filter(r => r.providers.some(p => p.fallback)).length}</p>
                 </div>
               </div>
             </div>
@@ -200,7 +289,7 @@ export default function RoutingRules() {
           <div className="card mb-4">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="card-title mb-0">Routing Rules</h5>
-              <button className="btn btn-sm btn-primary">
+              <button className="btn btn-sm btn-primary" onClick={() => setShowCreate(true)}>
                 <i className="bi bi-plus-circle me-1"></i>
                 Create Rule
               </button>
@@ -221,8 +310,8 @@ export default function RoutingRules() {
                     </tr>
                   </thead>
                   <tbody>
-                    {routingRules.map((rule) => (
-                      <tr key={rule.id}>
+                    {ruleList.map((rule) => (
+                      <tr key={rule.id} role="button" style={{ cursor: 'pointer' }} onClick={() => setSelectedRule(rule.id)}>
                         <td>
                           <span className="badge bg-primary">{rule.priority}</span>
                         </td>
@@ -254,14 +343,33 @@ export default function RoutingRules() {
                           <span className={`badge ${getStatusColor(rule.status)}`}>{rule.status}</span>
                         </td>
                         <td className="text-muted small">{new Date(rule.lastModified).toLocaleDateString()}</td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <div className="btn-group btn-group-sm">
-                            <button className="btn btn-outline-primary">
+                            <button className="btn btn-outline-primary" onClick={() => setEditing(rule)}>
                               <i className="bi bi-pencil"></i>
                             </button>
-                            <button className="btn btn-outline-secondary">
-                              <i className="bi bi-three-dots"></i>
-                            </button>
+                            <div className="position-relative">
+                              <button className="btn btn-outline-secondary" onClick={() => setMenuFor(menuFor === rule.id ? null : rule.id)}>
+                                <i className="bi bi-three-dots"></i>
+                              </button>
+                              {menuFor === rule.id && (
+                                <ul className="dropdown-menu show" style={{ position: 'absolute', right: 0, zIndex: 1050 }}>
+                                  <li>
+                                    <button
+                                      className="dropdown-item small"
+                                      onClick={() => { updateRuleStatus(rule, rule.status === 'Suspended' ? 'Active' : 'Suspended'); setMenuFor(null); }}
+                                    >
+                                      {rule.status === 'Suspended' ? 'Activate' : 'Suspend'}
+                                    </button>
+                                  </li>
+                                  <li>
+                                    <button className="dropdown-item small text-danger" onClick={() => { setDeleteTarget(rule); setMenuFor(null); }}>
+                                      Delete
+                                    </button>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -283,7 +391,7 @@ export default function RoutingRules() {
               </div>
               <div className="card-body">
                 {(() => {
-                  const rule = routingRules.find(r => r.id === selectedRule);
+                  const rule = ruleList.find(r => r.id === selectedRule);
                   if (!rule) return null;
                   return (
                     <div className="row g-4">
@@ -339,7 +447,7 @@ export default function RoutingRules() {
           <div className="card mb-4">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="card-title mb-0">Failover Policies</h5>
-              <button className="btn btn-sm btn-outline-primary">
+              <button className="btn btn-sm btn-outline-primary" onClick={() => toast('Add a failover policy (demo)', 'info')}>
                 <i className="bi bi-plus-circle me-1"></i>
                 Add Policy
               </button>
@@ -368,7 +476,7 @@ export default function RoutingRules() {
                       <td><span className="badge bg-success">Active</span></td>
                       <td>
                         <div className="btn-group btn-group-sm">
-                          <button className="btn btn-outline-primary">
+                          <button className="btn btn-outline-primary" onClick={() => setEditPolicy('Standard Payment Failover')}>
                             <i className="bi bi-pencil"></i>
                           </button>
                         </div>
@@ -383,7 +491,7 @@ export default function RoutingRules() {
                       <td><span className="badge bg-success">Active</span></td>
                       <td>
                         <div className="btn-group btn-group-sm">
-                          <button className="btn btn-outline-primary">
+                          <button className="btn btn-outline-primary" onClick={() => setEditPolicy('High-Value Transaction')}>
                             <i className="bi bi-pencil"></i>
                           </button>
                         </div>
@@ -398,7 +506,7 @@ export default function RoutingRules() {
                       <td><span className="badge bg-info text-dark">Testing</span></td>
                       <td>
                         <div className="btn-group btn-group-sm">
-                          <button className="btn btn-outline-primary">
+                          <button className="btn btn-outline-primary" onClick={() => setEditPolicy('Cross-Border Payment')}>
                             <i className="bi bi-pencil"></i>
                           </button>
                         </div>
@@ -423,7 +531,7 @@ export default function RoutingRules() {
               <div className="row g-3 mb-3">
                 <div className="col-md-3">
                   <label className="form-label small">Payment Method</label>
-                  <select className="form-select form-select-sm">
+                  <select className="form-select form-select-sm" value={sim.method} onChange={(e) => setSim({ ...sim, method: e.target.value })}>
                     <option>EcoCash</option>
                     <option>Visa</option>
                     <option>Mastercard</option>
@@ -432,7 +540,7 @@ export default function RoutingRules() {
                 </div>
                 <div className="col-md-3">
                   <label className="form-label small">Currency</label>
-                  <select className="form-select form-select-sm">
+                  <select className="form-select form-select-sm" value={sim.currency} onChange={(e) => setSim({ ...sim, currency: e.target.value })}>
                     <option>USD</option>
                     <option>ZWL</option>
                     <option>EUR</option>
@@ -440,25 +548,137 @@ export default function RoutingRules() {
                 </div>
                 <div className="col-md-3">
                   <label className="form-label small">Amount</label>
-                  <input type="number" className="form-control form-control-sm" placeholder="100.00" />
+                  <input type="number" className="form-control form-control-sm" placeholder="100.00" value={sim.amount} onChange={(e) => setSim({ ...sim, amount: e.target.value })} />
                 </div>
                 <div className="col-md-3 d-flex align-items-end">
-                  <button className="btn btn-primary w-100">
+                  <button className="btn btn-primary w-100" onClick={runSimulation}>
                     <i className="bi bi-play-circle me-1"></i>
                     Simulate
                   </button>
                 </div>
               </div>
               <div className="border rounded p-3 bg-light">
-                <p className="text-muted small mb-0">
-                  <i className="bi bi-lightbulb me-1"></i>
-                  Simulation results will display here showing which provider would be selected based on current routing rules
+                <p className={`small mb-0 ${simResult ? '' : 'text-muted'}`}>
+                  <i className={`bi ${simResult ? 'bi-check-circle text-success' : 'bi-lightbulb'} me-1`}></i>
+                  {simResult || 'Simulation results will display here showing which provider would be selected based on current routing rules'}
                 </p>
               </div>
             </div>
           </div>
         </>
       )}
-    </>
+
+      {/* Edit rule modal */}
+      {editing && (
+        <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
+          <div className="mb-3">
+            <label className="form-label small">Status</label>
+            <select
+              className="form-select form-select-sm"
+              value={editing.status}
+              onChange={(e) => updateRuleStatus(editing, e.target.value)}
+            >
+              <option>Active</option>
+              <option>Draft</option>
+              <option>Testing</option>
+              <option>Degraded</option>
+              <option>Suspended</option>
+            </select>
+          </div>
+          <p className="small text-muted mb-0">
+            Routing condition and weight changes require full provider testing in production.
+          </p>
+        </Modal>
+      )}
+
+      {/* Create rule modal */}
+      {showCreate && (
+        <Modal
+          title="Create Routing Rule"
+          onClose={() => setShowCreate(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={createRule}>Create rule</button>
+            </>
+          }
+        >
+          <div className="mb-3">
+            <label className="form-label small">Rule name *</label>
+            <input className="form-control form-control-sm" placeholder="e.g., ZIPIT High Value" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
+          </div>
+          <div className="row g-2 mb-3">
+            <div className="col-6">
+              <label className="form-label small">Payment method</label>
+              <select className="form-select form-select-sm" value={createForm.method} onChange={(e) => setCreateForm({ ...createForm, method: e.target.value })}>
+                <option>EcoCash</option>
+                <option>InnBucks</option>
+                <option>Omari</option>
+                <option>Visa</option>
+                <option>Mastercard</option>
+                <option>ZIPIT</option>
+              </select>
+            </div>
+            <div className="col-6">
+              <label className="form-label small">Currency</label>
+              <select className="form-select form-select-sm" value={createForm.currency} onChange={(e) => setCreateForm({ ...createForm, currency: e.target.value })}>
+                <option>USD</option>
+                <option>ZWL</option>
+                <option>EUR</option>
+              </select>
+            </div>
+          </div>
+          <div className="row g-2 mb-3">
+            <div className="col-6">
+              <label className="form-label small">Min amount</label>
+              <input type="number" className="form-control form-control-sm" value={createForm.minAmount} onChange={(e) => setCreateForm({ ...createForm, minAmount: e.target.value })} />
+            </div>
+            <div className="col-6">
+              <label className="form-label small">Max amount</label>
+              <input type="number" className="form-control form-control-sm" value={createForm.maxAmount} onChange={(e) => setCreateForm({ ...createForm, maxAmount: e.target.value })} />
+            </div>
+          </div>
+          <div>
+            <label className="form-label small">Primary provider</label>
+            <input className="form-control form-control-sm" value={createForm.provider} onChange={(e) => setCreateForm({ ...createForm, provider: e.target.value })} />
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit failover policy modal */}
+      {editPolicy && (
+        <Modal
+          title={`Edit ${editPolicy}`}
+          onClose={() => setEditPolicy(null)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setEditPolicy(null)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={() => { setEditPolicy(null); toast('Failover policy updated'); }}>Save</button>
+            </>
+          }
+        >
+          <div className="mb-3">
+            <label className="form-label small">Max retries</label>
+            <input type="number" className="form-control form-control-sm" defaultValue="3" />
+          </div>
+          <div>
+            <label className="form-label small">Retry interval (seconds)</label>
+            <input type="number" className="form-control form-control-sm" defaultValue="5" />
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete confirm */}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete routing rule"
+          message={`Delete "${deleteTarget.name}"? This affects how new payments are routed.`}
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={deleteRule}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </ToastProvider>
   );
 }

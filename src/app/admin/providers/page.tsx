@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Modal, ToastProvider, toast } from '@/components/ui';
 
 interface Provider {
   name: string;
@@ -16,6 +17,54 @@ export default function AdminProvidersPage() {
   const router = useRouter();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
+  const [configuring, setConfiguring] = useState<Provider | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [addForm, setAddForm] = useState({ name: '', category: 'Mobile money' });
+
+  const runHealthChecks = () => {
+    setChecking(true);
+    setTimeout(() => {
+      setProviders((prev) =>
+        prev.map((p) =>
+          p.status === 'Connected'
+            ? { ...p, success: Math.min(100, Math.round((p.success + (Math.random() - 0.5)) * 10) / 10) }
+            : p,
+        ),
+      );
+      setChecking(false);
+      toast('Health checks complete', 'info');
+    }, 1200);
+  };
+
+  const testProvider = (p: Provider) => {
+    setTesting(p.name);
+    setTimeout(() => {
+      setTesting(null);
+      if (p.status === 'Connected') {
+        toast(`${p.name}: connectivity check passed`, 'success');
+      } else if (p.status === 'Sandbox') {
+        toast(`${p.name}: sandbox credentials verified`, 'info');
+      } else {
+        toast(`${p.name}: no credentials configured`, 'warning');
+      }
+    }, 800);
+  };
+
+  const addProvider = () => {
+    if (!addForm.name.trim()) {
+      toast('Provider name required', 'warning');
+      return;
+    }
+    setProviders((prev) => [
+      ...prev,
+      { name: addForm.name.trim(), category: addForm.category, status: 'Not configured', success: 0, volume: 0 },
+    ]);
+    setShowAdd(false);
+    setAddForm({ name: '', category: 'Mobile money' });
+    toast(`${addForm.name} added — configure credentials to activate`);
+  };
 
   useEffect(() => {
     const authed = localStorage.getItem('zeepay_authed');
@@ -68,13 +117,14 @@ export default function AdminProvidersPage() {
   };
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14">
             <div className="flex items-center gap-8">
               <Link href="/" className="text-sm font-semibold text-gray-900">ZeePay</Link>
-              <div className="flex gap-6">
+              <div className="hidden md:flex gap-6">
                 <Link href="/admin" className="text-xs text-gray-600 hover:text-gray-900">Platform overview</Link>
                 <Link href="/admin/merchants" className="text-xs text-gray-600 hover:text-gray-900">Merchants</Link>
                 <Link href="/admin/transactions" className="text-xs text-gray-600 hover:text-gray-900">Transactions</Link>
@@ -84,7 +134,7 @@ export default function AdminProvidersPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-600">admin@zeepay.co.zw</span>
+              <span className="hidden md:inline text-xs text-gray-600">admin@zeepay.co.zw</span>
               <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900">
                 Sign out
               </button>
@@ -94,16 +144,23 @@ export default function AdminProvidersPage() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-8 flex flex-wrap gap-3 justify-between items-center">
           <div>
             <h1 className="text-sm font-semibold text-gray-900">Payment providers</h1>
             <p className="text-xs text-gray-600 mt-1">Configure adapters, inspect readiness, and monitor provider health</p>
           </div>
           <div className="flex gap-3">
-            <button className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50">
-              ↻ Run health checks
+            <button
+              className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50 disabled:opacity-50"
+              onClick={runHealthChecks}
+              disabled={checking}
+            >
+              {checking ? 'Checking…' : '↻ Run health checks'}
             </button>
-            <button className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800">
+            <button
+              className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800"
+              onClick={() => setShowAdd(true)}
+            >
               ＋ Add provider
             </button>
           </div>
@@ -148,11 +205,18 @@ export default function AdminProvidersPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <button className="flex-1 text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50">
+                  <button
+                    className="flex-1 text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50"
+                    onClick={() => setConfiguring(provider)}
+                  >
                     Configure
                   </button>
-                  <button className="flex-1 text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50">
-                    Test
+                  <button
+                    className="flex-1 text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50 disabled:opacity-50"
+                    onClick={() => testProvider(provider)}
+                    disabled={testing === provider.name}
+                  >
+                    {testing === provider.name ? 'Testing…' : 'Test'}
                   </button>
                 </div>
               </div>
@@ -160,6 +224,77 @@ export default function AdminProvidersPage() {
           </div>
         )}
       </main>
+
+      {/* Configure modal */}
+      {configuring && (
+        <Modal title={`Configure ${configuring.name}`} onClose={() => setConfiguring(null)}>
+          <div className="mb-3">
+            <label className="form-label small">Status</label>
+            <select
+              className="form-select form-select-sm"
+              value={configuring.status}
+              onChange={(e) => {
+                const status = e.target.value;
+                setProviders((prev) => prev.map((p) => (p.name === configuring.name ? { ...p, status } : p)));
+                setConfiguring({ ...configuring, status });
+                toast(`${configuring.name} status → ${status}`, 'info');
+              }}
+            >
+              <option>Connected</option>
+              <option>Sandbox</option>
+              <option>Not configured</option>
+              <option>Roadmap</option>
+            </select>
+          </div>
+          <div className="mb-3">
+            <label className="form-label small">API base URL</label>
+            <input className="form-control form-control-sm" placeholder="https://api.provider.co.zw" />
+          </div>
+          <div className="mb-1">
+            <label className="form-label small">Credentials reference</label>
+            <input className="form-control form-control-sm" placeholder="Encrypted credential name" />
+            <small className="text-muted">Credentials are stored encrypted; they are never shown here.</small>
+          </div>
+        </Modal>
+      )}
+
+      {/* Add provider modal */}
+      {showAdd && (
+        <Modal
+          title="Add provider"
+          onClose={() => setShowAdd(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowAdd(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={addProvider}>Add provider</button>
+            </>
+          }
+        >
+          <div className="mb-3">
+            <label className="form-label small">Provider name *</label>
+            <input
+              className="form-control form-control-sm"
+              placeholder="e.g., ZimSwitch"
+              value={addForm.name}
+              onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+            />
+          </div>
+          <div className="mb-1">
+            <label className="form-label small">Category</label>
+            <select
+              className="form-select form-select-sm"
+              value={addForm.category}
+              onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
+            >
+              <option>Mobile money</option>
+              <option>Cards</option>
+              <option>Bank transfer</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </Modal>
+      )}
     </div>
+    </ToastProvider>
   );
 }

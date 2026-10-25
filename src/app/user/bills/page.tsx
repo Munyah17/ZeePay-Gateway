@@ -4,11 +4,38 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+
+interface Bill {
+  id: string;
+  category: string;
+  provider: string;
+  accountNumber: string;
+  amount: number;
+  currency: string;
+  dueDate: string;
+  status: string;
+  lastPaid: string;
+  autopay: boolean;
+}
 
 export default function Bills() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [billList, setBillList] = useState<Bill[]>([]);
+  const [viewing, setViewing] = useState<Bill | null>(null);
+  const [paying, setPaying] = useState<Bill | null>(null);
+  const [removing, setRemoving] = useState<Bill | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [payAll, setPayAll] = useState(false);
+  const [addForm, setAddForm] = useState({ provider: '', accountNumber: '', amount: '', category: 'utilities' });
+
+  const persist = (next: Bill[]) => {
+    setBillList(next);
+    try { localStorage.setItem('zeepay_bills', JSON.stringify(next)); } catch { /* noop */ }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -18,8 +45,56 @@ export default function Bills() {
         return;
       }
     }
+    try {
+      const saved = localStorage.getItem('zeepay_bills');
+      setBillList(saved ? JSON.parse(saved) : seedBills);
+    } catch {
+      setBillList(seedBills);
+    }
     setLoading(false);
   }, [router]);
+
+  const payBill = (bill: Bill) => {
+    persist(billList.map((b) => (b.id === bill.id ? { ...b, status: 'Paid', lastPaid: new Date().toISOString().slice(0, 10) } : b)));
+    setPaying(null);
+    toast(`Paid ${bill.provider} ${bill.currency} ${bill.amount.toFixed(2)}`);
+  };
+
+  const payAllBills = () => {
+    persist(billList.map((b) => ((b.status === 'Pending' || b.status === 'Overdue') ? { ...b, status: 'Paid', lastPaid: new Date().toISOString().slice(0, 10) } : b)));
+    setPayAll(false);
+    toast(`Paid ${billList.filter((b) => b.status !== 'Paid').length} bills`);
+  };
+
+  const toggleAutopay = (bill: Bill) => {
+    persist(billList.map((b) => (b.id === bill.id ? { ...b, autopay: !b.autopay } : b)));
+    setMenuFor(null);
+    toast(`Autopay ${bill.autopay ? 'disabled' : 'enabled'} for ${bill.provider}`, 'info');
+  };
+
+  const addBill = () => {
+    const amount = parseFloat(addForm.amount);
+    if (!addForm.provider.trim() || !addForm.accountNumber.trim() || !amount || amount <= 0) {
+      toast('Provider, account number and a valid amount are required', 'warning');
+      return;
+    }
+    const bill: Bill = {
+      id: `bill_${Math.random().toString(36).slice(2, 6)}`,
+      category: addForm.category,
+      provider: addForm.provider.trim(),
+      accountNumber: addForm.accountNumber.trim(),
+      amount,
+      currency: 'USD',
+      dueDate: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+      status: 'Pending',
+      lastPaid: '—',
+      autopay: false,
+    };
+    persist([bill, ...billList]);
+    setShowAdd(false);
+    setAddForm({ provider: '', accountNumber: '', amount: '', category: 'utilities' });
+    toast('Bill added');
+  };
 
   const billCategories = [
     { id: 'utilities', name: 'Utilities', icon: '⚡', color: 'bg-warning' },
@@ -30,7 +105,7 @@ export default function Bills() {
     { id: 'tv', name: 'TV', icon: '📺', color: 'bg-danger' },
   ];
 
-  const bills = [
+  const seedBills: Bill[] = [
     {
       id: 'bill_001',
       category: 'electricity',
@@ -94,8 +169,8 @@ export default function Bills() {
   ];
 
   const filteredBills = selectedCategory === 'all' 
-    ? bills 
-    : bills.filter(bill => bill.category === selectedCategory);
+    ? billList 
+    : billList.filter(bill => bill.category === selectedCategory);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -111,7 +186,7 @@ export default function Bills() {
     .reduce((sum, b) => sum + b.amount, 0);
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Pay Bills</h2>
         <p className="text-muted">Manage and pay your bills securely</p>
@@ -185,7 +260,7 @@ export default function Bills() {
           <div className="card mb-4">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="card-title mb-0">Your Bills</h5>
-              <button className="btn btn-sm btn-primary">
+              <button className="btn btn-sm btn-primary" onClick={() => setShowAdd(true)}>
                 <i className="bi bi-plus-circle me-1"></i>
                 Add Bill
               </button>
@@ -234,15 +309,44 @@ export default function Bills() {
                         </td>
                         <td>
                           <div className="btn-group btn-group-sm">
-                            <button className="btn btn-outline-primary" title="Pay Now">
+                            <button
+                              className="btn btn-outline-primary"
+                              title="Pay Now"
+                              disabled={bill.status === 'Paid'}
+                              onClick={() => setPaying(bill)}
+                            >
                               <i className="bi bi-credit-card"></i>
                             </button>
-                            <button className="btn btn-outline-primary" title="View Details">
+                            <button className="btn btn-outline-primary" title="View Details" onClick={() => setViewing(bill)}>
                               <i className="bi bi-eye"></i>
                             </button>
-                            <button className="btn btn-outline-secondary" title="More">
-                              <i className="bi bi-three-dots"></i>
-                            </button>
+                            <div className="position-relative">
+                              <button
+                                className="btn btn-outline-secondary"
+                                title="More"
+                                onClick={() => setMenuFor(menuFor === bill.id ? null : bill.id)}
+                              >
+                                <i className="bi bi-three-dots"></i>
+                              </button>
+                              {menuFor === bill.id && (
+                                <ul className="dropdown-menu show" style={{ position: 'absolute', right: 0, zIndex: 1050 }}>
+                                  <li>
+                                    <button className="dropdown-item small" onClick={() => toggleAutopay(bill)}>
+                                      <i className={`bi ${bill.autopay ? 'bi-x-circle' : 'bi-arrow-repeat'} me-2`}></i>
+                                      {bill.autopay ? 'Disable autopay' : 'Enable autopay'}
+                                    </button>
+                                  </li>
+                                  <li>
+                                    <button
+                                      className="dropdown-item small text-danger"
+                                      onClick={() => { setRemoving(bill); setMenuFor(null); }}
+                                    >
+                                      <i className="bi bi-trash me-2"></i>Remove bill
+                                    </button>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -262,7 +366,7 @@ export default function Bills() {
                     <h6 className="mb-1">Pay All Pending Bills</h6>
                     <p className="text-muted small mb-0">Total: ${totalDue.toFixed(2)}</p>
                   </div>
-                  <button className="btn btn-primary">
+                  <button className="btn btn-primary" onClick={() => setPayAll(true)}>
                     <i className="bi bi-credit-card me-2"></i>
                     Pay All
                   </button>
@@ -310,6 +414,127 @@ export default function Bills() {
           </div>
         </>
       )}
-    </>
+
+      {/* View bill modal */}
+      {viewing && (
+        <Modal title={viewing.provider} onClose={() => setViewing(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Account</span>
+              <code className="small">{viewing.accountNumber}</code>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Amount due</span>
+              <span className="small fw-medium">{viewing.currency} {viewing.amount.toFixed(2)}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Due date</span>
+              <span className="small">{new Date(viewing.dueDate).toLocaleDateString()}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <span className={`badge ${getStatusColor(viewing.status)}`}>{viewing.status}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Autopay</span>
+              <span className="small">{viewing.autopay ? 'Enabled' : 'Disabled'}</span>
+            </li>
+          </ul>
+        </Modal>
+      )}
+
+      {/* Pay confirm */}
+      {paying && (
+        <ConfirmDialog
+          title="Pay bill"
+          message={`Pay ${paying.currency} ${paying.amount.toFixed(2)} to ${paying.provider} (${paying.accountNumber})?`}
+          confirmLabel="Pay now"
+          onConfirm={() => payBill(paying)}
+          onCancel={() => setPaying(null)}
+        />
+      )}
+
+      {/* Pay all confirm */}
+      {payAll && (
+        <ConfirmDialog
+          title="Pay all pending bills"
+          message={`Pay all ${billList.filter((b) => b.status !== 'Paid').length} outstanding bills totalling $${totalDue.toFixed(2)}?`}
+          confirmLabel="Pay all"
+          onConfirm={payAllBills}
+          onCancel={() => setPayAll(false)}
+        />
+      )}
+
+      {/* Remove confirm */}
+      {removing && (
+        <ConfirmDialog
+          title="Remove bill"
+          message={`Remove ${removing.provider} from your bills?`}
+          confirmLabel="Remove"
+          tone="danger"
+          onConfirm={() => {
+            persist(billList.filter((b) => b.id !== removing.id));
+            setRemoving(null);
+            toast('Bill removed', 'info');
+          }}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
+
+      {/* Add bill modal */}
+      {showAdd && (
+        <Modal
+          title="Add Bill"
+          onClose={() => setShowAdd(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowAdd(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={addBill}>Add bill</button>
+            </>
+          }
+        >
+          <div className="mb-3">
+            <label className="form-label small">Provider *</label>
+            <input
+              className="form-control form-control-sm"
+              placeholder="e.g., ZESA"
+              value={addForm.provider}
+              onChange={(e) => setAddForm({ ...addForm, provider: e.target.value })}
+            />
+          </div>
+          <div className="mb-3">
+            <label className="form-label small">Category</label>
+            <select
+              className="form-select form-select-sm"
+              value={addForm.category}
+              onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
+            >
+              {billCategories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mb-3">
+            <label className="form-label small">Account number *</label>
+            <input
+              className="form-control form-control-sm"
+              value={addForm.accountNumber}
+              onChange={(e) => setAddForm({ ...addForm, accountNumber: e.target.value })}
+            />
+          </div>
+          <div className="mb-1">
+            <label className="form-label small">Amount (USD) *</label>
+            <input
+              type="number"
+              className="form-control form-control-sm"
+              step="0.01"
+              min="0.01"
+              value={addForm.amount}
+              onChange={(e) => setAddForm({ ...addForm, amount: e.target.value })}
+            />
+          </div>
+        </Modal>
+      )}
+    </ToastProvider>
   );
 }

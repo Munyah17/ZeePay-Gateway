@@ -3,10 +3,18 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Modal, ToastProvider, toast } from '@/components/ui';
+
+const strategicAlerts = [
+  { id: 'SA-1', alert: 'Omari provider experiencing intermittent delays', category: 'Infrastructure', severity: 'Medium', severityClass: 'bg-warning text-dark', date: '2 hours ago', status: 'Monitoring', statusClass: 'bg-secondary' },
+  { id: 'SA-2', alert: 'Unusual transaction pattern detected - Merchant ID 45', category: 'Fraud', severity: 'High', severityClass: 'bg-danger', date: '5 hours ago', status: 'Investigating', statusClass: 'bg-primary' },
+  { id: 'SA-3', alert: 'RBA quarterly report due in 30 days', category: 'Compliance', severity: 'Low', severityClass: 'bg-info text-dark', date: '1 day ago', status: 'Scheduled', statusClass: 'bg-success' },
+];
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [viewing, setViewing] = useState<typeof strategicAlerts[number] | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -20,7 +28,7 @@ export default function SuperAdminDashboard() {
   }, [router]);
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Executive Overview</h2>
         <p className="text-muted">High-level platform metrics and strategic insights</p>
@@ -235,27 +243,15 @@ export default function SuperAdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>Omari provider experiencing intermittent delays</td>
-                      <td>Infrastructure</td>
-                      <td><span className="badge bg-warning text-dark">Medium</span></td>
-                      <td className="text-muted">2 hours ago</td>
-                      <td><span className="badge bg-secondary">Monitoring</span></td>
-                    </tr>
-                    <tr>
-                      <td>Unusual transaction pattern detected - Merchant ID 45</td>
-                      <td>Fraud</td>
-                      <td><span className="badge bg-danger">High</span></td>
-                      <td className="text-muted">5 hours ago</td>
-                      <td><span className="badge bg-primary">Investigating</span></td>
-                    </tr>
-                    <tr>
-                      <td>RBA quarterly report due in 30 days</td>
-                      <td>Compliance</td>
-                      <td><span className="badge bg-info text-dark">Low</span></td>
-                      <td className="text-muted">1 day ago</td>
-                      <td><span className="badge bg-success">Scheduled</span></td>
-                    </tr>
+                    {strategicAlerts.map((a) => (
+                      <tr key={a.id} role="button" style={{ cursor: 'pointer' }} onClick={() => setViewing(a)}>
+                        <td>{a.alert}</td>
+                        <td>{a.category}</td>
+                        <td><span className={`badge ${a.severityClass}`}>{a.severity}</span></td>
+                        <td className="text-muted">{a.date}</td>
+                        <td><span className={`badge ${a.statusClass}`}>{a.status}</span></td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -263,6 +259,35 @@ export default function SuperAdminDashboard() {
           </div>
         </>
       )}
-    </>
+
+      {viewing && (
+        <Modal title={`${viewing.id} — ${viewing.category}`} onClose={() => setViewing(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item px-0">
+              <p className="small text-muted mb-1">Alert</p>
+              <p className="small">{viewing.alert}</p>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Severity</span>
+              <span className={`badge ${viewing.severityClass}`}>{viewing.severity}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <span className={`badge ${viewing.statusClass}`}>{viewing.status}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Raised</span>
+              <span className="small">{viewing.date}</span>
+            </li>
+          </ul>
+          <button
+            className="btn btn-outline-primary btn-sm w-100 mt-3"
+            onClick={() => { setViewing(null); toast(`${viewing.id} acknowledged`, 'info'); }}
+          >
+            Acknowledge
+          </button>
+        </Modal>
+      )}
+    </ToastProvider>
   );
 }

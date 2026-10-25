@@ -4,11 +4,40 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { ConfirmDialog, Modal, ToastProvider, toast } from '@/components/ui';
+import { downloadCSV } from '@/utils/actions';
+
+interface Merchant {
+  id: string;
+  businessName: string;
+  businessType: string;
+  registrationDate: string;
+  status: string;
+  tier: string;
+  riskLevel: string;
+  complianceScore: number;
+  monthlyVolume: number;
+  totalTransactions: number;
+  lastAudit: string | null;
+  nextReview: string;
+  kycStatus: string;
+  kycDate: string | null;
+  contact: { name: string; email: string; phone: string };
+}
 
 export default function MerchantGovernance() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [selectedMerchant, setSelectedMerchant] = useState<string | null>(null);
+  const [merchantList, setMerchantList] = useState<Merchant[]>([]);
+  const [statusFilter, setStatusFilter] = useState('All Status');
+  const [riskFilter, setRiskFilter] = useState('All Risk Levels');
+  const [tierFilter, setTierFilter] = useState('All Tiers');
+  const [search, setSearch] = useState('');
+  const [editing, setEditing] = useState<Merchant | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<Merchant | null>(null);
+  const [auditing, setAuditing] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -18,10 +47,28 @@ export default function MerchantGovernance() {
         return;
       }
     }
+    setMerchantList(seedMerchants);
     setLoading(false);
   }, [router]);
 
-  const merchants = [
+  const updateStatus = (m: Merchant, status: string, msg: string) => {
+    setMerchantList((prev) => prev.map((x) => (x.id === m.id ? { ...x, status } : x)));
+    setEditing(null);
+    setSuspendTarget(null);
+    setSelectedMerchant(null);
+    setMenuFor(null);
+    toast(msg, status === 'Suspended' ? 'warning' : 'success');
+  };
+
+  const filteredMerchants = merchantList.filter((m) => {
+    if (statusFilter !== 'All Status' && m.status !== statusFilter) return false;
+    if (riskFilter !== 'All Risk Levels' && m.riskLevel !== riskFilter) return false;
+    if (tierFilter !== 'All Tiers' && m.tier !== tierFilter) return false;
+    if (search && !m.businessName.toLowerCase().includes(search.toLowerCase()) && !m.contact.email.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const seedMerchants: Merchant[] = [
     {
       id: 'mch_001',
       businessName: 'Acme Corporation',
@@ -158,7 +205,7 @@ export default function MerchantGovernance() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Merchant Governance</h2>
         <p className="text-muted">Monitor merchant compliance, risk assessment, and approval workflows</p>
@@ -178,7 +225,7 @@ export default function MerchantGovernance() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Total Merchants</p>
-                  <p className="h3 mb-0">{merchants.length}</p>
+                  <p className="h3 mb-0">{merchantList.length}</p>
                 </div>
               </div>
             </div>
@@ -186,7 +233,7 @@ export default function MerchantGovernance() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Active</p>
-                  <p className="h3 mb-0 text-success">{merchants.filter(m => m.status === 'Active').length}</p>
+                  <p className="h3 mb-0 text-success">{merchantList.filter(m => m.status === 'Active').length}</p>
                 </div>
               </div>
             </div>
@@ -194,7 +241,7 @@ export default function MerchantGovernance() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Pending Approval</p>
-                  <p className="h3 mb-0 text-warning">{merchants.filter(m => m.status === 'Pending Approval').length}</p>
+                  <p className="h3 mb-0 text-warning">{merchantList.filter(m => m.status === 'Pending Approval').length}</p>
                 </div>
               </div>
             </div>
@@ -202,19 +249,19 @@ export default function MerchantGovernance() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">High Risk</p>
-                  <p className="h3 mb-0 text-danger">{merchants.filter(m => m.riskLevel === 'High').length}</p>
+                  <p className="h3 mb-0 text-danger">{merchantList.filter(m => m.riskLevel === 'High').length}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Pending Approvals Alert */}
-          {merchants.filter(m => m.status === 'Pending Approval').length > 0 && (
+          {merchantList.filter(m => m.status === 'Pending Approval').length > 0 && (
             <div className="alert alert-info mb-4" role="alert">
               <div className="d-flex align-items-center gap-3">
                 <i className="bi bi-info-circle-fill fs-4"></i>
                 <div>
-                  <strong>{merchants.filter(m => m.status === 'Pending Approval').length} merchants</strong> awaiting approval
+                  <strong>{merchantList.filter(m => m.status === 'Pending Approval').length} merchants</strong> awaiting approval
                 </div>
                 <Link href="/super-admin/approvals/merchants" className="btn btn-sm btn-outline-info ms-auto">
                   Review Queue
@@ -228,27 +275,49 @@ export default function MerchantGovernance() {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center">
                 <div className="d-flex gap-2">
-                  <select className="form-select form-select-sm" style={{ width: '150px' }}>
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ width: '150px' }}
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
                     <option>All Status</option>
                     <option>Active</option>
                     <option>Pending Approval</option>
                     <option>Under Review</option>
                     <option>Suspended</option>
                   </select>
-                  <select className="form-select form-select-sm" style={{ width: '150px' }}>
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ width: '150px' }}
+                    value={riskFilter}
+                    onChange={(e) => setRiskFilter(e.target.value)}
+                  >
                     <option>All Risk Levels</option>
                     <option>Low</option>
                     <option>Medium</option>
                     <option>High</option>
                   </select>
-                  <select className="form-select form-select-sm" style={{ width: '150px' }}>
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ width: '150px' }}
+                    value={tierFilter}
+                    onChange={(e) => setTierFilter(e.target.value)}
+                  >
                     <option>All Tiers</option>
                     <option>Enterprise</option>
                     <option>Growth</option>
                     <option>Starter</option>
                   </select>
                 </div>
-                <input type="text" className="form-control form-select-sm" placeholder="Search merchants..." style={{ width: '250px' }} />
+                <input
+                  type="text"
+                  className="form-control form-select-sm"
+                  placeholder="Search merchants..."
+                  style={{ width: '250px' }}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
             </div>
           </div>
@@ -272,7 +341,7 @@ export default function MerchantGovernance() {
                     </tr>
                   </thead>
                   <tbody>
-                    {merchants.map((merchant) => (
+                    {filteredMerchants.map((merchant) => (
                       <tr key={merchant.id}>
                         <td>
                           <div>
@@ -312,12 +381,47 @@ export default function MerchantGovernance() {
                             <button className="btn btn-outline-primary" onClick={() => setSelectedMerchant(merchant.id)}>
                               <i className="bi bi-eye"></i>
                             </button>
-                            <button className="btn btn-outline-primary">
+                            <button className="btn btn-outline-primary" onClick={() => setEditing(merchant)}>
                               <i className="bi bi-pencil"></i>
                             </button>
-                            <button className="btn btn-outline-secondary">
-                              <i className="bi bi-three-dots"></i>
-                            </button>
+                            <div className="position-relative">
+                              <button className="btn btn-outline-secondary" onClick={() => setMenuFor(menuFor === merchant.id ? null : merchant.id)}>
+                                <i className="bi bi-three-dots"></i>
+                              </button>
+                              {menuFor === merchant.id && (
+                                <ul className="dropdown-menu show" style={{ position: 'absolute', right: 0, zIndex: 1050 }}>
+                                  {merchant.status === 'Active' && (
+                                    <li>
+                                      <button className="dropdown-item small" onClick={() => { setSuspendTarget(merchant); setMenuFor(null); }}>
+                                        Suspend
+                                      </button>
+                                    </li>
+                                  )}
+                                  {merchant.status === 'Suspended' && (
+                                    <li>
+                                      <button
+                                        className="dropdown-item small"
+                                        onClick={() => updateStatus(merchant, 'Active', `${merchant.businessName} reactivated`)}
+                                      >
+                                        Reactivate
+                                      </button>
+                                    </li>
+                                  )}
+                                  <li>
+                                    <button
+                                      className="dropdown-item small"
+                                      onClick={() => {
+                                        downloadCSV(`merchant-${merchant.id}`, [merchant]);
+                                        setMenuFor(null);
+                                        toast('Merchant exported');
+                                      }}
+                                    >
+                                      Export
+                                    </button>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -339,7 +443,7 @@ export default function MerchantGovernance() {
               </div>
               <div className="card-body">
                 {(() => {
-                  const merchant = merchants.find(m => m.id === selectedMerchant);
+                  const merchant = merchantList.find(m => m.id === selectedMerchant);
                   if (!merchant) return null;
                   return (
                     <div className="row g-4">
@@ -423,26 +527,48 @@ export default function MerchantGovernance() {
                       <div className="col-md-6">
                         <h6 className="mb-3">Governance Actions</h6>
                         <div className="d-grid gap-2">
-                          <button className="btn btn-outline-primary">
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => { downloadCSV(`merchant-${merchant.id}`, [merchant]); toast('Full profile exported'); }}
+                          >
                             <i className="bi bi-file-earmark-text me-2"></i>
                             View Full Profile
                           </button>
-                          <button className="btn btn-outline-primary">
+                          <button
+                            className="btn btn-outline-primary"
+                            disabled={auditing}
+                            onClick={() => {
+                              setAuditing(true);
+                              setTimeout(() => {
+                                setAuditing(false);
+                                toast(`Compliance check complete — score ${merchant.complianceScore}%`, 'info');
+                              }, 1200);
+                            }}
+                          >
                             <i className="bi bi-clipboard-check me-2"></i>
-                            Run Compliance Check
+                            {auditing ? 'Running…' : 'Run Compliance Check'}
                           </button>
-                          <button className="btn btn-outline-primary">
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => {
+                              setMerchantList((prev) => prev.map((x) => (x.id === merchant.id ? { ...x, riskLevel: 'Medium', nextReview: '2024-04-15' } : x)));
+                              toast('Risk assessment updated', 'info');
+                            }}
+                          >
                             <i className="bi bi-shield-check me-2"></i>
                             Update Risk Assessment
                           </button>
                           {merchant.status === 'Active' && (
-                            <button className="btn btn-outline-warning">
+                            <button className="btn btn-outline-warning" onClick={() => setSuspendTarget(merchant)}>
                               <i className="bi bi-pause-circle me-2"></i>
                               Suspend Merchant
                             </button>
                           )}
                           {merchant.status === 'Suspended' && (
-                            <button className="btn btn-outline-success">
+                            <button
+                              className="btn btn-outline-success"
+                              onClick={() => updateStatus(merchant, 'Active', `${merchant.businessName} reactivated`)}
+                            >
                               <i className="bi bi-play-circle me-2"></i>
                               Reactivate Merchant
                             </button>
@@ -470,19 +596,41 @@ export default function MerchantGovernance() {
                   </Link>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    disabled={auditing}
+                    onClick={() => {
+                      setAuditing(true);
+                      setTimeout(() => { setAuditing(false); toast('Compliance audit complete — all merchants checked', 'success'); }, 1500);
+                    }}
+                  >
                     <i className="bi bi-shield-check me-2"></i>
-                    Run Compliance Audit
+                    {auditing ? 'Running…' : 'Run Compliance Audit'}
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    onClick={() => {
+                      const high = merchantList.filter((m) => m.riskLevel === 'High').length;
+                      toast(`${high} high-risk merchant(s) flagged`, high ? 'warning' : 'success');
+                    }}
+                  >
                     <i className="bi bi-exclamation-triangle me-2"></i>
                     Risk Assessment
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    onClick={() => {
+                      downloadCSV('merchant-governance', filteredMerchants.map((m) => ({
+                        business: m.businessName, type: m.businessType, tier: m.tier, status: m.status,
+                        risk: m.riskLevel, compliance: m.complianceScore, volume: m.monthlyVolume,
+                      })));
+                      toast('Governance report exported');
+                    }}
+                  >
                     <i className="bi bi-file-earmark-bar-graph me-2"></i>
                     Generate Report
                   </button>
@@ -492,6 +640,54 @@ export default function MerchantGovernance() {
           </div>
         </>
       )}
-    </>
+
+      {/* Edit status modal */}
+      {editing && (
+        <Modal title={`Edit ${editing.businessName}`} onClose={() => setEditing(null)}>
+          <div className="mb-3">
+            <label className="form-label small">Status</label>
+            <select
+              className="form-select form-select-sm"
+              value={editing.status}
+              onChange={(e) => updateStatus(editing, e.target.value, `${editing.businessName} → ${e.target.value}`)}
+            >
+              <option>Active</option>
+              <option>Pending Approval</option>
+              <option>Under Review</option>
+              <option>Suspended</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label small">Tier</label>
+            <select
+              className="form-select form-select-sm"
+              value={editing.tier}
+              onChange={(e) => {
+                const tier = e.target.value;
+                setMerchantList((prev) => prev.map((x) => (x.id === editing.id ? { ...x, tier } : x)));
+                setEditing(null);
+                toast(`${editing.businessName} tier → ${tier}`, 'info');
+              }}
+            >
+              <option>Enterprise</option>
+              <option>Growth</option>
+              <option>Starter</option>
+            </select>
+          </div>
+        </Modal>
+      )}
+
+      {/* Suspend confirm */}
+      {suspendTarget && (
+        <ConfirmDialog
+          title="Suspend merchant"
+          message={`Suspend ${suspendTarget.businessName}? Their payment processing will be paused.`}
+          confirmLabel="Suspend"
+          tone="warning"
+          onConfirm={() => updateStatus(suspendTarget, 'Suspended', `${suspendTarget.businessName} suspended`)}
+          onCancel={() => setSuspendTarget(null)}
+        />
+      )}
+    </ToastProvider>
   );
 }

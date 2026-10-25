@@ -4,12 +4,32 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { copyToClipboard as copyText } from '@/utils/actions';
+
+interface ApiKey {
+  id: string;
+  name: string;
+  type: string;
+  environment: string;
+  status: string;
+  createdAt: string;
+  lastUsed: string;
+  permissions: string[];
+}
 
 export default function ApiKeys() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [envFilter, setEnvFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [revealing, setRevealing] = useState<ApiKey | null>(null);
+  const [revoking, setRevoking] = useState<ApiKey | null>(null);
+  const [rotating, setRotating] = useState<ApiKey | null>(null);
+  const [form, setForm] = useState({ name: '', environment: 'Sandbox', type: 'Secret', permissions: ['Read'] });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -19,10 +39,65 @@ export default function ApiKeys() {
         return;
       }
     }
+    try {
+      const saved = localStorage.getItem('zeepay_api_keys');
+      setKeys(saved ? JSON.parse(saved) : seedKeys);
+    } catch {
+      setKeys(seedKeys);
+    }
     setLoading(false);
   }, [router]);
 
-  const apiKeys = [
+  const persist = (next: ApiKey[]) => {
+    setKeys(next);
+    try { localStorage.setItem('zeepay_api_keys', JSON.stringify(next)); } catch { /* noop */ }
+  };
+
+  const filtered = keys.filter(
+    (k) => (!envFilter || k.environment === envFilter) && (!typeFilter || k.type === typeFilter),
+  );
+
+  const genKey = (env: string, type: string) =>
+    `${type === 'Secret' ? 'sk' : 'pk'}_${env === 'Production' ? 'live' : 'test'}_${Math.random().toString(36).slice(2, 18)}`;
+
+  const createKey = () => {
+    if (!form.name.trim()) {
+      toast('Key name is required', 'warning');
+      return;
+    }
+    const key: ApiKey = {
+      id: genKey(form.environment, form.type),
+      name: form.name.trim(),
+      type: form.type,
+      environment: form.environment,
+      status: 'Active',
+      createdAt: new Date().toISOString().slice(0, 10),
+      lastUsed: new Date().toISOString().slice(0, 10),
+      permissions: form.type === 'Public' ? ['Read'] : form.permissions,
+    };
+    persist([key, ...keys]);
+    setShowCreateModal(false);
+    setForm({ name: '', environment: 'Sandbox', type: 'Secret', permissions: ['Read'] });
+    setRevealing(key);
+    toast('API key created — copy it now, it won\'t be shown again');
+  };
+
+  const confirmRotate = () => {
+    if (!rotating) return;
+    const nextId = genKey(rotating.environment, rotating.type);
+    persist(keys.map((k) => (k.id === rotating.id ? { ...k, id: nextId, lastUsed: new Date().toISOString().slice(0, 10) } : k)));
+    setRotating(null);
+    toast('Key rotated — old key revoked');
+  };
+
+  const confirmRevoke = () => {
+    if (!revoking) return;
+    persist(keys.map((k) => (k.id === revoking.id ? { ...k, status: 'Revoked' } : k)));
+    setRevoking(null);
+    toast('Key revoked', 'info');
+  };
+
+  const seedKeys: ApiKey[] = [
     {
       id: 'pk_live_51Mz...',
       name: 'Production - Public Key',
@@ -66,9 +141,15 @@ export default function ApiKeys() {
   ];
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(text);
-    setTimeout(() => setCopiedKey(null), 2000);
+    copyText(text).then((ok) => {
+      if (ok) {
+        setCopiedKey(text);
+        setTimeout(() => setCopiedKey(null), 2000);
+        toast('Copied to clipboard');
+      } else {
+        toast('Copy failed', 'danger');
+      }
+    });
   };
 
   const getTypeColor = (type: string) => {
@@ -80,7 +161,7 @@ export default function ApiKeys() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">API Keys</h2>
         <p className="text-muted">Manage your API keys for integrating with ZeePay</p>
@@ -109,15 +190,25 @@ export default function ApiKeys() {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center">
                 <div className="d-flex gap-2">
-                  <select className="form-select form-select-sm" style={{ width: '150px' }}>
-                    <option>All Environments</option>
-                    <option>Production</option>
-                    <option>Sandbox</option>
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ width: '150px' }}
+                    value={envFilter}
+                    onChange={(e) => setEnvFilter(e.target.value)}
+                  >
+                    <option value="">All Environments</option>
+                    <option value="Production">Production</option>
+                    <option value="Sandbox">Sandbox</option>
                   </select>
-                  <select className="form-select form-select-sm" style={{ width: '150px' }}>
-                    <option>All Types</option>
-                    <option>Public</option>
-                    <option>Secret</option>
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ width: '150px' }}
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                  >
+                    <option value="">All Types</option>
+                    <option value="Public">Public</option>
+                    <option value="Secret">Secret</option>
                   </select>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
@@ -145,7 +236,7 @@ export default function ApiKeys() {
                     </tr>
                   </thead>
                   <tbody>
-                    {apiKeys.map((key) => (
+                    {filtered.map((key) => (
                       <tr key={key.id}>
                         <td>
                           <h6 className="mb-0 small fw-medium">{key.name}</h6>
@@ -176,13 +267,13 @@ export default function ApiKeys() {
                         <td className="text-muted small">{new Date(key.lastUsed).toLocaleDateString()}</td>
                         <td>
                           <div className="btn-group btn-group-sm">
-                            <button className="btn btn-outline-primary" title="Reveal">
+                            <button className="btn btn-outline-primary" title="Reveal" onClick={() => setRevealing(key)}>
                               <i className="bi bi-eye"></i>
                             </button>
-                            <button className="btn btn-outline-primary" title="Rotate">
+                            <button className="btn btn-outline-primary" title="Rotate" onClick={() => setRotating(key)}>
                               <i className="bi bi-arrow-repeat"></i>
                             </button>
-                            <button className="btn btn-outline-danger" title="Revoke">
+                            <button className="btn btn-outline-danger" title="Revoke" onClick={() => setRevoking(key)}>
                               <i className="bi bi-trash"></i>
                             </button>
                           </div>
@@ -207,34 +298,60 @@ export default function ApiKeys() {
                   <div className="modal-body">
                     <div className="mb-3">
                       <label className="form-label">Key Name *</label>
-                      <input type="text" className="form-control" placeholder="e.g., Production - App Integration" />
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g., Production - App Integration"
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      />
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Environment *</label>
-                      <select className="form-select">
+                      <select
+                        className="form-select"
+                        value={form.environment}
+                        onChange={(e) => setForm({ ...form, environment: e.target.value })}
+                      >
                         <option>Sandbox</option>
                         <option>Production</option>
                       </select>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Key Type *</label>
-                      <select className="form-select">
-                        <option>Secret Key (Full access)</option>
-                        <option>Public Key (Read only)</option>
+                      <select
+                        className="form-select"
+                        value={form.type}
+                        onChange={(e) => setForm({ ...form, type: e.target.value, permissions: e.target.value === 'Public' ? ['Read'] : form.permissions })}
+                      >
+                        <option value="Secret">Secret Key (Full access)</option>
+                        <option value="Public">Public Key (Read only)</option>
                       </select>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Permissions</label>
                       <div className="form-check">
-                        <input className="form-check-input" type="checkbox" id="perm1" defaultChecked />
+                        <input
+                          className="form-check-input" type="checkbox" id="perm1"
+                          checked={form.permissions.includes('Read')}
+                          onChange={(e) => setForm({ ...form, permissions: e.target.checked ? [...form.permissions, 'Read'] : form.permissions.filter((p) => p !== 'Read') })}
+                        />
                         <label className="form-check-label" htmlFor="perm1">Read payments</label>
                       </div>
                       <div className="form-check">
-                        <input className="form-check-input" type="checkbox" id="perm2" defaultChecked />
+                        <input
+                          className="form-check-input" type="checkbox" id="perm2"
+                          checked={form.permissions.includes('Write')}
+                          onChange={(e) => setForm({ ...form, permissions: e.target.checked ? [...form.permissions, 'Write'] : form.permissions.filter((p) => p !== 'Write') })}
+                        />
                         <label className="form-check-label" htmlFor="perm2">Create payments</label>
                       </div>
                       <div className="form-check">
-                        <input className="form-check-input" type="checkbox" id="perm3" />
+                        <input
+                          className="form-check-input" type="checkbox" id="perm3"
+                          checked={form.permissions.includes('Refunds')}
+                          onChange={(e) => setForm({ ...form, permissions: e.target.checked ? [...form.permissions, 'Refunds'] : form.permissions.filter((p) => p !== 'Refunds') })}
+                        />
                         <label className="form-check-label" htmlFor="perm3">Refund payments</label>
                       </div>
                     </div>
@@ -247,13 +364,64 @@ export default function ApiKeys() {
                     <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
                       Cancel
                     </button>
-                    <button type="button" className="btn btn-primary" onClick={() => setShowCreateModal(false)}>
+                    <button type="button" className="btn btn-primary" onClick={createKey}>
                       Create Key
                     </button>
                   </div>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Reveal modal */}
+          {revealing && (
+            <Modal title={revealing.name} onClose={() => setRevealing(null)}>
+              <p className="small text-muted mb-2">Your {revealing.type.toLowerCase()} key — copy it now:</p>
+              <div className="input-group input-group-sm mb-3">
+                <code className="form-control font-monospace text-truncate">{revealing.id}</code>
+                <button className="btn btn-outline-primary" onClick={() => copyToClipboard(revealing.id)}>
+                  <i className="bi bi-clipboard"></i>
+                </button>
+              </div>
+              <ul className="list-group list-group-flush">
+                <li className="list-group-item d-flex justify-content-between px-0">
+                  <span className="small text-muted">Environment</span>
+                  <span className="small fw-medium">{revealing.environment}</span>
+                </li>
+                <li className="list-group-item d-flex justify-content-between px-0">
+                  <span className="small text-muted">Permissions</span>
+                  <span className="small fw-medium">{revealing.permissions.join(', ')}</span>
+                </li>
+                <li className="list-group-item d-flex justify-content-between px-0">
+                  <span className="small text-muted">Created</span>
+                  <span className="small fw-medium">{revealing.createdAt}</span>
+                </li>
+              </ul>
+            </Modal>
+          )}
+
+          {/* Rotate confirm */}
+          {rotating && (
+            <ConfirmDialog
+              title="Rotate API key"
+              message={`Rotate "${rotating.name}"? The current key will stop working immediately.`}
+              confirmLabel="Rotate"
+              tone="warning"
+              onConfirm={confirmRotate}
+              onCancel={() => setRotating(null)}
+            />
+          )}
+
+          {/* Revoke confirm */}
+          {revoking && (
+            <ConfirmDialog
+              title="Revoke API key"
+              message={`Revoke "${revoking.name}"? Integrations using this key will fail.`}
+              confirmLabel="Revoke"
+              tone="danger"
+              onConfirm={confirmRevoke}
+              onCancel={() => setRevoking(null)}
+            />
           )}
 
           {/* Best Practices */}
@@ -312,6 +480,6 @@ export default function ApiKeys() {
           </div>
         </>
       )}
-    </>
+    </ToastProvider>
   );
 }

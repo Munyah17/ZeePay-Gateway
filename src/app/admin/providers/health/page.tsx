@@ -4,10 +4,28 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ToastProvider, toast } from '@/components/ui';
+
+interface ProviderHealth {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  uptime: string;
+  responseTime: string;
+  successRate: string;
+  lastIncident: string;
+  incidents: number;
+  connectedSince: string;
+}
 
 export default function ProviderHealth() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [viewing, setViewing] = useState<ProviderHealth | null>(null);
+  const [alertConfig, setAlertConfig] = useState(false);
+  const [alertToggles, setAlertToggles] = useState([true, true, false]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -20,7 +38,7 @@ export default function ProviderHealth() {
     setLoading(false);
   }, [router]);
 
-  const providers = [
+  const providers: ProviderHealth[] = [
     {
       id: 'prov_ecocash',
       name: 'EcoCash',
@@ -174,7 +192,7 @@ export default function ProviderHealth() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Provider Health</h2>
         <p className="text-muted">Monitor provider uptime, response times, and incidents</p>
@@ -245,9 +263,16 @@ export default function ProviderHealth() {
               <div className="card h-100">
                 <div className="card-header d-flex justify-content-between align-items-center">
                   <h5 className="card-title mb-0">Provider Status</h5>
-                  <button className="btn btn-sm btn-outline-secondary">
-                    <i className="bi bi-arrow-clockwise me-1"></i>
-                    Refresh
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => {
+                      setRefreshing(true);
+                      setTimeout(() => { setRefreshing(false); toast('Health metrics refreshed'); }, 800);
+                    }}
+                    disabled={refreshing}
+                  >
+                    <i className={`bi bi-arrow-clockwise me-1 ${refreshing ? 'spin' : ''}`}></i>
+                    {refreshing ? 'Refreshing…' : 'Refresh'}
                   </button>
                 </div>
                 <div className="card-body">
@@ -288,7 +313,9 @@ export default function ProviderHealth() {
                             <td className="small">{provider.successRate}</td>
                             <td className="small">{provider.incidents}</td>
                             <td>
-                              <button className="btn btn-sm btn-outline-primary">View</button>
+                              <button className="btn btn-sm btn-outline-primary" onClick={() => setViewing(provider)}>
+                                View
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -376,25 +403,32 @@ export default function ProviderHealth() {
             <div className="card-body">
               <div className="row g-3">
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <Link href="/admin/providers" className="btn btn-outline-primary w-100">
                     <i className="bi bi-plus-circle me-2"></i>
                     Add Provider
-                  </button>
+                  </Link>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    onClick={() => {
+                      setRefreshing(true);
+                      setTimeout(() => { setRefreshing(false); toast('Health check complete — all providers responding', 'success'); }, 1200);
+                    }}
+                    disabled={refreshing}
+                  >
                     <i className="bi bi-activity me-2"></i>
-                    Run Health Check
+                    {refreshing ? 'Checking…' : 'Run Health Check'}
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <Link href="/admin/providers/incidents" className="btn btn-outline-primary w-100">
                     <i className="bi bi-file-earmark-text me-2"></i>
                     View Incident Report
-                  </button>
+                  </Link>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button className="btn btn-outline-primary w-100" onClick={() => setAlertConfig(true)}>
                     <i className="bi bi-gear me-2"></i>
                     Configure Alerts
                   </button>
@@ -404,6 +438,71 @@ export default function ProviderHealth() {
           </div>
         </>
       )}
-    </>
+
+      {/* Provider detail modal */}
+      {viewing && (
+        <Modal title={viewing.name} onClose={() => setViewing(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Type</span>
+              <span className="small">{viewing.type}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Status</span>
+              <span className={`badge ${getStatusColor(viewing.status)}`}>{viewing.status}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Uptime (30d)</span>
+              <span className="small fw-medium">{viewing.uptime}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Response time</span>
+              <span className="small">{viewing.responseTime}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Success rate</span>
+              <span className="small">{viewing.successRate}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Last incident</span>
+              <span className="small">{viewing.lastIncident}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Connected since</span>
+              <span className="small">{viewing.connectedSince}</span>
+            </li>
+          </ul>
+        </Modal>
+      )}
+
+      {/* Alert config modal */}
+      {alertConfig && (
+        <Modal
+          title="Configure Alerts"
+          onClose={() => setAlertConfig(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setAlertConfig(false)}>Close</button>
+              <button className="btn btn-primary btn-sm" onClick={() => { setAlertConfig(false); toast('Alert preferences saved'); }}>
+                Save
+              </button>
+            </>
+          }
+        >
+          {['Provider goes down', 'Success rate drops below 95%', 'New incident reported'].map((label, i) => (
+            <div key={i} className="form-check mb-2">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id={`alert_${i}`}
+                checked={alertToggles[i]}
+                onChange={(e) => setAlertToggles(alertToggles.map((t, x) => (x === i ? e.target.checked : t)))}
+              />
+              <label className="form-check-label small" htmlFor={`alert_${i}`}>{label}</label>
+            </div>
+          ))}
+        </Modal>
+      )}
+    </ToastProvider>
   );
 }

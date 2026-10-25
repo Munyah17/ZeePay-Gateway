@@ -3,11 +3,59 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ToastProvider, toast } from '@/components/ui';
+import { copyToClipboard } from '@/utils/actions';
+
+type Lang = 'curl' | 'node' | 'python' | 'php';
+
+const langExamples: Record<Lang, string> = {
+  curl: `curl -X POST https://api.zeepay.co.zw/api/v1/payments \\
+  -H "Authorization: Bearer YOUR_SECRET_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 1000,
+    "currency": "USD",
+    "payment_method": "ecocash",
+    "customer_email": "customer@example.com",
+    "metadata": { "order_id": "12345" }
+  }'`,
+  node: `const Zeepay = require('zeepay-node');
+const client = new Zeepay('YOUR_SECRET_KEY');
+
+const payment = await client.payments.create({
+  amount: 1000,
+  currency: 'USD',
+  payment_method: 'ecocash',
+  customer_email: 'customer@example.com',
+  metadata: { order_id: '12345' },
+});`,
+  python: `import zeepay
+
+client = zeepay.Client('YOUR_SECRET_KEY')
+
+payment = client.payments.create(
+    amount=1000,
+    currency='USD',
+    payment_method='ecocash',
+    customer_email='customer@example.com',
+    metadata={'order_id': '12345'},
+)`,
+  php: `<?php
+$client = new \Zeepay\Client('YOUR_SECRET_KEY');
+
+$payment = $client->payments->create([
+    'amount' => 1000,
+    'currency' => 'USD',
+    'payment_method' => 'ecocash',
+    'customer_email' => 'customer@example.com',
+    'metadata' => ['order_id' => '12345'],
+]);`,
+};
 
 export default function DeveloperPlatform() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState('overview');
+  const [lang, setLang] = useState<Lang>('curl');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -53,23 +101,8 @@ export default function DeveloperPlatform() {
     },
   ];
 
-  const codeExamples = {
-    createPayment: `curl -X POST https://api.zeepay.co.zw/api/v1/payments \\
-  -H "Authorization: Bearer YOUR_SECRET_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "amount": 1000,
-    "currency": "USD",
-    "payment_method": "ecocash",
-    "customer_email": "customer@example.com",
-    "metadata": {
-      "order_id": "12345"
-    }
-  }'`,
-  };
-
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Developer Platform</h2>
         <p className="text-muted">API documentation, integration guides, and developer resources</p>
@@ -119,7 +152,12 @@ export default function DeveloperPlatform() {
               </Link>
             </div>
             <div className="col-md-3">
-              <a href="#" className="card text-decoration-none text-dark h-100">
+              <a
+                href="/docs/openapi.yaml"
+                target="_blank"
+                rel="noreferrer"
+                className="card text-decoration-none text-dark h-100"
+              >
                 <div className="card-body">
                   <div className="text-primary mb-2">
                     <i className="bi bi-book fs-4"></i>
@@ -201,7 +239,10 @@ export default function DeveloperPlatform() {
                       <p className="text-muted mb-0">Use the simulator to test before going live.</p>
                     </li>
                   </ol>
-                  <button className="btn btn-primary w-100 mt-3">
+                  <button
+                    className="btn btn-primary w-100 mt-3"
+                    onClick={() => window.open('/docs/openapi.yaml', '_blank')}
+                  >
                     <i className="bi bi-book me-2"></i>
                     View Full Guide
                   </button>
@@ -215,17 +256,25 @@ export default function DeveloperPlatform() {
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="card-title mb-0">Create Payment Example</h5>
               <div className="btn-group btn-group-sm">
-                <button className="btn btn-outline-secondary">cURL</button>
-                <button className="btn btn-outline-secondary">Node.js</button>
-                <button className="btn btn-outline-secondary">Python</button>
-                <button className="btn btn-outline-secondary">PHP</button>
+                {(['curl', 'node', 'python', 'php'] as Lang[]).map((l) => (
+                  <button
+                    key={l}
+                    className={`btn ${lang === l ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                    onClick={() => setLang(l)}
+                  >
+                    {l === 'curl' ? 'cURL' : l === 'node' ? 'Node.js' : l === 'python' ? 'Python' : 'PHP'}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="card-body">
               <pre className="bg-dark text-light p-3 rounded">
-                <code>{codeExamples.createPayment}</code>
+                <code>{langExamples[lang]}</code>
               </pre>
-              <button className="btn btn-sm btn-outline-primary mt-2">
+              <button
+                className="btn btn-sm btn-outline-primary mt-2"
+                onClick={() => { copyToClipboard(langExamples[lang]); toast('Code copied to clipboard'); }}
+              >
                 <i className="bi bi-clipboard me-1"></i>
                 Copy Code
               </button>
@@ -247,7 +296,15 @@ export default function DeveloperPlatform() {
                         Node.js SDK
                       </h6>
                       <p className="text-muted small mb-2">Official Node.js library for ZeePay API</p>
-                      <code className="small">npm install zeepay-node</code>
+                      <code
+                        className="small d-block"
+                        role="button"
+                        style={{ cursor: 'pointer' }}
+                        title="Click to copy"
+                        onClick={() => { copyToClipboard('npm install zeepay-node'); toast('Install command copied'); }}
+                      >
+                        npm install zeepay-node
+                      </code>
                     </div>
                   </div>
                 </div>
@@ -259,7 +316,15 @@ export default function DeveloperPlatform() {
                         Python SDK
                       </h6>
                       <p className="text-muted small mb-2">Official Python library for ZeePay API</p>
-                      <code className="small">pip install zeepay-python</code>
+                      <code
+                        className="small d-block"
+                        role="button"
+                        style={{ cursor: 'pointer' }}
+                        title="Click to copy"
+                        onClick={() => { copyToClipboard('pip install zeepay-python'); toast('Install command copied'); }}
+                      >
+                        pip install zeepay-python
+                      </code>
                     </div>
                   </div>
                 </div>
@@ -271,7 +336,15 @@ export default function DeveloperPlatform() {
                         PHP SDK
                       </h6>
                       <p className="text-muted small mb-2">Official PHP library for ZeePay API</p>
-                      <code className="small">composer require zeepay/php</code>
+                      <code
+                        className="small d-block"
+                        role="button"
+                        style={{ cursor: 'pointer' }}
+                        title="Click to copy"
+                        onClick={() => { copyToClipboard('composer require zeepay/php'); toast('Install command copied'); }}
+                      >
+                        composer require zeepay/php
+                      </code>
                     </div>
                   </div>
                 </div>
@@ -324,6 +397,6 @@ export default function DeveloperPlatform() {
           </div>
         </>
       )}
-    </>
+    </ToastProvider>
   );
 }

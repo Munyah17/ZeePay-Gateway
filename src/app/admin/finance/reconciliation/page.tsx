@@ -4,11 +4,50 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import { Modal, ToastProvider, toast } from '@/components/ui';
+import { downloadCSV } from '@/utils/actions';
+
+interface Batch {
+  id: string;
+  batchNumber: string;
+  provider: string;
+  currency: string;
+  expectedAmount: number;
+  actualAmount: number | null;
+  feeAmount: number;
+  refundAmount: number;
+  netAmount: number;
+  transactionCount: number;
+  status: string;
+  discrepancy: number | null;
+  settlementDate: string;
+  dueDate: string;
+}
+
+interface UnmatchedTx {
+  id: string;
+  transactionId: string;
+  provider: string;
+  zeePayAmount: number | null;
+  providerAmount: number | null;
+  currency: string;
+  date: string;
+  reason: string;
+  status: string;
+}
 
 export default function ReconciliationWorkbench() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [unmatched, setUnmatched] = useState<UnmatchedTx[]>([]);
+  const [providerFilter, setProviderFilter] = useState('All Providers');
+  const [exceptionsOnly, setExceptionsOnly] = useState(false);
+  const [investigating, setInvestigating] = useState<UnmatchedTx | null>(null);
+  const [reconciling, setReconciling] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -18,10 +57,36 @@ export default function ReconciliationWorkbench() {
         return;
       }
     }
+    setBatches(seedBatches);
+    setUnmatched(seedUnmatched);
     setLoading(false);
   }, [router]);
 
-  const settlementBatches = [
+  const visibleBatches = batches.filter(
+    (b) =>
+      (providerFilter === 'All Providers' || b.provider === providerFilter) &&
+      (!exceptionsOnly || b.status === 'Exception'),
+  );
+
+  const markResolved = (batch: Batch) => {
+    setBatches((prev) => prev.map((b) => (b.id === batch.id ? { ...b, status: 'Reconciled', discrepancy: 0 } : b)));
+    toast(`${batch.batchNumber} marked resolved`);
+  };
+
+  const requestReconciliation = (batch: Batch) => {
+    setReconciling(true);
+    setTimeout(() => {
+      setReconciling(false);
+      if (batch.status === 'Pending') {
+        setBatches((prev) => prev.map((b) => (b.id === batch.id ? { ...b, status: 'Reconciled', actualAmount: b.expectedAmount, discrepancy: 0 } : b)));
+        toast(`${batch.batchNumber} reconciled`);
+      } else {
+        toast(`Reconciliation re-run for ${batch.batchNumber}`, 'info');
+      }
+    }, 1200);
+  };
+
+  const seedBatches: Batch[] = [
     {
       id: 'batch_001',
       batchNumber: 'SETT-2024-0115',
@@ -104,7 +169,7 @@ export default function ReconciliationWorkbench() {
     },
   ];
 
-  const unmatchedTransactions = [
+  const seedUnmatched: UnmatchedTx[] = [
     {
       id: 'tx_001',
       transactionId: 'pay_8x2k91',
@@ -152,7 +217,7 @@ export default function ReconciliationWorkbench() {
   };
 
   return (
-    <>
+    <ToastProvider>
       <div className="mb-4">
         <h2 className="h4">Reconciliation Workbench</h2>
         <p className="text-muted">Compare provider settlements with ZeePay records and resolve discrepancies</p>
@@ -172,7 +237,7 @@ export default function ReconciliationWorkbench() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Total Batches</p>
-                  <p className="h3 mb-0">{settlementBatches.length}</p>
+                  <p className="h3 mb-0">{batches.length}</p>
                 </div>
               </div>
             </div>
@@ -180,7 +245,7 @@ export default function ReconciliationWorkbench() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Reconciled</p>
-                  <p className="h3 mb-0 text-success">{settlementBatches.filter(b => b.status === 'Reconciled').length}</p>
+                  <p className="h3 mb-0 text-success">{batches.filter(b => b.status === 'Reconciled').length}</p>
                 </div>
               </div>
             </div>
@@ -188,7 +253,7 @@ export default function ReconciliationWorkbench() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Exceptions</p>
-                  <p className="h3 mb-0 text-danger">{settlementBatches.filter(b => b.status === 'Exception').length}</p>
+                  <p className="h3 mb-0 text-danger">{batches.filter(b => b.status === 'Exception').length}</p>
                 </div>
               </div>
             </div>
@@ -196,21 +261,21 @@ export default function ReconciliationWorkbench() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-muted small mb-1">Total Discrepancy</p>
-                  <p className="h3 mb-0 text-warning">${settlementBatches.reduce((sum, b) => sum + (b.discrepancy || 0), 0).toFixed(2)}</p>
+                  <p className="h3 mb-0 text-warning">${batches.reduce((sum, b) => sum + (b.discrepancy || 0), 0).toFixed(2)}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Exception Alert */}
-          {settlementBatches.filter(b => b.status === 'Exception').length > 0 && (
+          {batches.filter(b => b.status === 'Exception').length > 0 && (
             <div className="alert alert-warning mb-4" role="alert">
               <div className="d-flex align-items-center gap-3">
                 <i className="bi bi-exclamation-triangle-fill fs-4"></i>
                 <div>
-                  <strong>{settlementBatches.filter(b => b.status === 'Exception').length} settlement batches</strong> have discrepancies requiring attention
+                  <strong>{batches.filter(b => b.status === 'Exception').length} settlement batches</strong> have discrepancies requiring attention
                 </div>
-                <button className="btn btn-sm btn-warning ms-auto">
+                <button className="btn btn-sm btn-warning ms-auto" onClick={() => setExceptionsOnly(true)}>
                   Review All
                 </button>
               </div>
@@ -224,14 +289,23 @@ export default function ReconciliationWorkbench() {
                 <div className="card-header d-flex justify-content-between align-items-center">
                   <h5 className="card-title mb-0">Settlement Batches</h5>
                   <div className="d-flex gap-2">
-                    <select className="form-select form-select-sm" style={{ width: '150px' }}>
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ width: '150px' }}
+                      value={providerFilter}
+                      onChange={(e) => setProviderFilter(e.target.value)}
+                    >
                       <option>All Providers</option>
                       <option>EcoCash</option>
                       <option>InnBucks</option>
                       <option>Omari</option>
                       <option>Visa</option>
                     </select>
-                    <button className="btn btn-sm btn-outline-secondary">
+                    <button
+                      className={`btn btn-sm ${exceptionsOnly ? 'btn-warning' : 'btn-outline-secondary'}`}
+                      title="Show exceptions only"
+                      onClick={() => setExceptionsOnly(!exceptionsOnly)}
+                    >
                       <i className="bi bi-filter"></i>
                     </button>
                   </div>
@@ -252,7 +326,7 @@ export default function ReconciliationWorkbench() {
                         </tr>
                       </thead>
                       <tbody>
-                        {settlementBatches.map((batch) => (
+                        {visibleBatches.map((batch) => (
                           <tr key={batch.id} className={batch.status === 'Exception' ? 'table-warning' : ''}>
                             <td>
                               <div>
@@ -289,11 +363,11 @@ export default function ReconciliationWorkbench() {
               <div className="card h-100">
                 <div className="card-header d-flex justify-content-between align-items-center">
                   <h5 className="card-title mb-0">Unmatched Transactions</h5>
-                  <span className="badge bg-danger">{unmatchedTransactions.length}</span>
+                  <span className="badge bg-danger">{unmatched.length}</span>
                 </div>
                 <div className="card-body">
                   <div className="list-group list-group-flush">
-                    {unmatchedTransactions.map((tx) => (
+                    {unmatched.map((tx) => (
                       <div key={tx.id} className="list-group-item">
                         <div className="d-flex justify-content-between align-items-start mb-2">
                           <div>
@@ -307,7 +381,7 @@ export default function ReconciliationWorkbench() {
                           <small className="text-muted">Provider: {tx.providerAmount ? `${tx.currency} ${tx.providerAmount.toFixed(2)}` : '-'}</small>
                         </div>
                         <p className="small text-muted mb-2">{tx.reason}</p>
-                        <button className="btn btn-sm btn-outline-primary w-100">
+                        <button className="btn btn-sm btn-outline-primary w-100" onClick={() => setInvestigating(tx)}>
                           Investigate
                         </button>
                       </div>
@@ -329,7 +403,7 @@ export default function ReconciliationWorkbench() {
               </div>
               <div className="card-body">
                 {(() => {
-                  const batch = settlementBatches.find(b => b.id === selectedBatch);
+                  const batch = batches.find(b => b.id === selectedBatch);
                   if (!batch) return null;
                   return (
                     <div className="row g-4">
@@ -373,25 +447,48 @@ export default function ReconciliationWorkbench() {
                           </div>
                         )}
                         <div className="d-grid gap-2">
-                          <button className="btn btn-outline-primary">
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => {
+                              downloadCSV(`statement-${batch.batchNumber}`, [
+                                { field: 'Gross', amount: batch.expectedAmount },
+                                { field: 'Fees', amount: -batch.feeAmount },
+                                { field: 'Refunds', amount: -batch.refundAmount },
+                                { field: 'Net', amount: batch.netAmount },
+                              ]);
+                              toast('Provider statement exported');
+                            }}
+                          >
                             <i className="bi bi-file-earmark-text me-2"></i>
                             View Provider Statement
                           </button>
-                          <button className="btn btn-outline-primary">
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => {
+                              const matches = unmatched.filter((t) => t.provider === batch.provider);
+                              toast(`${matches.length ? `${matches.length} unmatched transaction(s) for ${batch.provider}` : 'All transactions matched'}`, 'info');
+                            }}
+                          >
                             <i className="bi bi-list-check me-2"></i>
                             View Transaction List
                           </button>
-                          <button className="btn btn-outline-primary">
+                          <button className="btn btn-outline-primary" onClick={() => requestReconciliation(batch)} disabled={reconciling}>
                             <i className="bi bi-arrow-repeat me-2"></i>
-                            Request Reconciliation
+                            {reconciling ? 'Running…' : 'Request Reconciliation'}
                           </button>
                           {batch.status === 'Exception' && (
-                            <button className="btn btn-outline-warning">
+                            <button
+                              className="btn btn-outline-warning"
+                              onClick={() => {
+                                setBatches((prev) => prev.map((b) => (b.id === batch.id ? { ...b, status: 'Reconciled', actualAmount: b.expectedAmount, discrepancy: 0 } : b)));
+                                toast('Adjustment created — discrepancy written off (demo)', 'info');
+                              }}
+                            >
                               <i className="bi bi-pencil me-2"></i>
                               Create Adjustment
                             </button>
                           )}
-                          <button className="btn btn-outline-success">
+                          <button className="btn btn-outline-success" onClick={() => markResolved(batch)}>
                             <i className="bi bi-check-circle me-2"></i>
                             Mark as Resolved
                           </button>
@@ -464,25 +561,45 @@ export default function ReconciliationWorkbench() {
             <div className="card-body">
               <div className="row g-3">
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button className="btn btn-outline-primary w-100" onClick={() => setShowImport(true)}>
                     <i className="bi bi-download me-2"></i>
                     Import Statement
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    disabled={reconciling}
+                    onClick={() => {
+                      setReconciling(true);
+                      setTimeout(() => {
+                        setBatches((prev) => prev.map((b) => (b.status === 'Pending' ? { ...b, status: 'Reconciled', actualAmount: b.expectedAmount, discrepancy: 0 } : b)));
+                        setReconciling(false);
+                        toast('Auto-reconciliation complete — pending batches matched', 'success');
+                      }, 1500);
+                    }}
+                  >
                     <i className="bi bi-arrow-repeat me-2"></i>
-                    Run Auto-Reconciliation
+                    {reconciling ? 'Running…' : 'Run Auto-Reconciliation'}
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button
+                    className="btn btn-outline-primary w-100"
+                    onClick={() => {
+                      downloadCSV('reconciliation-report', batches.map((b) => ({
+                        batch: b.batchNumber, provider: b.provider, expected: b.expectedAmount,
+                        actual: b.actualAmount ?? '', discrepancy: b.discrepancy ?? '', status: b.status,
+                      })));
+                      toast('Reconciliation report exported');
+                    }}
+                  >
                     <i className="bi bi-file-earmark-bar-graph me-2"></i>
                     Export Report
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100">
+                  <button className="btn btn-outline-primary w-100" onClick={() => setShowAlerts(true)}>
                     <i className="bi bi-bell me-2"></i>
                     Configure Alerts
                   </button>
@@ -492,6 +609,102 @@ export default function ReconciliationWorkbench() {
           </div>
         </>
       )}
-    </>
+
+      {/* Investigate modal */}
+      {investigating && (
+        <Modal title={`Investigate ${investigating.transactionId}`} onClose={() => setInvestigating(null)}>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Provider</span>
+              <span className="small">{investigating.provider}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">ZeePay amount</span>
+              <span className="small">{investigating.zeePayAmount ? `${investigating.currency} ${investigating.zeePayAmount.toFixed(2)}` : '—'}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Provider amount</span>
+              <span className="small">{investigating.providerAmount ? `${investigating.currency} ${investigating.providerAmount.toFixed(2)}` : '—'}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Issue</span>
+              <span className="small">{investigating.reason}</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between px-0">
+              <span className="small text-muted">Date</span>
+              <span className="small">{investigating.date}</span>
+            </li>
+          </ul>
+          <div className="d-flex gap-2 mt-3">
+            <button
+              className="btn btn-success btn-sm flex-grow-1"
+              onClick={() => {
+                setUnmatched((prev) => prev.filter((t) => t.id !== investigating.id));
+                setInvestigating(null);
+                toast('Transaction marked resolved', 'success');
+              }}
+            >
+              Resolve
+            </button>
+            <button
+              className="btn btn-outline-secondary btn-sm flex-grow-1"
+              onClick={() => { setInvestigating(null); toast('Flagged for follow-up', 'info'); }}
+            >
+              Flag for follow-up
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Import statement modal */}
+      {showImport && (
+        <Modal
+          title="Import Provider Statement"
+          onClose={() => setShowImport(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowImport(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={() => { setShowImport(false); toast('Statement imported — reconciliation queued (demo)', 'info'); }}>Import</button>
+            </>
+          }
+        >
+          <div className="mb-3">
+            <label className="form-label small">Provider</label>
+            <select className="form-select form-select-sm">
+              <option>EcoCash</option>
+              <option>InnBucks</option>
+              <option>Omari</option>
+              <option>Visa</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label small">Statement file (CSV)</label>
+            <input type="file" className="form-control form-control-sm" accept=".csv" />
+            <small className="text-muted">Statement imports are simulated in this demo.</small>
+          </div>
+        </Modal>
+      )}
+
+      {/* Alerts modal */}
+      {showAlerts && (
+        <Modal
+          title="Reconciliation Alerts"
+          onClose={() => setShowAlerts(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowAlerts(false)}>Close</button>
+              <button className="btn btn-primary btn-sm" onClick={() => { setShowAlerts(false); toast('Alert preferences saved'); }}>Save</button>
+            </>
+          }
+        >
+          {['New discrepancy detected', 'Batch pending >48h', 'Unmatched transactions found'].map((label, i) => (
+            <div key={i} className="form-check mb-2">
+              <input className="form-check-input" type="checkbox" id={`rec_alert_${i}`} defaultChecked={i < 2} />
+              <label className="form-check-label small" htmlFor={`rec_alert_${i}`}>{label}</label>
+            </div>
+          ))}
+        </Modal>
+      )}
+    </ToastProvider>
   );
 }
