@@ -216,6 +216,16 @@ export const superAdminNavGroups: NavGroup[] = [
     ],
   },
   {
+    name: "Messaging",
+    icon: "bi-chat-square-text",
+    items: [
+      { name: "SMS Gateway", path: "/super-admin/sms", icon: "bi-chat-dots" },
+      { name: "Gateways", path: "/super-admin/sms/gateways", icon: "bi-hdd-network" },
+      { name: "Sender IDs", path: "/super-admin/sms/sender-ids", icon: "bi-person-badge" },
+      { name: "SMS Settings", path: "/super-admin/sms/settings", icon: "bi-sliders" },
+    ],
+  },
+  {
     name: "Pricing & Commercials",
     icon: "bi-tag",
     items: [
