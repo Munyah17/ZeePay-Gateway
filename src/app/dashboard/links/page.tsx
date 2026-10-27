@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
-import { copyToClipboard as copyText } from '@/utils/actions';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { usePersistentState } from '@/components/ui';
+import { copyToClipboard as copyText } from '@/lib/export';
 
 interface PayLink {
   id: string;
@@ -25,6 +26,8 @@ interface PayLink {
 
 export default function PaymentLinks() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [links, setLinks] = useState<PayLink[]>([]);
@@ -43,12 +46,6 @@ export default function PaymentLinks() {
         return;
       }
     }
-    try {
-      const saved = localStorage.getItem('zeepay_payment_links');
-      setLinks(saved ? JSON.parse(saved) : seedLinks);
-    } catch {
-      setLinks(seedLinks);
-    }
     setLoading(false);
   }, [router]);
 
@@ -65,7 +62,7 @@ export default function PaymentLinks() {
 
   const createLink = () => {
     if (!form.title.trim()) {
-      toast('Title is required', 'warning');
+      toast('Title is required', { tone: 'warning' });
       return;
     }
     const id = `link_${Date.now().toString(36)}`;
@@ -100,14 +97,14 @@ export default function PaymentLinks() {
   const archiveLink = (link: PayLink) => {
     persist(links.map((l) => (l.id === link.id ? { ...l, status: 'Archived' } : l)));
     setMenuFor(null);
-    toast('Link archived', 'info');
+    toast('Link archived', { tone: 'info' });
   };
 
   const confirmDelete = () => {
     if (!deleting) return;
     persist(links.filter((l) => l.id !== deleting.id));
     setDeleting(null);
-    toast('Link deleted', 'info');
+    toast('Link deleted', { tone: 'info' });
   };
 
   const seedLinks: PayLink[] = [
@@ -203,8 +200,8 @@ export default function PaymentLinks() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Payment Links</h2>
         <p className="text-muted">Create and manage payment links for quick collections</p>
       </div>
@@ -536,7 +533,7 @@ export default function PaymentLinks() {
 
           {/* View modal */}
           {viewing && (
-            <Modal title={viewing.title} onClose={() => setViewing(null)}>
+            <Modal open title={viewing.title} onClose={() => setViewing(null)}>
               <ul className="list-group list-group-flush">
                 <li className="list-group-item d-flex justify-content-between px-0">
                   <span className="small text-muted">Status</span>
@@ -580,17 +577,10 @@ export default function PaymentLinks() {
 
           {/* Delete confirm */}
           {deleting && (
-            <ConfirmDialog
-              title="Delete payment link"
-              message={`Delete "${deleting.title}"? Customers with the link will no longer be able to pay.`}
-              confirmLabel="Delete"
-              tone="danger"
-              onConfirm={confirmDelete}
-              onCancel={() => setDeleting(null)}
-            />
+            <Modal open title={"Delete payment link"} onClose={() => setDeleting(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setDeleting(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={confirmDelete}>Delete</button></>}><p className="small mb-0">{`Delete "${deleting.title}"? Customers with the link will no longer be able to pay.`}</p></Modal>
           )}
         </>
       )}
-    </ToastProvider>
+    </>
   );
 }

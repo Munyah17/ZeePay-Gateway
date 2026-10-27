@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { ConfirmDialog, Modal, ToastProvider, toast } from '@/components/ui';
-import { downloadCSV } from '@/utils/actions';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { exportCSV } from '@/lib/export';
 
 interface GovProvider {
   id: string;
@@ -30,6 +30,8 @@ interface GovProvider {
 
 export default function ProviderGovernance() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [providerList, setProviderList] = useState<GovProvider[]>([]);
@@ -67,7 +69,7 @@ export default function ProviderGovernance() {
 
   const onboard = () => {
     if (!onboardForm.name.trim()) {
-      toast('Provider name required', 'warning');
+      toast('Provider name required', { tone: 'warning' });
       return;
     }
     const p: GovProvider = {
@@ -257,8 +259,8 @@ export default function ProviderGovernance() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Provider Governance</h2>
         <p className="text-muted">Monitor provider performance, compliance, and contract management</p>
       </div>
@@ -468,7 +470,7 @@ export default function ProviderGovernance() {
                                     <button
                                       className="dropdown-item small"
                                       onClick={() => {
-                                        downloadCSV(`provider-${provider.id}`, [provider]);
+                                        exportCSV(`provider-${provider.id}`, [provider]);
                                         setMenuFor(null);
                                         toast('Provider exported');
                                       }}
@@ -607,7 +609,7 @@ export default function ProviderGovernance() {
                         <div className="d-flex gap-2 flex-wrap">
                           <button
                             className="btn btn-outline-primary"
-                            onClick={() => { downloadCSV(`contract-${provider.id}`, [{ provider: provider.name, contractExpiry: provider.contractExpiry, fees: provider.feeStructure, settlementDays: provider.settlementDays }]); toast('Contract exported'); }}
+                            onClick={() => { exportCSV(`contract-${provider.id}`, [{ provider: provider.name, contractExpiry: provider.contractExpiry, fees: provider.feeStructure, settlementDays: provider.settlementDays }]); toast('Contract exported'); }}
                           >
                             <i className="bi bi-file-earmark-text me-2"></i>
                             View Contract
@@ -617,7 +619,7 @@ export default function ProviderGovernance() {
                             disabled={auditing}
                             onClick={() => {
                               setAuditing(true);
-                              setTimeout(() => { setAuditing(false); toast(`Compliance audit complete — ${provider.complianceScore}%`, 'info'); }, 1200);
+                              setTimeout(() => { setAuditing(false); toast(`Compliance audit complete — ${provider.complianceScore}%`, { tone: 'info' }); }, 1200);
                             }}
                           >
                             <i className="bi bi-clipboard-check me-2"></i>
@@ -627,7 +629,7 @@ export default function ProviderGovernance() {
                             className="btn btn-outline-primary"
                             onClick={() => {
                               setProviderList((prev) => prev.map((x) => (x.id === provider.id ? { ...x, riskLevel: 'Medium' } : x)));
-                              toast('Risk assessment updated', 'info');
+                              toast('Risk assessment updated', { tone: 'info' });
                             }}
                           >
                             <i className="bi bi-shield-check me-2"></i>
@@ -636,7 +638,7 @@ export default function ProviderGovernance() {
                           <button
                             className="btn btn-outline-primary"
                             onClick={() => {
-                              downloadCSV(`performance-${provider.id}`, [{ uptime: provider.uptime, sla: provider.slaCompliance, volume: provider.monthlyVolume }]);
+                              exportCSV(`performance-${provider.id}`, [{ uptime: provider.uptime, sla: provider.slaCompliance, volume: provider.monthlyVolume }]);
                               toast('Performance report exported');
                             }}
                           >
@@ -686,7 +688,7 @@ export default function ProviderGovernance() {
                     disabled={auditing}
                     onClick={() => {
                       setAuditing(true);
-                      setTimeout(() => { setAuditing(false); toast('Compliance audit complete for all providers', 'success'); }, 1500);
+                      setTimeout(() => { setAuditing(false); toast('Compliance audit complete for all providers'); }, 1500);
                     }}
                   >
                     <i className="bi bi-clipboard-check me-2"></i>
@@ -697,7 +699,7 @@ export default function ProviderGovernance() {
                   <button
                     className="btn btn-outline-primary w-100"
                     onClick={() => {
-                      downloadCSV('provider-performance', filteredProviders.map((p) => ({
+                      exportCSV('provider-performance', filteredProviders.map((p) => ({
                         name: p.name, status: p.status, certification: p.certificationStatus,
                         compliance: p.complianceScore, uptime: p.uptime, volume: p.monthlyVolume,
                       })));
@@ -722,7 +724,7 @@ export default function ProviderGovernance() {
 
       {/* Edit status modal */}
       {editing && (
-        <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
+        <Modal open title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
           <div className="mb-3">
             <label className="form-label small">Status</label>
             <select
@@ -745,7 +747,7 @@ export default function ProviderGovernance() {
                 const certificationStatus = e.target.value;
                 setProviderList((prev) => prev.map((x) => (x.id === editing.id ? { ...x, certificationStatus } : x)));
                 setEditing(null);
-                toast(`${editing.name} certification → ${certificationStatus}`, 'info');
+                toast(`${editing.name} certification → ${certificationStatus}`, { tone: 'info' });
               }}
             >
               <option>Certified</option>
@@ -759,7 +761,7 @@ export default function ProviderGovernance() {
 
       {/* Onboard provider modal */}
       {showOnboard && (
-        <Modal
+        <Modal open 
           title="Onboard New Provider"
           onClose={() => setShowOnboard(false)}
           footer={
@@ -800,15 +802,8 @@ export default function ProviderGovernance() {
 
       {/* Suspend confirm */}
       {suspendTarget && (
-        <ConfirmDialog
-          title="Suspend provider"
-          message={`Suspend ${suspendTarget.name}? Routing rules that prefer this provider will fall back to alternates.`}
-          confirmLabel="Suspend"
-          tone="warning"
-          onConfirm={() => updateStatus(suspendTarget, 'Suspended', `${suspendTarget.name} suspended`)}
-          onCancel={() => setSuspendTarget(null)}
-        />
+        <Modal open title={"Suspend provider"} onClose={() => setSuspendTarget(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setSuspendTarget(null)}>Cancel</button><button className="btn btn-warning btn-sm" onClick={() => updateStatus(suspendTarget, 'Suspended', `${suspendTarget.name} suspended`)}>Suspend</button></>}><p className="small mb-0">{`Suspend ${suspendTarget.name}? Routing rules that prefer this provider will fall back to alternates.`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

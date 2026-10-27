@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
-import { copyToClipboard as copyText } from '@/utils/actions';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { usePersistentState } from '@/components/ui';
+import { copyToClipboard as copyText } from '@/lib/export';
 
 interface Webhook {
   id: string;
@@ -21,6 +22,8 @@ interface Webhook {
 
 export default function Webhooks() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
@@ -39,12 +42,6 @@ export default function Webhooks() {
         return;
       }
     }
-    try {
-      const saved = localStorage.getItem('zeepay_webhooks');
-      setWebhooks(saved ? JSON.parse(saved) : seedWebhooks);
-    } catch {
-      setWebhooks(seedWebhooks);
-    }
     setLoading(false);
   }, [router]);
 
@@ -58,11 +55,11 @@ export default function Webhooks() {
   const createWebhook = () => {
     const url = form.url.trim();
     if (!/^https:\/\/.+/.test(url)) {
-      toast('Enter a valid HTTPS endpoint URL', 'warning');
+      toast('Enter a valid HTTPS endpoint URL', { tone: 'warning' });
       return;
     }
     if (form.events.length === 0) {
-      toast('Select at least one event', 'warning');
+      toast('Select at least one event', { tone: 'warning' });
       return;
     }
     const wh: Webhook = {
@@ -91,14 +88,14 @@ export default function Webhooks() {
   };
 
   const testWebhook = (wh: Webhook) => {
-    toast(`Test event sent to ${wh.url}`, 'info');
+    toast(`Test event sent to ${wh.url}`, { tone: 'info' });
   };
 
   const confirmDelete = () => {
     if (!deleting) return;
     persist(webhooks.filter((w) => w.id !== deleting.id));
     setDeleting(null);
-    toast('Webhook deleted', 'info');
+    toast('Webhook deleted', { tone: 'info' });
   };
 
   const seedWebhooks: Webhook[] = [
@@ -200,8 +197,8 @@ export default function Webhooks() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Webhooks</h2>
         <p className="text-muted">Configure webhooks to receive real-time payment notifications</p>
       </div>
@@ -512,7 +509,7 @@ export default function Webhooks() {
 
           {/* View webhook modal */}
           {viewing && (
-            <Modal title={`Webhook ${viewing.id}`} onClose={() => setViewing(null)}>
+            <Modal open title={`Webhook ${viewing.id}`} onClose={() => setViewing(null)}>
               <ul className="list-group list-group-flush">
                 <li className="list-group-item px-0">
                   <p className="small text-muted mb-1">Endpoint</p>
@@ -546,14 +543,7 @@ export default function Webhooks() {
 
           {/* Delete confirm */}
           {deleting && (
-            <ConfirmDialog
-              title="Delete webhook"
-              message={`Delete endpoint ${deleting.url}? You will stop receiving its events.`}
-              confirmLabel="Delete"
-              tone="danger"
-              onConfirm={confirmDelete}
-              onCancel={() => setDeleting(null)}
-            />
+            <Modal open title={"Delete webhook"} onClose={() => setDeleting(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setDeleting(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={confirmDelete}>Delete</button></>}><p className="small mb-0">{`Delete endpoint ${deleting.url}? You will stop receiving its events.`}</p></Modal>
           )}
 
           {/* Webhook Guide */}
@@ -601,6 +591,6 @@ export default function Webhooks() {
           </div>
         </>
       )}
-    </ToastProvider>
+    </>
   );
 }

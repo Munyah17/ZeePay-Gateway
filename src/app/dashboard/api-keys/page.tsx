@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
-import { copyToClipboard as copyText } from '@/utils/actions';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { usePersistentState } from '@/components/ui';
+import { copyToClipboard as copyText } from '@/lib/export';
 
 interface ApiKey {
   id: string;
@@ -20,6 +21,8 @@ interface ApiKey {
 
 export default function ApiKeys() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -39,12 +42,6 @@ export default function ApiKeys() {
         return;
       }
     }
-    try {
-      const saved = localStorage.getItem('zeepay_api_keys');
-      setKeys(saved ? JSON.parse(saved) : seedKeys);
-    } catch {
-      setKeys(seedKeys);
-    }
     setLoading(false);
   }, [router]);
 
@@ -62,7 +59,7 @@ export default function ApiKeys() {
 
   const createKey = () => {
     if (!form.name.trim()) {
-      toast('Key name is required', 'warning');
+      toast('Key name is required', { tone: 'warning' });
       return;
     }
     const key: ApiKey = {
@@ -94,7 +91,7 @@ export default function ApiKeys() {
     if (!revoking) return;
     persist(keys.map((k) => (k.id === revoking.id ? { ...k, status: 'Revoked' } : k)));
     setRevoking(null);
-    toast('Key revoked', 'info');
+    toast('Key revoked', { tone: 'info' });
   };
 
   const seedKeys: ApiKey[] = [
@@ -147,7 +144,7 @@ export default function ApiKeys() {
         setTimeout(() => setCopiedKey(null), 2000);
         toast('Copied to clipboard');
       } else {
-        toast('Copy failed', 'danger');
+        toast('Copy failed', { tone: 'danger' });
       }
     });
   };
@@ -161,8 +158,8 @@ export default function ApiKeys() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">API Keys</h2>
         <p className="text-muted">Manage your API keys for integrating with ZeePay</p>
       </div>
@@ -375,7 +372,7 @@ export default function ApiKeys() {
 
           {/* Reveal modal */}
           {revealing && (
-            <Modal title={revealing.name} onClose={() => setRevealing(null)}>
+            <Modal open title={revealing.name} onClose={() => setRevealing(null)}>
               <p className="small text-muted mb-2">Your {revealing.type.toLowerCase()} key — copy it now:</p>
               <div className="input-group input-group-sm mb-3">
                 <code className="form-control font-monospace text-truncate">{revealing.id}</code>
@@ -402,26 +399,12 @@ export default function ApiKeys() {
 
           {/* Rotate confirm */}
           {rotating && (
-            <ConfirmDialog
-              title="Rotate API key"
-              message={`Rotate "${rotating.name}"? The current key will stop working immediately.`}
-              confirmLabel="Rotate"
-              tone="warning"
-              onConfirm={confirmRotate}
-              onCancel={() => setRotating(null)}
-            />
+            <Modal open title={"Rotate API key"} onClose={() => setRotating(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setRotating(null)}>Cancel</button><button className="btn btn-warning btn-sm" onClick={confirmRotate}>Rotate</button></>}><p className="small mb-0">{`Rotate "${rotating.name}"? The current key will stop working immediately.`}</p></Modal>
           )}
 
           {/* Revoke confirm */}
           {revoking && (
-            <ConfirmDialog
-              title="Revoke API key"
-              message={`Revoke "${revoking.name}"? Integrations using this key will fail.`}
-              confirmLabel="Revoke"
-              tone="danger"
-              onConfirm={confirmRevoke}
-              onCancel={() => setRevoking(null)}
-            />
+            <Modal open title={"Revoke API key"} onClose={() => setRevoking(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setRevoking(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={confirmRevoke}>Revoke</button></>}><p className="small mb-0">{`Revoke "${revoking.name}"? Integrations using this key will fail.`}</p></Modal>
           )}
 
           {/* Best Practices */}
@@ -480,6 +463,6 @@ export default function ApiKeys() {
           </div>
         </>
       )}
-    </ToastProvider>
+    </>
   );
 }

@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { usePersistentState } from '@/components/ui';
 
 interface Bill {
   id: string;
@@ -21,6 +22,8 @@ interface Bill {
 
 export default function Bills() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [billList, setBillList] = useState<Bill[]>([]);
@@ -45,12 +48,6 @@ export default function Bills() {
         return;
       }
     }
-    try {
-      const saved = localStorage.getItem('zeepay_bills');
-      setBillList(saved ? JSON.parse(saved) : seedBills);
-    } catch {
-      setBillList(seedBills);
-    }
     setLoading(false);
   }, [router]);
 
@@ -69,7 +66,7 @@ export default function Bills() {
   const toggleAutopay = (bill: Bill) => {
     persist(billList.map((b) => (b.id === bill.id ? { ...b, autopay: !b.autopay } : b)));
     setMenuFor(null);
-    toast(`Autopay ${bill.autopay ? 'disabled' : 'enabled'} for ${bill.provider}`, 'info');
+    toast(`Autopay ${bill.autopay ? 'disabled' : 'enabled'} for ${bill.provider}`, { tone: 'info' });
   };
 
   const addBill = () => {
@@ -186,8 +183,8 @@ export default function Bills() {
     .reduce((sum, b) => sum + b.amount, 0);
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Pay Bills</h2>
         <p className="text-muted">Manage and pay your bills securely</p>
       </div>
@@ -417,7 +414,7 @@ export default function Bills() {
 
       {/* View bill modal */}
       {viewing && (
-        <Modal title={viewing.provider} onClose={() => setViewing(null)}>
+        <Modal open title={viewing.provider} onClose={() => setViewing(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Account</span>
@@ -445,45 +442,26 @@ export default function Bills() {
 
       {/* Pay confirm */}
       {paying && (
-        <ConfirmDialog
-          title="Pay bill"
-          message={`Pay ${paying.currency} ${paying.amount.toFixed(2)} to ${paying.provider} (${paying.accountNumber})?`}
-          confirmLabel="Pay now"
-          onConfirm={() => payBill(paying)}
-          onCancel={() => setPaying(null)}
-        />
+        <Modal open title={"Pay bill"} onClose={() => setPaying(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setPaying(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={() => payBill(paying)}>Pay now</button></>}><p className="small mb-0">{`Pay ${paying.currency} ${paying.amount.toFixed(2)} to ${paying.provider} (${paying.accountNumber})?`}</p></Modal>
       )}
 
       {/* Pay all confirm */}
       {payAll && (
-        <ConfirmDialog
-          title="Pay all pending bills"
-          message={`Pay all ${billList.filter((b) => b.status !== 'Paid').length} outstanding bills totalling $${totalDue.toFixed(2)}?`}
-          confirmLabel="Pay all"
-          onConfirm={payAllBills}
-          onCancel={() => setPayAll(false)}
-        />
+        <Modal open title={"Pay all pending bills"} onClose={() => setPayAll(false)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setPayAll(false)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={payAllBills}>Pay all</button></>}><p className="small mb-0">{`Pay all ${billList.filter((b) => b.status !== 'Paid').length} outstanding bills totalling $${totalDue.toFixed(2)}?`}</p></Modal>
       )}
 
       {/* Remove confirm */}
       {removing && (
-        <ConfirmDialog
-          title="Remove bill"
-          message={`Remove ${removing.provider} from your bills?`}
-          confirmLabel="Remove"
-          tone="danger"
-          onConfirm={() => {
+        <Modal open title={"Remove bill"} onClose={() => setRemoving(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setRemoving(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={() => {
             persist(billList.filter((b) => b.id !== removing.id));
             setRemoving(null);
-            toast('Bill removed', 'info');
-          }}
-          onCancel={() => setRemoving(null)}
-        />
+            toast('Bill removed', { tone: 'info' });
+          }}>Remove</button></>}><p className="small mb-0">{`Remove ${removing.provider} from your bills?`}</p></Modal>
       )}
 
       {/* Add bill modal */}
       {showAdd && (
-        <Modal
+        <Modal open 
           title="Add Bill"
           onClose={() => setShowAdd(false)}
           footer={
@@ -535,6 +513,6 @@ export default function Bills() {
           </div>
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

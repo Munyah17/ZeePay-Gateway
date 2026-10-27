@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { ToastProvider, toast } from '@/components/ui';
+import { useToast } from '@/components/ui';
 
 interface Approval {
   id: string;
@@ -23,6 +23,7 @@ interface Approval {
 
 export default function ApprovalQueues() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [selectedQueue, setSelectedQueue] = useState('all');
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
@@ -208,8 +209,8 @@ export default function ApprovalQueues() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Approval Queues</h2>
         <p className="text-muted">Review and approve pending requests across all platform areas</p>
       </div>
@@ -469,7 +470,7 @@ export default function ApprovalQueues() {
                             onChange={(e) => {
                               const assignedTo = e.target.value || null;
                               setApprovals((prev) => prev.map((a) => (a.id === approval.id ? { ...a, assignedTo } : a)));
-                              if (assignedTo) toast(`Assigned to ${assignedTo}`, 'info');
+                              if (assignedTo) toast(`Assigned to ${assignedTo}`, { tone: 'info' });
                             }}
                           >
                             <option value="">Select reviewer...</option>
@@ -497,7 +498,7 @@ export default function ApprovalQueues() {
                           </button>
                           <button
                             className="btn btn-outline-primary"
-                            onClick={() => toast(`Info request sent to ${approval.submittedBy}`, 'info')}
+                            onClick={() => toast(`Info request sent to ${approval.submittedBy}`, { tone: 'info' })}
                           >
                             <i className="bi bi-chat-text me-2"></i>
                             Request More Info
@@ -523,7 +524,7 @@ export default function ApprovalQueues() {
                     className="btn btn-outline-primary w-100"
                     onClick={() => {
                       setApprovals((prev) => prev.map((a) => (a.status === 'Pending' && !a.assignedTo ? { ...a, assignedTo: 'Sarah Johnson' } : a)));
-                      toast('Unassigned items assigned to Sarah Johnson', 'info');
+                      toast('Unassigned items assigned to Sarah Johnson', { tone: 'info' });
                     }}
                   >
                     <i className="bi bi-people me-2"></i>
@@ -548,13 +549,13 @@ export default function ApprovalQueues() {
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100" onClick={() => toast('Escalation rules are managed in governance settings', 'info')}>
+                  <button className="btn btn-outline-primary w-100" onClick={() => toast('Escalation rules are managed in governance settings', { tone: 'info' })}>
                     <i className="bi bi-bell me-2"></i>
                     Set Escalation Rules
                   </button>
                 </div>
                 <div className="col-md-3">
-                  <button className="btn btn-outline-primary w-100" onClick={() => toast('Approval analytics coming soon', 'info')}>
+                  <button className="btn btn-outline-primary w-100" onClick={() => toast('Approval analytics coming soon', { tone: 'info' })}>
                     <i className="bi bi-file-earmark-bar-graph me-2"></i>
                     Approval Analytics
                   </button>
@@ -564,6 +565,6 @@ export default function ApprovalQueues() {
           </div>
         </>
       )}
-    </ToastProvider>
+    </>
   );
 }

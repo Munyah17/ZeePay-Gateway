@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Modal, ToastProvider, toast } from '@/components/ui';
-import { copyToClipboard as copyText } from '@/utils/actions';
+import { Modal, useToast } from '@/components/ui';
+import { copyToClipboard as copyText } from '@/lib/export';
 
 interface ApiKey {
   id: string;
@@ -23,6 +23,7 @@ interface WebhookEndpoint {
 }
 
 export default function SettingsPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'api-keys' | 'webhooks'>('api-keys');
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([]);
@@ -82,13 +83,13 @@ export default function SettingsPage() {
 
   const deleteKey = (id: string) => {
     setApiKeys((prev) => prev.filter((k) => k.id !== id));
-    toast('API key deleted', 'info');
+    toast('API key deleted', { tone: 'info' });
   };
 
   const addWebhook = () => {
     const url = webhookForm.url.trim();
     if (!/^https:\/\/.+/.test(url)) {
-      toast('Enter a valid HTTPS URL', 'warning');
+      toast('Enter a valid HTTPS URL', { tone: 'warning' });
       return;
     }
     setWebhooks((prev) => [
@@ -113,16 +114,16 @@ export default function SettingsPage() {
 
   const deleteWebhook = (id: string) => {
     setWebhooks((prev) => prev.filter((w) => w.id !== id));
-    toast('Webhook deleted', 'info');
+    toast('Webhook deleted', { tone: 'info' });
   };
 
   const copyToClipboard = (text: string) => {
-    copyText(text).then((ok) => toast(ok ? 'Copied to clipboard' : 'Copy failed', ok ? 'success' : 'danger'));
+    copyText(text).then((ok) => toast(ok ? 'Copied to clipboard' : 'Copy failed', ok ? undefined : { tone: 'danger' }));
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Settings</h2>
         <p className="text-muted">Manage your account settings</p>
       </div>
@@ -356,7 +357,7 @@ export default function SettingsPage() {
       )}
 
       {showWebhookModal && (
-        <Modal
+        <Modal open 
           title="Add Webhook Endpoint"
           onClose={() => setShowWebhookModal(false)}
           footer={
@@ -387,6 +388,6 @@ export default function SettingsPage() {
           </div>
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

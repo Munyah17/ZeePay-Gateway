@@ -18,8 +18,9 @@ interface ConfirmOptions {
   requireReason?: boolean;
   reasonLabel?: string;
 }
+type ToastOptions = Tone | { tone?: Tone; message?: string };
 interface UIContextValue {
-  toast: (title: string, opts?: { tone?: Tone; message?: string }) => void;
+  toast: (title: string, opts?: ToastOptions) => void;
   confirm: (opts: ConfirmOptions) => Promise<false | { reason: string }>;
 }
 
@@ -39,9 +40,11 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const resolver = useRef<((v: false | { reason: string }) => void) | null>(null);
   const counter = useRef(0);
 
-  const toast = useCallback<UIContextValue['toast']>((title, opts = {}) => {
+  const toast = useCallback<UIContextValue['toast']>((title, opts = 'success') => {
     const id = ++counter.current;
-    setToasts((t) => [...t, { id, title, tone: opts.tone || 'success', message: opts.message }]);
+    const tone = typeof opts === 'string' ? opts : opts.tone || 'success';
+    const message = typeof opts === 'object' ? opts.message : undefined;
+    setToasts((t) => [...t, { id, title, tone, message }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800);
   }, []);
 

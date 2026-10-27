@@ -524,3 +524,85 @@ ON CONFLICT (name) DO UPDATE SET
   provider_type = EXCLUDED.provider_type,
   capabilities = EXCLUDED.capabilities,
   config_schema = EXCLUDED.config_schema;
+
+-- ============================================================
+-- SMS Gateway (bulk SMS via HTTP + SMPP transports)
+-- ============================================================
+
+-- SMS batches table (bulk campaign records)
+CREATE TABLE IF NOT EXISTS sms_batches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id),
+  provider_name VARCHAR(50) NOT NULL, -- sms-http, sms-smpp
+  external_reference VARCHAR(255) NOT NULL, -- merchant batch reference (idempotency key)
+  sender_id VARCHAR(15),
+  message_text TEXT NOT NULL,
+  total INTEGER NOT NULL DEFAULT 0,
+  failed_count INTEGER NOT NULL DEFAULT 0,
+  status VARCHAR(20) NOT NULL DEFAULT 'processing', -- processing, completed, completed_with_errors, failed
+  error_message TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(merchant_id, external_reference)
+);
+
+-- SMS messages table (per-recipient message records)
+CREATE TABLE IF NOT EXISTS sms_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id),
+  provider_name VARCHAR(50) NOT NULL, -- sms-http, sms-smpp
+  batch_id UUID REFERENCES sms_batches(id) ON DELETE SET NULL,
+  external_reference VARCHAR(255) NOT NULL, -- merchant reference (idempotency key)
+  provider_reference VARCHAR(255), -- gateway message_id / submit_sm id
+  recipient_msisdn VARCHAR(20) NOT NULL,
+  sender_id VARCHAR(15),
+  message_text TEXT NOT NULL,
+  segments INTEGER NOT NULL DEFAULT 1,
+  status VARCHAR(20) NOT NULL DEFAULT 'queued', -- queued, sent, delivered, failed, rejected
+  error_message TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(merchant_id, external_reference)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sms_messages_merchant ON sms_messages(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_sms_messages_status ON sms_messages(status);
+CREATE INDEX IF NOT EXISTS idx_sms_messages_batch ON sms_messages(batch_id);
+CREATE INDEX IF NOT EXISTS idx_sms_messages_provider_ref ON sms_messages(provider_reference);
+CREATE INDEX IF NOT EXISTS idx_sms_batches_merchant ON sms_batches(merchant_id);
+
+-- SMS gateway provider registrations
+INSERT INTO payment_providers (name, provider_type, supports_test, supports_live, capabilities, config_schema)
+VALUES
+  ('sms-http', 'sms', true, true,
+   '{"sendSms": true, "bulkSend": true, "getDeliveryStatus": true, "supportsDeliveryReports": true}',
+   '{
+     "endpoint": {"label": "Submit endpoint URL", "required": true},
+     "statusEndpoint": {"label": "Status polling URL base", "required": false},
+     "accessToken": {"label": "Bearer access token", "required": false, "secret": true},
+     "username": {"label": "Basic auth username", "required": false},
+     "password": {"label": "Basic auth password", "required": false, "secret": true},
+     "authHeader": {"label": "Custom auth header name", "required": false},
+     "defaultSenderId": {"label": "Default sender ID", "required": false},
+     "bodyFormat": {"label": "Body format (json|form)", "required": false}
+   }'),
+  ('sms-smpp', 'sms', true, true,
+   '{"sendSms": true, "bulkSend": true, "getDeliveryStatus": false, "supportsDeliveryReports": true}',
+   '{
+     "host": {"label": "SMSC host", "required": true},
+     "port": {"label": "SMSC port", "required": false},
+     "systemId": {"label": "SMPP system_id", "required": true},
+     "password": {"label": "SMPP password", "required": true, "secret": true},
+     "systemType": {"label": "SMPP system_type", "required": false},
+     "defaultSenderId": {"label": "Default source address", "required": false},
+     "sourceAddrTon": {"label": "Source TON", "required": false},
+     "sourceAddrNpi": {"label": "Source NPI", "required": false},
+     "destAddrTon": {"label": "Destination TON", "required": false},
+     "destAddrNpi": {"label": "Destination NPI", "required": false}
+   }')
+ON CONFLICT (name) DO UPDATE SET
+  provider_type = EXCLUDED.provider_type,
+  capabilities = EXCLUDED.capabilities,
+  config_schema = EXCLUDED.config_schema;

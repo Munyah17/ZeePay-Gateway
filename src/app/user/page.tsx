@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Modal, ToastProvider } from '@/components/ui';
+import { Modal } from '@/components/ui';
 
 interface RecentTx { name: string; amount: number; date: string; icon: string; color: string }
 
@@ -179,8 +179,7 @@ export default function UserDashboard() {
       )}
 
       {viewing && (
-        <ToastProvider>
-          <Modal title={viewing.name} onClose={() => setViewing(null)}>
+        <Modal open title={viewing.name} onClose={() => setViewing(null)}>
             <ul className="list-group list-group-flush">
               <li className="list-group-item d-flex justify-content-between px-0">
                 <span className="small text-muted">Amount</span>
@@ -201,7 +200,6 @@ export default function UserDashboard() {
               View full history
             </Link>
           </Modal>
-        </ToastProvider>
       )}
     </>
   );

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { downloadCSV } from '@/utils/actions';
-import { Modal, ToastProvider, toast } from '@/components/ui';
+import { exportCSV } from '@/lib/export';
+import { Modal, useToast } from '@/components/ui';
 
 interface Settlement {
   id: string;
@@ -16,6 +16,7 @@ interface Settlement {
 
 export default function AdminSettlementsPage() {
   const router = useRouter();
+  const toast = useToast();
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [loading, setLoading] = useState(true);
   const [reconciling, setReconciling] = useState(false);
@@ -31,7 +32,7 @@ export default function AdminSettlementsPage() {
   };
 
   const exportReport = () => {
-    downloadCSV(
+    exportCSV(
       'settlements',
       settlements.map((s) => ({ id: s.id, provider: s.provider, amount: s.amount, status: s.status, date: s.date })),
     );
@@ -83,7 +84,6 @@ export default function AdminSettlementsPage() {
   };
 
   return (
-    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -210,7 +210,7 @@ export default function AdminSettlementsPage() {
 
       {/* Inspect modal */}
       {inspecting && (
-        <Modal title={`Settlement ${inspecting.id}`} onClose={() => setInspecting(null)}>
+        <Modal open title={`Settlement ${inspecting.id}`} onClose={() => setInspecting(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Provider</span>
@@ -239,6 +239,5 @@ export default function AdminSettlementsPage() {
         </Modal>
       )}
     </div>
-    </ToastProvider>
   );
 }

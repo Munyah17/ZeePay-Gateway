@@ -53,8 +53,9 @@ export function exportExcel(name: string, rows: Record<string, any>[], columns?:
   download(`${slug(name)}-${stamp()}.xls`, html, 'application/vnd.ms-excel');
 }
 
-export function exportJSON(name: string, rows: Record<string, any>[]) {
-  const clean = rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith('_'))));
+export function exportJSON(name: string, rows: Record<string, any>[] | Record<string, any>) {
+  const list = Array.isArray(rows) ? rows : [rows];
+  const clean = list.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith('_'))));
   download(`${slug(name)}-${stamp()}.json`, JSON.stringify(clean, null, 2), 'application/json');
 }
 

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { downloadCSV } from '@/utils/actions';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { exportCSV } from '@/lib/export';
+import { Modal, useToast, useConfirm } from '@/components/ui';
 
 interface Merchant {
   name: string;
@@ -16,6 +16,8 @@ interface Merchant {
 
 export default function AdminMerchantsPage() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [managing, setManaging] = useState<Merchant | null>(null);
@@ -73,7 +75,6 @@ export default function AdminMerchantsPage() {
   };
 
   return (
-    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -108,7 +109,7 @@ export default function AdminMerchantsPage() {
           <button
             className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50"
             onClick={() => {
-              downloadCSV(
+              exportCSV(
                 'merchants',
                 merchants.map((m) => ({ name: m.name, email: m.email, status: m.status, volume: m.volume, joined: m.joined })),
               );
@@ -188,7 +189,7 @@ export default function AdminMerchantsPage() {
 
         {/* Manage modal */}
         {managing && (
-          <Modal title={managing.name} onClose={() => setManaging(null)}>
+          <Modal open title={managing.name} onClose={() => setManaging(null)}>
             <ul className="list-group list-group-flush">
               <li className="list-group-item d-flex justify-content-between px-0">
                 <span className="small text-muted">Contact email</span>
@@ -246,19 +247,11 @@ export default function AdminMerchantsPage() {
 
         {/* Suspend confirm */}
         {suspendTarget && (
-          <ConfirmDialog
-            title="Suspend merchant"
-            message={`Suspend ${suspendTarget.name}? Their payments will be blocked until reactivated.`}
-            confirmLabel="Suspend"
-            tone="danger"
-            onConfirm={() => {
+          <Modal open title={"Suspend merchant"} onClose={() => setSuspendTarget(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setSuspendTarget(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={() => {
               updateStatus(suspendTarget, 'Suspended', `${suspendTarget.name} suspended`);
               setSuspendTarget(null);
-            }}
-            onCancel={() => setSuspendTarget(null)}
-          />
+            }}>Suspend</button></>}><p className="small mb-0">{`Suspend ${suspendTarget.name}? Their payments will be blocked until reactivated.`}</p></Modal>
         )}
       </div>
-    </ToastProvider>
   );
 }

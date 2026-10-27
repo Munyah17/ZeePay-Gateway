@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ToastProvider, toast } from '@/components/ui';
-import { copyToClipboard } from '@/utils/actions';
+import { useToast } from '@/components/ui';
+import { copyToClipboard } from '@/lib/export';
 
 type Lang = 'curl' | 'node' | 'python' | 'php';
 
@@ -54,6 +54,7 @@ $payment = $client->payments->create([
 
 export default function DeveloperPlatform() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState<Lang>('curl');
 
@@ -102,8 +103,8 @@ export default function DeveloperPlatform() {
   ];
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Developer Platform</h2>
         <p className="text-muted">API documentation, integration guides, and developer resources</p>
       </div>
@@ -397,6 +398,6 @@ export default function DeveloperPlatform() {
           </div>
         </>
       )}
-    </ToastProvider>
+    </>
   );
 }

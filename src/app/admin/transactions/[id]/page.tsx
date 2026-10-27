@@ -4,11 +4,12 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ToastProvider, toast } from '@/components/ui';
-import { downloadJSON } from '@/utils/actions';
+import { Modal, UIProvider, useToast } from '@/components/ui';
+import { exportJSON } from '@/lib/export';
 
 function TransactionInvestigationContent() {
   const router = useRouter();
+  const toast = useToast();
   const params = useParams();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -118,7 +119,7 @@ function TransactionInvestigationContent() {
 
   const addNote = () => {
     if (!noteDraft.trim()) {
-      toast('Enter a note first', 'warning');
+      toast('Enter a note first', { tone: 'warning' });
       return;
     }
     setNotes((prev) => [
@@ -133,12 +134,12 @@ function TransactionInvestigationContent() {
     setRetrying(true);
     setTimeout(() => {
       setRetrying(false);
-      toast('Investigation re-run — no new findings (demo)', 'info');
+      toast('Investigation re-run — no new findings (demo)', { tone: 'info' });
     }, 1200);
   };
 
   return (
-    <ToastProvider>
+    <>
       <div className="mb-4">
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-2">
@@ -170,7 +171,7 @@ function TransactionInvestigationContent() {
                 <button
                   className="btn btn-sm btn-outline-secondary"
                   onClick={() => {
-                    downloadJSON(`transaction-${transaction.id}`, transaction);
+                    exportJSON(`transaction-${transaction.id}`, [transaction]);
                     toast('Transaction exported');
                   }}
                 >
@@ -585,7 +586,7 @@ function TransactionInvestigationContent() {
 
       {/* Webhook payload modal */}
       {viewingPayload && (
-        <Modal title={`Event ${viewingPayload}`} onClose={() => setViewingPayload(null)} size="lg">
+        <Modal open title={`Event ${viewingPayload}`} onClose={() => setViewingPayload(null)} size="lg">
           <pre className="bg-light rounded p-3 small mb-0">{JSON.stringify(
             {
               id: viewingPayload,
@@ -601,7 +602,7 @@ function TransactionInvestigationContent() {
 
       {/* Refund detail modal */}
       {viewingRefund && (
-        <Modal title={`Refund ${viewingRefund.id}`} onClose={() => setViewingRefund(null)}>
+        <Modal open title={`Refund ${viewingRefund.id}`} onClose={() => setViewingRefund(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Amount</span>
@@ -622,14 +623,16 @@ function TransactionInvestigationContent() {
           </ul>
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }
 
 export default function TransactionInvestigation() {
   return (
-    <Suspense fallback={<div className="text-center py-5"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Loading...</span></div></div>}>
-      <TransactionInvestigationContent />
-    </Suspense>
+    <UIProvider>
+      <Suspense fallback={<div className="text-center py-5"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Loading...</span></div></div>}>
+        <TransactionInvestigationContent />
+      </Suspense>
+    </UIProvider>
   );
 }

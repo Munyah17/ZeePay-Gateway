@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { ConfirmDialog, Modal, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast, useConfirm } from '@/components/ui';
 
 interface Role {
   id: string;
@@ -20,6 +20,8 @@ interface Role {
 
 export default function RolesAndPermissions() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export default function RolesAndPermissions() {
 
   const createRole = () => {
     if (!createForm.name.trim()) {
-      toast('Role name required', 'warning');
+      toast('Role name required', { tone: 'warning' });
       return;
     }
     const role: Role = {
@@ -163,8 +165,8 @@ export default function RolesAndPermissions() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Roles and Permissions</h2>
         <p className="text-muted">Manage platform-wide access control and permissions</p>
       </div>
@@ -515,7 +517,7 @@ export default function RolesAndPermissions() {
 
       {/* Edit role modal */}
       {editing && (
-        <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
+        <Modal open title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
           <div className="mb-3">
             <label className="form-label small">Status</label>
             <select
@@ -525,7 +527,7 @@ export default function RolesAndPermissions() {
                 const status = e.target.value;
                 setRoleList((prev) => prev.map((r) => (r.id === editing.id ? { ...r, status } : r)));
                 setEditing(null);
-                toast(`${editing.name} → ${status}`, 'info');
+                toast(`${editing.name} → ${status}`, { tone: 'info' });
               }}
             >
               <option>Active</option>
@@ -545,19 +547,12 @@ export default function RolesAndPermissions() {
 
       {/* Delete confirm */}
       {deleteTarget && (
-        <ConfirmDialog
-          title="Delete role"
-          message={`Delete role "${deleteTarget.name}"? Users assigned to this role will lose its permissions.`}
-          confirmLabel="Delete"
-          tone="danger"
-          onConfirm={() => {
+        <Modal open title={"Delete role"} onClose={() => setDeleteTarget(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setDeleteTarget(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={() => {
             setRoleList((prev) => prev.filter((r) => r.id !== deleteTarget.id));
             setDeleteTarget(null);
-            toast('Role deleted', 'info');
-          }}
-          onCancel={() => setDeleteTarget(null)}
-        />
+            toast('Role deleted', { tone: 'info' });
+          }}>Delete</button></>}><p className="small mb-0">{`Delete role "${deleteTarget.name}"? Users assigned to this role will lose its permissions.`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

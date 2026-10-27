@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast, useConfirm } from '@/components/ui';
 
 interface RoutingRule {
   id: string;
@@ -25,6 +25,8 @@ interface RoutingRule {
 
 export default function RoutingRules() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [selectedRule, setSelectedRule] = useState<string | null>(null);
   const [ruleList, setRuleList] = useState<RoutingRule[]>([]);
@@ -52,12 +54,12 @@ export default function RoutingRules() {
   const updateRuleStatus = (rule: RoutingRule, status: string) => {
     setRuleList((prev) => prev.map((r) => (r.id === rule.id ? { ...r, status, lastModified: new Date().toISOString().slice(0, 10) } : r)));
     setEditing(null);
-    toast(`${rule.name} → ${status}`, 'info');
+    toast(`${rule.name} → ${status}`, { tone: 'info' });
   };
 
   const createRule = () => {
     if (!createForm.name.trim()) {
-      toast('Rule name required', 'warning');
+      toast('Rule name required', { tone: 'warning' });
       return;
     }
     const maxPriority = ruleList.reduce((m, r) => Math.max(m, r.priority), 0);
@@ -87,7 +89,7 @@ export default function RoutingRules() {
     if (!deleteTarget) return;
     setRuleList((prev) => prev.filter((r) => r.id !== deleteTarget.id));
     setDeleteTarget(null);
-    toast('Rule deleted', 'info');
+    toast('Rule deleted', { tone: 'info' });
   };
 
   const runSimulation = () => {
@@ -235,8 +237,8 @@ export default function RoutingRules() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Routing Rules</h2>
         <p className="text-muted">Configure how payments are routed to providers based on conditions</p>
       </div>
@@ -570,7 +572,7 @@ export default function RoutingRules() {
 
       {/* Edit rule modal */}
       {editing && (
-        <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
+        <Modal open title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
           <div className="mb-3">
             <label className="form-label small">Status</label>
             <select
@@ -593,7 +595,7 @@ export default function RoutingRules() {
 
       {/* Create rule modal */}
       {showCreate && (
-        <Modal
+        <Modal open 
           title="Create Routing Rule"
           onClose={() => setShowCreate(false)}
           footer={
@@ -647,7 +649,7 @@ export default function RoutingRules() {
 
       {/* Edit failover policy modal */}
       {editPolicy && (
-        <Modal
+        <Modal open 
           title={`Edit ${editPolicy}`}
           onClose={() => setEditPolicy(null)}
           footer={
@@ -670,15 +672,8 @@ export default function RoutingRules() {
 
       {/* Delete confirm */}
       {deleteTarget && (
-        <ConfirmDialog
-          title="Delete routing rule"
-          message={`Delete "${deleteTarget.name}"? This affects how new payments are routed.`}
-          confirmLabel="Delete"
-          tone="danger"
-          onConfirm={deleteRule}
-          onCancel={() => setDeleteTarget(null)}
-        />
+        <Modal open title={"Delete routing rule"} onClose={() => setDeleteTarget(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setDeleteTarget(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={deleteRule}>Delete</button></>}><p className="small mb-0">{`Delete "${deleteTarget.name}"? This affects how new payments are routed.`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

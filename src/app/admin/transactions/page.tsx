@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { downloadCSV } from '@/utils/actions';
-import { ToastProvider, toast } from '@/components/ui';
+import { exportCSV } from '@/lib/export';
+import { useToast } from '@/components/ui';
 
 interface Transaction {
   id: string;
@@ -17,6 +17,7 @@ interface Transaction {
 
 export default function AdminTransactionsPage() {
   const router = useRouter();
+  const toast = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
@@ -77,7 +78,7 @@ export default function AdminTransactionsPage() {
   );
 
   const exportCsv = () => {
-    downloadCSV(
+    exportCSV(
       'admin-transactions',
       filteredTransactions.map((t) => ({
         id: t.id,
@@ -92,7 +93,6 @@ export default function AdminTransactionsPage() {
   };
 
   return (
-    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -199,6 +199,5 @@ export default function AdminTransactionsPage() {
         )}
       </main>
     </div>
-    </ToastProvider>
   );
 }

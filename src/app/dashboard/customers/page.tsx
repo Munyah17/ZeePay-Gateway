@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
-import { downloadCSV } from '@/utils/actions';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { exportCSV } from '@/lib/export';
 
 interface Customer {
   name: string;
@@ -17,6 +17,8 @@ interface Customer {
 
 export default function CustomersPage() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -58,7 +60,7 @@ export default function CustomersPage() {
 
   const addCustomer = () => {
     if (!form.name.trim() || !form.email.trim()) {
-      toast('Name and email are required', 'warning');
+      toast('Name and email are required', { tone: 'warning' });
       return;
     }
     setCustomers((prev) => [
@@ -81,7 +83,7 @@ export default function CustomersPage() {
     if (!deleting) return;
     setCustomers((prev) => prev.filter((c) => c !== deleting));
     setDeleting(null);
-    toast('Customer removed', 'info');
+    toast('Customer removed', { tone: 'info' });
   };
 
   const filtered = customers.filter(
@@ -94,7 +96,7 @@ export default function CustomersPage() {
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const exportCsv = () => {
-    downloadCSV(
+    exportCSV(
       'customers',
       filtered.map((c) => ({ name: c.name, email: c.email, payments: c.payments, totalPaid: `$${c.totalPaid.toFixed(2)}`, lastActivity: c.lastActivity })),
     );
@@ -102,8 +104,8 @@ export default function CustomersPage() {
   };
 
   return (
-    <ToastProvider>
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <>
+    <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="h4 mb-0">Customers</h2>
           <p className="text-muted small mb-0">Customers associated with your payment activity</p>
@@ -288,7 +290,7 @@ export default function CustomersPage() {
       )}
 
       {viewing && (
-        <Modal title={viewing.name} onClose={() => setViewing(null)}>
+        <Modal open title={viewing.name} onClose={() => setViewing(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Email</span>
@@ -315,7 +317,7 @@ export default function CustomersPage() {
       )}
 
       {editing && (
-        <Modal
+        <Modal open 
           title={`Edit ${editing.customer.name}`}
           onClose={() => setEditing(null)}
           footer={
@@ -356,15 +358,8 @@ export default function CustomersPage() {
       )}
 
       {deleting && (
-        <ConfirmDialog
-          title="Delete customer"
-          message={`Delete ${deleting.name} (${deleting.email})? This cannot be undone.`}
-          confirmLabel="Delete"
-          tone="danger"
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleting(null)}
-        />
+        <Modal open title={"Delete customer"} onClose={() => setDeleting(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setDeleting(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={confirmDelete}>Delete</button></>}><p className="small mb-0">{`Delete ${deleting.name} (${deleting.email})? This cannot be undone.`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast } from '@/components/ui';
 
 interface PaymentMethod {
   id: string;
@@ -20,6 +20,7 @@ interface PaymentMethod {
 
 export default function PaymentMethodsCatalogue() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -51,7 +52,7 @@ export default function PaymentMethodsCatalogue() {
 
   const addMethod = () => {
     if (!addForm.name.trim()) {
-      toast('Method name required', 'warning');
+      toast('Method name required', { tone: 'warning' });
       return;
     }
     setMethodList((prev) => [
@@ -279,8 +280,8 @@ export default function PaymentMethodsCatalogue() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Payment Methods Catalogue</h2>
         <p className="text-muted">Manage payment methods independently of provider integrations</p>
       </div>
@@ -470,7 +471,7 @@ export default function PaymentMethodsCatalogue() {
 
       {/* Configure modal */}
       {configuring && (
-        <Modal title={`Configure ${configuring.name}`} onClose={() => setConfiguring(null)}>
+        <Modal open title={`Configure ${configuring.name}`} onClose={() => setConfiguring(null)}>
           <div className="mb-3">
             <label className="form-label small">Status</label>
             <select
@@ -480,7 +481,7 @@ export default function PaymentMethodsCatalogue() {
                 const status = e.target.value;
                 setMethodList((prev) => prev.map((x) => (x.id === configuring.id ? { ...x, status } : x)));
                 setConfiguring({ ...configuring, status });
-                toast(`${configuring.name} → ${status}`, 'info');
+                toast(`${configuring.name} → ${status}`, { tone: 'info' });
               }}
             >
               <option>Live</option>
@@ -499,7 +500,7 @@ export default function PaymentMethodsCatalogue() {
 
       {/* Add method modal */}
       {showAdd && (
-        <Modal
+        <Modal open 
           title="Add Payment Method"
           onClose={() => setShowAdd(false)}
           footer={
@@ -555,6 +556,6 @@ export default function PaymentMethodsCatalogue() {
           </div>
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

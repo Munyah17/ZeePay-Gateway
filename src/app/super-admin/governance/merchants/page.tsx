@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { ConfirmDialog, Modal, ToastProvider, toast } from '@/components/ui';
-import { downloadCSV } from '@/utils/actions';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { exportCSV } from '@/lib/export';
 
 interface Merchant {
   id: string;
@@ -27,6 +27,8 @@ interface Merchant {
 
 export default function MerchantGovernance() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [selectedMerchant, setSelectedMerchant] = useState<string | null>(null);
   const [merchantList, setMerchantList] = useState<Merchant[]>([]);
@@ -205,8 +207,8 @@ export default function MerchantGovernance() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Merchant Governance</h2>
         <p className="text-muted">Monitor merchant compliance, risk assessment, and approval workflows</p>
       </div>
@@ -411,7 +413,7 @@ export default function MerchantGovernance() {
                                     <button
                                       className="dropdown-item small"
                                       onClick={() => {
-                                        downloadCSV(`merchant-${merchant.id}`, [merchant]);
+                                        exportCSV(`merchant-${merchant.id}`, [merchant]);
                                         setMenuFor(null);
                                         toast('Merchant exported');
                                       }}
@@ -529,7 +531,7 @@ export default function MerchantGovernance() {
                         <div className="d-grid gap-2">
                           <button
                             className="btn btn-outline-primary"
-                            onClick={() => { downloadCSV(`merchant-${merchant.id}`, [merchant]); toast('Full profile exported'); }}
+                            onClick={() => { exportCSV(`merchant-${merchant.id}`, [merchant]); toast('Full profile exported'); }}
                           >
                             <i className="bi bi-file-earmark-text me-2"></i>
                             View Full Profile
@@ -541,7 +543,7 @@ export default function MerchantGovernance() {
                               setAuditing(true);
                               setTimeout(() => {
                                 setAuditing(false);
-                                toast(`Compliance check complete — score ${merchant.complianceScore}%`, 'info');
+                                toast(`Compliance check complete — score ${merchant.complianceScore}%`, { tone: 'info' });
                               }, 1200);
                             }}
                           >
@@ -552,7 +554,7 @@ export default function MerchantGovernance() {
                             className="btn btn-outline-primary"
                             onClick={() => {
                               setMerchantList((prev) => prev.map((x) => (x.id === merchant.id ? { ...x, riskLevel: 'Medium', nextReview: '2024-04-15' } : x)));
-                              toast('Risk assessment updated', 'info');
+                              toast('Risk assessment updated', { tone: 'info' });
                             }}
                           >
                             <i className="bi bi-shield-check me-2"></i>
@@ -601,7 +603,7 @@ export default function MerchantGovernance() {
                     disabled={auditing}
                     onClick={() => {
                       setAuditing(true);
-                      setTimeout(() => { setAuditing(false); toast('Compliance audit complete — all merchants checked', 'success'); }, 1500);
+                      setTimeout(() => { setAuditing(false); toast('Compliance audit complete — all merchants checked'); }, 1500);
                     }}
                   >
                     <i className="bi bi-shield-check me-2"></i>
@@ -624,7 +626,7 @@ export default function MerchantGovernance() {
                   <button
                     className="btn btn-outline-primary w-100"
                     onClick={() => {
-                      downloadCSV('merchant-governance', filteredMerchants.map((m) => ({
+                      exportCSV('merchant-governance', filteredMerchants.map((m) => ({
                         business: m.businessName, type: m.businessType, tier: m.tier, status: m.status,
                         risk: m.riskLevel, compliance: m.complianceScore, volume: m.monthlyVolume,
                       })));
@@ -643,7 +645,7 @@ export default function MerchantGovernance() {
 
       {/* Edit status modal */}
       {editing && (
-        <Modal title={`Edit ${editing.businessName}`} onClose={() => setEditing(null)}>
+        <Modal open title={`Edit ${editing.businessName}`} onClose={() => setEditing(null)}>
           <div className="mb-3">
             <label className="form-label small">Status</label>
             <select
@@ -666,7 +668,7 @@ export default function MerchantGovernance() {
                 const tier = e.target.value;
                 setMerchantList((prev) => prev.map((x) => (x.id === editing.id ? { ...x, tier } : x)));
                 setEditing(null);
-                toast(`${editing.businessName} tier → ${tier}`, 'info');
+                toast(`${editing.businessName} tier → ${tier}`, { tone: 'info' });
               }}
             >
               <option>Enterprise</option>
@@ -679,15 +681,8 @@ export default function MerchantGovernance() {
 
       {/* Suspend confirm */}
       {suspendTarget && (
-        <ConfirmDialog
-          title="Suspend merchant"
-          message={`Suspend ${suspendTarget.businessName}? Their payment processing will be paused.`}
-          confirmLabel="Suspend"
-          tone="warning"
-          onConfirm={() => updateStatus(suspendTarget, 'Suspended', `${suspendTarget.businessName} suspended`)}
-          onCancel={() => setSuspendTarget(null)}
-        />
+        <Modal open title={"Suspend merchant"} onClose={() => setSuspendTarget(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setSuspendTarget(null)}>Cancel</button><button className="btn btn-warning btn-sm" onClick={() => updateStatus(suspendTarget, 'Suspended', `${suspendTarget.businessName} suspended`)}>Suspend</button></>}><p className="small mb-0">{`Suspend ${suspendTarget.businessName}? Their payment processing will be paused.`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

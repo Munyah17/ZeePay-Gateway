@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
-import { copyToClipboard as copyText } from '@/utils/actions';
+import { Modal, useToast, useConfirm, usePersistentState } from '@/components/ui';
+import { copyToClipboard as copyText } from '@/lib/export';
 
 const defaultConfig = {
   businessName: 'Acme Solutions',
@@ -43,20 +43,17 @@ const defaultConfig = {
 
 export default function CheckoutConfiguration() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('appearance');
-  const [config, setConfig] = useState(defaultConfig);
+  const [config, persist] = usePersistentState('checkout_config', defaultConfig);
   const [showPreview, setShowPreview] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
 
-  const persist = (next: typeof config) => {
-    setConfig(next);
-    try { localStorage.setItem('zeepay_checkout_config', JSON.stringify(next)); } catch { /* noop */ }
-  };
-
   const saveSection = (name: string) => {
-    try { localStorage.setItem('zeepay_checkout_config', JSON.stringify(config)); } catch { /* noop */ }
+    persist(config); // usePersistentState already writes on every change
     toast(`${name} settings saved`);
   };
 
@@ -68,10 +65,6 @@ export default function CheckoutConfiguration() {
         return;
       }
     }
-    try {
-      const saved = localStorage.getItem('zeepay_checkout_config');
-      if (saved) setConfig({ ...defaultConfig, ...JSON.parse(saved) });
-    } catch { /* noop */ }
     setLoading(false);
   }, [router]);
 
@@ -86,7 +79,7 @@ export default function CheckoutConfiguration() {
   };
 
   return (
-    <ToastProvider>
+    <>
       <div className="mb-4">
         <h2 className="h4">Checkout Configuration</h2>
         <p className="text-muted">Customize the payment checkout experience for your customers</p>
@@ -175,7 +168,7 @@ export default function CheckoutConfiguration() {
                           <div className="bg-light rounded d-flex align-items-center justify-content-center" style={{ width: '80px', height: '80px' }}>
                             <span className="text-muted small">Logo</span>
                           </div>
-                          <button className="btn btn-outline-primary btn-sm" onClick={() => toast('Logo upload requires merchant file storage — coming soon', 'info')}>Upload Logo</button>
+                          <button className="btn btn-outline-primary btn-sm" onClick={() => toast('Logo upload requires merchant file storage — coming soon', { tone: 'info' })}>Upload Logo</button>
                         </div>
                       </div>
                       <div className="mb-3">
@@ -565,7 +558,7 @@ export default function CheckoutConfiguration() {
 
       {/* Preview modal */}
       {showPreview && (
-        <Modal title="Checkout Preview" onClose={() => setShowPreview(false)}>
+        <Modal open title="Checkout Preview" onClose={() => setShowPreview(false)}>
           <div className="border rounded p-3" style={{ backgroundColor: checkoutConfig.theme.backgroundColor }}>
             <h6 className="mb-1" style={{ color: checkoutConfig.theme.textColor }}>{checkoutConfig.businessName}</h6>
             <p className="small text-muted mb-3">Payment of USD 25.00</p>
@@ -596,7 +589,7 @@ export default function CheckoutConfiguration() {
 
       {/* Integration code modal */}
       {showCode && (
-        <Modal title="Integration Code" onClose={() => setShowCode(false)} size="lg">
+        <Modal open title="Integration Code" onClose={() => setShowCode(false)} size="lg">
           <p className="small text-muted">Drop this snippet into your site to launch ZeePay checkout:</p>
           <pre className="bg-dark text-light rounded p-3 small">{`<script src="https://js.zeepay.co.zw/v1/checkout.js"></script>
 <button id="zeepay-pay">Pay Now</button>
@@ -621,15 +614,8 @@ export default function CheckoutConfiguration() {
 
       {/* Reset confirm */}
       {confirmReset && (
-        <ConfirmDialog
-          title="Reset checkout settings"
-          message="Restore all checkout settings to defaults? Your current customization will be lost."
-          confirmLabel="Reset"
-          tone="warning"
-          onConfirm={() => { persist(defaultConfig); setConfirmReset(false); toast('Settings reset to defaults', 'info'); }}
-          onCancel={() => setConfirmReset(false)}
-        />
+        <Modal open title={"Reset checkout settings"} onClose={() => setConfirmReset(false)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setConfirmReset(false)}>Cancel</button><button className="btn btn-warning btn-sm" onClick={() => { persist(defaultConfig); setConfirmReset(false); toast('Settings reset to defaults', { tone: 'info' }); }}>Reset</button></>}><p className="small mb-0">Restore all checkout settings to defaults? Your current customization will be lost.</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

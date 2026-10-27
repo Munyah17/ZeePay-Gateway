@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast } from '@/components/ui';
 
 interface ProviderHealth {
   id: string;
@@ -21,6 +21,7 @@ interface ProviderHealth {
 
 export default function ProviderHealth() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewing, setViewing] = useState<ProviderHealth | null>(null);
@@ -192,8 +193,8 @@ export default function ProviderHealth() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Provider Health</h2>
         <p className="text-muted">Monitor provider uptime, response times, and incidents</p>
       </div>
@@ -413,7 +414,7 @@ export default function ProviderHealth() {
                     className="btn btn-outline-primary w-100"
                     onClick={() => {
                       setRefreshing(true);
-                      setTimeout(() => { setRefreshing(false); toast('Health check complete — all providers responding', 'success'); }, 1200);
+                      setTimeout(() => { setRefreshing(false); toast('Health check complete — all providers responding'); }, 1200);
                     }}
                     disabled={refreshing}
                   >
@@ -441,7 +442,7 @@ export default function ProviderHealth() {
 
       {/* Provider detail modal */}
       {viewing && (
-        <Modal title={viewing.name} onClose={() => setViewing(null)}>
+        <Modal open title={viewing.name} onClose={() => setViewing(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Type</span>
@@ -477,7 +478,7 @@ export default function ProviderHealth() {
 
       {/* Alert config modal */}
       {alertConfig && (
-        <Modal
+        <Modal open 
           title="Configure Alerts"
           onClose={() => setAlertConfig(false)}
           footer={
@@ -503,6 +504,6 @@ export default function ProviderHealth() {
           ))}
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

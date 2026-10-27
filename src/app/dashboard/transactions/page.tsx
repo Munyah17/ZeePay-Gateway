@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Modal, ToastProvider, toast } from '@/components/ui';
-import { downloadCSV, downloadJSON } from '@/utils/actions';
+import { Modal, useToast } from '@/components/ui';
+import { exportCSV, exportJSON } from '@/lib/export';
 
 interface Transaction {
   id: string;
@@ -15,6 +15,7 @@ interface Transaction {
 }
 
 export default function TransactionsPage() {
+  const toast = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -59,7 +60,7 @@ export default function TransactionsPage() {
   const pageRows = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const exportCsv = () => {
-    downloadCSV(
+    exportCSV(
       'transactions',
       visible.map((t) => ({
         reference: t.reference,
@@ -87,8 +88,8 @@ export default function TransactionsPage() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Transactions</h2>
         <p className="text-muted">View and manage your payment transactions</p>
       </div>
@@ -175,7 +176,7 @@ export default function TransactionsPage() {
                             className="btn btn-outline-secondary"
                             title="Download receipt"
                             onClick={() => {
-                              downloadJSON(`receipt-${tx.reference}`, tx);
+                              exportJSON(`receipt-${tx.reference}`, tx);
                               toast(`Receipt ${tx.reference} downloaded`);
                             }}
                           >
@@ -215,7 +216,7 @@ export default function TransactionsPage() {
       </div>
 
       {viewing && (
-        <Modal title={`Transaction ${viewing.reference}`} onClose={() => setViewing(null)}>
+        <Modal open title={`Transaction ${viewing.reference}`} onClose={() => setViewing(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Reference</span>
@@ -236,6 +237,6 @@ export default function TransactionsPage() {
           </ul>
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

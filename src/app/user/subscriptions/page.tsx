@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast } from '@/components/ui';
 
 interface UserSubscription {
   id: string;
@@ -20,6 +20,7 @@ interface UserSubscription {
 
 export default function UserSubscriptionsPage() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [cancelTarget, setCancelTarget] = useState<UserSubscription | null>(null);
@@ -92,14 +93,14 @@ export default function UserSubscriptionsPage() {
       subs.map((s) => (s.id === id ? { ...s, status: 'cancelled', nextDebit: '—' } : s))
     );
     setCancelTarget(null);
-    toast('Auto-deduct stopped', 'info');
+    toast('Auto-deduct stopped', { tone: 'info' });
   };
 
   const pauseSubscription = (sub: UserSubscription) => {
     setSubscriptions((subs) =>
       subs.map((s) => (s.id === sub.id ? { ...s, status: 'paused', nextDebit: 'Paused' } : s))
     );
-    toast(`${sub.merchant} auto-deduct paused`, 'info');
+    toast(`${sub.merchant} auto-deduct paused`, { tone: 'info' });
   };
 
   const resumeSubscription = (sub: UserSubscription) => {
@@ -126,8 +127,8 @@ export default function UserSubscriptionsPage() {
     .reduce((sum, s) => sum + s.amount, 0);
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4 mb-1">Subscriptions & Auto-Deduct</h2>
         <p className="text-muted mb-0">Merchants you've authorized to debit you automatically</p>
       </div>
@@ -232,7 +233,7 @@ export default function UserSubscriptionsPage() {
                           className="btn btn-sm btn-outline-primary flex-fill"
                           onClick={() => {
                             resumeSubscription(sub);
-                            toast(`${sub.merchant} re-subscribed`, 'success');
+                            toast(`${sub.merchant} re-subscribed`);
                           }}
                         >
                           Re-subscribe
@@ -256,15 +257,8 @@ export default function UserSubscriptionsPage() {
       )}
 
       {cancelTarget && (
-        <ConfirmDialog
-          title="Stop auto-deduct"
-          message={`Stop automatic payments to ${cancelTarget.merchant} (${cancelTarget.currency} ${cancelTarget.amount.toFixed(2)}/${cancelTarget.interval})? You can re-subscribe later.`}
-          confirmLabel="Stop auto-deduct"
-          tone="danger"
-          onConfirm={() => cancelSubscription(cancelTarget.id)}
-          onCancel={() => setCancelTarget(null)}
-        />
+        <Modal open title={"Stop auto-deduct"} onClose={() => setCancelTarget(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setCancelTarget(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={() => cancelSubscription(cancelTarget.id)}>Stop auto-deduct</button></>}><p className="small mb-0">{`Stop automatic payments to ${cancelTarget.merchant} (${cancelTarget.currency} ${cancelTarget.amount.toFixed(2)}/${cancelTarget.interval})? You can re-subscribe later.`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

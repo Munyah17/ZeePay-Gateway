@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
-import { downloadCSV } from '@/utils/actions';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { exportCSV } from '@/lib/export';
 
 interface Refund {
   id: string;
@@ -16,6 +16,8 @@ interface Refund {
 
 export default function RefundsPage() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -51,7 +53,7 @@ export default function RefundsPage() {
   const createRefund = () => {
     const amount = parseFloat(form.amount);
     if (!amount || amount <= 0) {
-      toast('Enter a valid amount', 'warning');
+      toast('Enter a valid amount', { tone: 'warning' });
       return;
     }
     const refund: Refund = {
@@ -70,11 +72,11 @@ export default function RefundsPage() {
     if (!deleting) return;
     setRefunds((prev) => prev.filter((r) => r.id !== deleting.id));
     setDeleting(null);
-    toast('Refund record removed', 'info');
+    toast('Refund record removed', { tone: 'info' });
   };
 
   const exportCsv = () => {
-    downloadCSV(
+    exportCSV(
       'refunds',
       refunds.map((r) => ({ id: r.id, paymentId: r.paymentId, amount: `$${r.amount.toFixed(2)}`, status: r.status, date: r.date })),
     );
@@ -95,8 +97,8 @@ export default function RefundsPage() {
   };
 
   return (
-    <ToastProvider>
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <>
+    <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="h4 mb-0">Refunds</h2>
           <p className="text-muted small mb-0">Track and initiate refunds for supported payment providers</p>
@@ -264,7 +266,7 @@ export default function RefundsPage() {
       )}
 
       {viewing && (
-        <Modal title={`Refund ${viewing.id}`} onClose={() => setViewing(null)}>
+        <Modal open title={`Refund ${viewing.id}`} onClose={() => setViewing(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Refund ID</span>
@@ -291,15 +293,8 @@ export default function RefundsPage() {
       )}
 
       {deleting && (
-        <ConfirmDialog
-          title="Remove refund record"
-          message={`Remove ${deleting.id} ($${deleting.amount.toFixed(2)}) from history?`}
-          confirmLabel="Remove"
-          tone="danger"
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleting(null)}
-        />
+        <Modal open title={"Remove refund record"} onClose={() => setDeleting(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setDeleting(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={confirmDelete}>Remove</button></>}><p className="small mb-0">{`Remove ${deleting.id} ($${deleting.amount.toFixed(2)}) from history?`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

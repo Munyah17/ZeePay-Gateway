@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
 import DataTable from '@/components/DataTable';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast, useConfirm, usePersistentState } from '@/components/ui';
 
 interface Subscription {
   id: string;
@@ -20,18 +20,78 @@ interface Subscription {
   failedAttempts: number;
 }
 
+const seedSubscriptions: Subscription[] = [
+  {
+    id: 'sub_8x21',
+    customer: 'Tendai Mukono',
+    method: 'EcoCash',
+    amount: 25.00,
+    currency: 'USD',
+    interval: 'monthly',
+    status: 'active',
+    nextBilling: '2024-02-01',
+    lastBilled: '2024-01-01',
+    failedAttempts: 0,
+  },
+  {
+    id: 'sub_8x22',
+    customer: 'Rutendo Dube',
+    method: 'Visa',
+    amount: 49.99,
+    currency: 'USD',
+    interval: 'monthly',
+    status: 'active',
+    nextBilling: '2024-02-05',
+    lastBilled: '2024-01-05',
+    failedAttempts: 0,
+  },
+  {
+    id: 'sub_8x23',
+    customer: 'Simba Chikafu',
+    method: 'InnBucks',
+    amount: 10.00,
+    currency: 'USD',
+    interval: 'weekly',
+    status: 'past_due',
+    nextBilling: '2024-01-20',
+    lastBilled: '2024-01-08',
+    failedAttempts: 1,
+  },
+  {
+    id: 'sub_8x24',
+    customer: 'Nyasha Karemba',
+    method: 'Omari',
+    amount: 99.00,
+    currency: 'USD',
+    interval: 'yearly',
+    status: 'pending',
+    nextBilling: '—',
+    lastBilled: '—',
+    failedAttempts: 0,
+  },
+  {
+    id: 'sub_8x25',
+    customer: 'Chipo Moyo',
+    method: 'EcoCash',
+    amount: 15.00,
+    currency: 'USD',
+    interval: 'monthly',
+    status: 'cancelled',
+    nextBilling: '—',
+    lastBilled: '2023-12-15',
+    failedAttempts: 3,
+  },
+];
+
 export default function SubscriptionsPage() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscriptions, persist] = usePersistentState<Subscription[]>('subscriptions', seedSubscriptions);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [cancelling, setCancelling] = useState<Subscription | null>(null);
   const [form, setForm] = useState({ customer: '', method: 'EcoCash', amount: '', interval: 'monthly' });
-
-  const persist = (next: Subscription[]) => {
-    setSubscriptions(next);
-    try { localStorage.setItem('zeepay_subscriptions', JSON.stringify(next)); } catch { /* noop */ }
-  };
 
   const updateStatus = (sub: Subscription, status: string, msg: string) => {
     persist(subscriptions.map((s) => (s.id === sub.id ? { ...s, status } : s)));
@@ -40,12 +100,12 @@ export default function SubscriptionsPage() {
 
   const createSubscription = () => {
     const amount = parseFloat(form.amount);
-    if (!form.customer.trim() || !amount || amount <= 0) {
-      toast('Customer and a valid amount are required', 'warning');
+    if (!form.customer.trim() || isNaN(amount) || amount <= 0) {
+      toast('Enter a customer name and a valid amount', { tone: 'warning' });
       return;
     }
     const sub: Subscription = {
-      id: `sub_${Math.random().toString(36).slice(2, 6)}`,
+      id: `sub_${Date.now().toString(36)}`,
       customer: form.customer.trim(),
       method: form.method,
       amount,
@@ -59,7 +119,7 @@ export default function SubscriptionsPage() {
     persist([sub, ...subscriptions]);
     setShowCreateModal(false);
     setForm({ customer: '', method: 'EcoCash', amount: '', interval: 'monthly' });
-    toast(`Mandate sent to ${sub.customer} for approval`);
+    toast(`Mandate sent to ${sub.customer} — awaiting approval`);
   };
 
   useEffect(() => {
@@ -71,74 +131,6 @@ export default function SubscriptionsPage() {
       }
     }
 
-    const seed: Subscription[] = [
-      {
-        id: 'sub_8x21',
-        customer: 'Tendai Mukono',
-        method: 'EcoCash',
-        amount: 25.00,
-        currency: 'USD',
-        interval: 'monthly',
-        status: 'active',
-        nextBilling: '2024-02-01',
-        lastBilled: '2024-01-01',
-        failedAttempts: 0,
-      },
-      {
-        id: 'sub_8x22',
-        customer: 'Rutendo Dube',
-        method: 'Visa',
-        amount: 49.99,
-        currency: 'USD',
-        interval: 'monthly',
-        status: 'active',
-        nextBilling: '2024-02-05',
-        lastBilled: '2024-01-05',
-        failedAttempts: 0,
-      },
-      {
-        id: 'sub_8x23',
-        customer: 'Simba Chikafu',
-        method: 'InnBucks',
-        amount: 10.00,
-        currency: 'USD',
-        interval: 'weekly',
-        status: 'past_due',
-        nextBilling: '2024-01-20',
-        lastBilled: '2024-01-08',
-        failedAttempts: 1,
-      },
-      {
-        id: 'sub_8x24',
-        customer: 'Nyasha Karemba',
-        method: 'Omari',
-        amount: 99.00,
-        currency: 'USD',
-        interval: 'yearly',
-        status: 'pending',
-        nextBilling: '—',
-        lastBilled: '—',
-        failedAttempts: 0,
-      },
-      {
-        id: 'sub_8x25',
-        customer: 'Chipo Moyo',
-        method: 'EcoCash',
-        amount: 15.00,
-        currency: 'USD',
-        interval: 'monthly',
-        status: 'cancelled',
-        nextBilling: '—',
-        lastBilled: '2023-12-15',
-        failedAttempts: 3,
-      },
-    ];
-    try {
-      const saved = localStorage.getItem('zeepay_subscriptions');
-      setSubscriptions(saved ? JSON.parse(saved) : seed);
-    } catch {
-      setSubscriptions(seed);
-    }
     setLoading(false);
   }, [router]);
 
@@ -169,7 +161,7 @@ export default function SubscriptionsPage() {
   ];
 
   return (
-    <ToastProvider>
+    <>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="h4 mb-1">Subscriptions</h2>
@@ -351,7 +343,7 @@ export default function SubscriptionsPage() {
 
       {/* Create subscription modal */}
       {showCreateModal && (
-        <Modal
+        <Modal open 
           title="New Subscription"
           onClose={() => setShowCreateModal(false)}
           footer={
@@ -417,18 +409,11 @@ export default function SubscriptionsPage() {
 
       {/* Cancel confirm */}
       {cancelling && (
-        <ConfirmDialog
-          title="Cancel subscription"
-          message={`Cancel ${cancelling.id} for ${cancelling.customer}? The mandate will be revoked and no further debits will occur.`}
-          confirmLabel="Cancel subscription"
-          tone="danger"
-          onConfirm={() => {
+        <Modal open title={"Cancel subscription"} onClose={() => setCancelling(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setCancelling(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={() => {
             updateStatus(cancelling, 'cancelled', `${cancelling.id} cancelled`);
             setCancelling(null);
-          }}
-          onCancel={() => setCancelling(null)}
-        />
+          }}>Cancel subscription</button></>}><p className="small mb-0">{`Cancel ${cancelling.id} for ${cancelling.customer}? The mandate will be revoked and no further debits will occur.`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Modal, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast } from '@/components/ui';
 
 interface Provider {
   name: string;
@@ -15,6 +15,7 @@ interface Provider {
 
 export default function AdminProvidersPage() {
   const router = useRouter();
+  const toast = useToast();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
@@ -34,7 +35,7 @@ export default function AdminProvidersPage() {
         ),
       );
       setChecking(false);
-      toast('Health checks complete', 'info');
+      toast('Health checks complete', { tone: 'info' });
     }, 1200);
   };
 
@@ -43,18 +44,18 @@ export default function AdminProvidersPage() {
     setTimeout(() => {
       setTesting(null);
       if (p.status === 'Connected') {
-        toast(`${p.name}: connectivity check passed`, 'success');
+        toast(`${p.name}: connectivity check passed`);
       } else if (p.status === 'Sandbox') {
-        toast(`${p.name}: sandbox credentials verified`, 'info');
+        toast(`${p.name}: sandbox credentials verified`, { tone: 'info' });
       } else {
-        toast(`${p.name}: no credentials configured`, 'warning');
+        toast(`${p.name}: no credentials configured`, { tone: 'warning' });
       }
     }, 800);
   };
 
   const addProvider = () => {
     if (!addForm.name.trim()) {
-      toast('Provider name required', 'warning');
+      toast('Provider name required', { tone: 'warning' });
       return;
     }
     setProviders((prev) => [
@@ -117,7 +118,6 @@ export default function AdminProvidersPage() {
   };
 
   return (
-    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -227,7 +227,7 @@ export default function AdminProvidersPage() {
 
       {/* Configure modal */}
       {configuring && (
-        <Modal title={`Configure ${configuring.name}`} onClose={() => setConfiguring(null)}>
+        <Modal open title={`Configure ${configuring.name}`} onClose={() => setConfiguring(null)}>
           <div className="mb-3">
             <label className="form-label small">Status</label>
             <select
@@ -237,7 +237,7 @@ export default function AdminProvidersPage() {
                 const status = e.target.value;
                 setProviders((prev) => prev.map((p) => (p.name === configuring.name ? { ...p, status } : p)));
                 setConfiguring({ ...configuring, status });
-                toast(`${configuring.name} status → ${status}`, 'info');
+                toast(`${configuring.name} status → ${status}`, { tone: 'info' });
               }}
             >
               <option>Connected</option>
@@ -260,7 +260,7 @@ export default function AdminProvidersPage() {
 
       {/* Add provider modal */}
       {showAdd && (
-        <Modal
+        <Modal open 
           title="Add provider"
           onClose={() => setShowAdd(false)}
           footer={
@@ -295,6 +295,5 @@ export default function AdminProvidersPage() {
         </Modal>
       )}
     </div>
-    </ToastProvider>
   );
 }

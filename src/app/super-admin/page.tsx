@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Modal, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast } from '@/components/ui';
 
 const strategicAlerts = [
   { id: 'SA-1', alert: 'Omari provider experiencing intermittent delays', category: 'Infrastructure', severity: 'Medium', severityClass: 'bg-warning text-dark', date: '2 hours ago', status: 'Monitoring', statusClass: 'bg-secondary' },
@@ -13,6 +13,7 @@ const strategicAlerts = [
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState<typeof strategicAlerts[number] | null>(null);
 
@@ -28,8 +29,8 @@ export default function SuperAdminDashboard() {
   }, [router]);
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Executive Overview</h2>
         <p className="text-muted">High-level platform metrics and strategic insights</p>
       </div>
@@ -261,7 +262,7 @@ export default function SuperAdminDashboard() {
       )}
 
       {viewing && (
-        <Modal title={`${viewing.id} — ${viewing.category}`} onClose={() => setViewing(null)}>
+        <Modal open title={`${viewing.id} — ${viewing.category}`} onClose={() => setViewing(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item px-0">
               <p className="small text-muted mb-1">Alert</p>
@@ -282,12 +283,12 @@ export default function SuperAdminDashboard() {
           </ul>
           <button
             className="btn btn-outline-primary btn-sm w-100 mt-3"
-            onClick={() => { setViewing(null); toast(`${viewing.id} acknowledged`, 'info'); }}
+            onClick={() => { setViewing(null); toast(`${viewing.id} acknowledged`, { tone: 'info' }); }}
           >
             Acknowledge
           </button>
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

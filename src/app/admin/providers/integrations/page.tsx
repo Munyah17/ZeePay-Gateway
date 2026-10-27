@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ToastProvider, toast } from '@/components/ui';
-import { copyToClipboard, downloadCSV } from '@/utils/actions';
+import { Modal, useToast } from '@/components/ui';
+import { copyToClipboard, exportCSV } from '@/lib/export';
 
 interface Integration {
   id: string;
@@ -24,6 +24,7 @@ interface Integration {
 
 export default function IntegrationManager() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [integrationList, setIntegrationList] = useState<Integration[]>([]);
   const [configuring, setConfiguring] = useState<Integration | null>(null);
@@ -61,7 +62,7 @@ export default function IntegrationManager() {
 
   const addIntegration = () => {
     if (!addForm.provider.trim()) {
-      toast('Provider name required', 'warning');
+      toast('Provider name required', { tone: 'warning' });
       return;
     }
     const item: Integration = {
@@ -205,8 +206,8 @@ export default function IntegrationManager() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Integration Manager</h2>
         <p className="text-muted">Configure and manage provider integrations, credentials, and test environments</p>
       </div>
@@ -351,7 +352,7 @@ export default function IntegrationManager() {
                                       onClick={() => {
                                         setIntegrationList((prev) => prev.map((x) => (x.id === integration.id ? { ...x, status: x.status === 'Disconnected' ? 'Connected' : 'Disconnected' } : x)));
                                         setMenuFor(null);
-                                        toast(`${integration.provider} ${integration.status === 'Disconnected' ? 'reconnected' : 'disconnected'}`, 'info');
+                                        toast(`${integration.provider} ${integration.status === 'Disconnected' ? 'reconnected' : 'disconnected'}`, { tone: 'info' });
                                       }}
                                     >
                                       {integration.status === 'Disconnected' ? 'Reconnect' : 'Disconnect'}
@@ -429,7 +430,7 @@ export default function IntegrationManager() {
                       disabled={rotating}
                       onClick={() => {
                         setRotating(true);
-                        setTimeout(() => { setRotating(false); toast('Credentials rotated — update your integrations', 'info'); }, 1000);
+                        setTimeout(() => { setRotating(false); toast('Credentials rotated — update your integrations', { tone: 'info' }); }, 1000);
                       }}
                     >
                       <i className="bi bi-arrow-repeat me-1"></i>
@@ -607,7 +608,7 @@ export default function IntegrationManager() {
                     disabled={runningAll}
                     onClick={() => {
                       setRunningAll(true);
-                      setTimeout(() => { setRunningAll(false); toast('All integration tests complete', 'success'); }, 2000);
+                      setTimeout(() => { setRunningAll(false); toast('All integration tests complete'); }, 2000);
                     }}
                   >
                     <i className="bi bi-play-circle me-2"></i>
@@ -618,7 +619,7 @@ export default function IntegrationManager() {
                   <button
                     className="btn btn-outline-primary w-100"
                     onClick={() => {
-                      downloadCSV('integration-tests', integrationList.map((i) => ({
+                      exportCSV('integration-tests', integrationList.map((i) => ({
                         provider: i.provider, environment: i.environment, status: i.status,
                         testResult: i.testResult, lastTest: i.lastTest, apiVersion: i.apiVersion,
                       })));
@@ -646,7 +647,7 @@ export default function IntegrationManager() {
 
       {/* Configure modal */}
       {configuring && (
-        <Modal title={`Configure ${configuring.provider}`} onClose={() => setConfiguring(null)}>
+        <Modal open title={`Configure ${configuring.provider}`} onClose={() => setConfiguring(null)}>
           <ul className="list-group list-group-flush mb-3">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Webhook URL</span>
@@ -670,7 +671,7 @@ export default function IntegrationManager() {
                 const environment = e.target.value;
                 setIntegrationList((prev) => prev.map((x) => (x.id === configuring.id ? { ...x, environment } : x)));
                 setConfiguring({ ...configuring, environment });
-                toast(`${configuring.provider} → ${environment}`, 'info');
+                toast(`${configuring.provider} → ${environment}`, { tone: 'info' });
               }}
             >
               <option>Production</option>
@@ -682,7 +683,7 @@ export default function IntegrationManager() {
 
       {/* Add integration modal */}
       {showAdd && (
-        <Modal
+        <Modal open 
           title="Add Integration"
           onClose={() => setShowAdd(false)}
           footer={
@@ -732,7 +733,7 @@ export default function IntegrationManager() {
 
       {/* Certification report modal */}
       {viewingReport && (
-        <Modal title={`${viewingReport} Test Report`} onClose={() => setViewingReport(null)} size="lg">
+        <Modal open title={`${viewingReport} Test Report`} onClose={() => setViewingReport(null)} size="lg">
           <p className="small text-muted">Demo certification test summary</p>
           <table className="table table-sm mb-0">
             <thead><tr><th>Scenario</th><th>Result</th></tr></thead>
@@ -746,6 +747,6 @@ export default function IntegrationManager() {
           </table>
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

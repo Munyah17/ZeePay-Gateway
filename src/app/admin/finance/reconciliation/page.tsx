@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ToastProvider, toast } from '@/components/ui';
-import { downloadCSV } from '@/utils/actions';
+import { Modal, useToast } from '@/components/ui';
+import { exportCSV } from '@/lib/export';
 
 interface Batch {
   id: string;
@@ -38,6 +38,7 @@ interface UnmatchedTx {
 
 export default function ReconciliationWorkbench() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -81,7 +82,7 @@ export default function ReconciliationWorkbench() {
         setBatches((prev) => prev.map((b) => (b.id === batch.id ? { ...b, status: 'Reconciled', actualAmount: b.expectedAmount, discrepancy: 0 } : b)));
         toast(`${batch.batchNumber} reconciled`);
       } else {
-        toast(`Reconciliation re-run for ${batch.batchNumber}`, 'info');
+        toast(`Reconciliation re-run for ${batch.batchNumber}`, { tone: 'info' });
       }
     }, 1200);
   };
@@ -217,8 +218,8 @@ export default function ReconciliationWorkbench() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Reconciliation Workbench</h2>
         <p className="text-muted">Compare provider settlements with ZeePay records and resolve discrepancies</p>
       </div>
@@ -450,7 +451,7 @@ export default function ReconciliationWorkbench() {
                           <button
                             className="btn btn-outline-primary"
                             onClick={() => {
-                              downloadCSV(`statement-${batch.batchNumber}`, [
+                              exportCSV(`statement-${batch.batchNumber}`, [
                                 { field: 'Gross', amount: batch.expectedAmount },
                                 { field: 'Fees', amount: -batch.feeAmount },
                                 { field: 'Refunds', amount: -batch.refundAmount },
@@ -575,7 +576,7 @@ export default function ReconciliationWorkbench() {
                       setTimeout(() => {
                         setBatches((prev) => prev.map((b) => (b.status === 'Pending' ? { ...b, status: 'Reconciled', actualAmount: b.expectedAmount, discrepancy: 0 } : b)));
                         setReconciling(false);
-                        toast('Auto-reconciliation complete — pending batches matched', 'success');
+                        toast('Auto-reconciliation complete — pending batches matched');
                       }, 1500);
                     }}
                   >
@@ -587,7 +588,7 @@ export default function ReconciliationWorkbench() {
                   <button
                     className="btn btn-outline-primary w-100"
                     onClick={() => {
-                      downloadCSV('reconciliation-report', batches.map((b) => ({
+                      exportCSV('reconciliation-report', batches.map((b) => ({
                         batch: b.batchNumber, provider: b.provider, expected: b.expectedAmount,
                         actual: b.actualAmount ?? '', discrepancy: b.discrepancy ?? '', status: b.status,
                       })));
@@ -612,7 +613,7 @@ export default function ReconciliationWorkbench() {
 
       {/* Investigate modal */}
       {investigating && (
-        <Modal title={`Investigate ${investigating.transactionId}`} onClose={() => setInvestigating(null)}>
+        <Modal open title={`Investigate ${investigating.transactionId}`} onClose={() => setInvestigating(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Provider</span>
@@ -641,14 +642,14 @@ export default function ReconciliationWorkbench() {
               onClick={() => {
                 setUnmatched((prev) => prev.filter((t) => t.id !== investigating.id));
                 setInvestigating(null);
-                toast('Transaction marked resolved', 'success');
+                toast('Transaction marked resolved');
               }}
             >
               Resolve
             </button>
             <button
               className="btn btn-outline-secondary btn-sm flex-grow-1"
-              onClick={() => { setInvestigating(null); toast('Flagged for follow-up', 'info'); }}
+              onClick={() => { setInvestigating(null); toast('Flagged for follow-up', { tone: 'info' }); }}
             >
               Flag for follow-up
             </button>
@@ -658,7 +659,7 @@ export default function ReconciliationWorkbench() {
 
       {/* Import statement modal */}
       {showImport && (
-        <Modal
+        <Modal open 
           title="Import Provider Statement"
           onClose={() => setShowImport(false)}
           footer={
@@ -687,7 +688,7 @@ export default function ReconciliationWorkbench() {
 
       {/* Alerts modal */}
       {showAlerts && (
-        <Modal
+        <Modal open 
           title="Reconciliation Alerts"
           onClose={() => setShowAlerts(false)}
           footer={
@@ -705,6 +706,6 @@ export default function ReconciliationWorkbench() {
           ))}
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

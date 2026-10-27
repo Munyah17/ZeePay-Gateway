@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ToastProvider, toast } from '@/components/ui';
+import { useToast } from '@/components/ui';
+import { usePersistentState } from '@/components/ui';
 
 const defaultSettings = {
   platformName: 'ZeePay',
@@ -18,8 +19,9 @@ const defaultSettings = {
 
 export default function AdminSettingsPage() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState(defaultSettings);
+  const [settings, setSettings] = usePersistentState('admin_settings', defaultSettings);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -28,15 +30,11 @@ export default function AdminSettingsPage() {
       router.push('/auth/login');
       return;
     }
-    try {
-      const stored = localStorage.getItem('zeepay_admin_settings');
-      if (stored) setSettings({ ...defaultSettings, ...JSON.parse(stored) });
-    } catch { /* noop */ }
     setLoading(false);
   }, [router]);
 
   const save = () => {
-    try { localStorage.setItem('zeepay_admin_settings', JSON.stringify(settings)); } catch { /* noop */ }
+    setSettings(settings); // usePersistentState already persists on change
     setSaved(true);
     toast('Platform settings saved');
     setTimeout(() => setSaved(false), 2000);
@@ -49,7 +47,6 @@ export default function AdminSettingsPage() {
   };
 
   return (
-    <ToastProvider>
     <div className="min-h-screen bg-white">
       <nav className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -255,6 +252,5 @@ export default function AdminSettingsPage() {
         )}
       </main>
     </div>
-    </ToastProvider>
   );
 }

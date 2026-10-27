@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
-import { downloadJSON } from '@/utils/actions';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { usePersistentState } from '@/components/ui';
+import { exportJSON } from '@/lib/export';
 
 interface InvoiceItem { description: string; quantity: number; unitPrice: number }
 interface Invoice {
@@ -24,6 +25,8 @@ interface Invoice {
 
 export default function Invoices() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -43,12 +46,6 @@ export default function Invoices() {
         return;
       }
     }
-    try {
-      const saved = localStorage.getItem('zeepay_invoices');
-      setInvoices(saved ? JSON.parse(saved) : seedInvoices);
-    } catch {
-      setInvoices(seedInvoices);
-    }
     setLoading(false);
   }, [router]);
 
@@ -65,7 +62,7 @@ export default function Invoices() {
 
   const createInvoice = (asDraft: boolean) => {
     if (!form.name.trim() || !form.email.trim()) {
-      toast('Customer name and email are required', 'warning');
+      toast('Customer name and email are required', { tone: 'warning' });
       return;
     }
     const items = formItems.filter((i) => i.description.trim());
@@ -108,14 +105,14 @@ export default function Invoices() {
   const cancelInvoice = (inv: Invoice) => {
     persist(invoices.map((i) => (i.id === inv.id ? { ...i, status: 'Cancelled' } : i)));
     setMenuFor(null);
-    toast(`${inv.id} cancelled`, 'info');
+    toast(`${inv.id} cancelled`, { tone: 'info' });
   };
 
   const confirmDelete = () => {
     if (!deleting) return;
     persist(invoices.filter((i) => i.id !== deleting.id));
     setDeleting(null);
-    toast('Invoice deleted', 'info');
+    toast('Invoice deleted', { tone: 'info' });
   };
 
   const seedInvoices: Invoice[] = [
@@ -233,8 +230,8 @@ export default function Invoices() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Invoices</h2>
         <p className="text-muted">Create and manage invoices for your customers</p>
       </div>
@@ -392,7 +389,7 @@ export default function Invoices() {
                                   <li>
                                     <button
                                       className="dropdown-item small"
-                                      onClick={() => { downloadJSON(`invoice-${invoice.id}`, invoice); setMenuFor(null); toast('Invoice downloaded'); }}
+                                      onClick={() => { exportJSON(`invoice-${invoice.id}`, invoice); setMenuFor(null); toast('Invoice downloaded'); }}
                                     >
                                       <i className="bi bi-download me-2"></i>Download
                                     </button>
@@ -582,7 +579,7 @@ export default function Invoices() {
           <div className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="card-title mb-0">Invoice Templates</h5>
-              <button className="btn btn-sm btn-outline-primary" onClick={() => toast('Template builder coming soon — create an invoice and reuse it', 'info')}>
+              <button className="btn btn-sm btn-outline-primary" onClick={() => toast('Template builder coming soon — create an invoice and reuse it', { tone: 'info' })}>
                 <i className="bi bi-plus-circle me-1"></i>
                 Create Template
               </button>
@@ -621,7 +618,7 @@ export default function Invoices() {
           </div>
           {/* View invoice modal */}
           {viewing && (
-            <Modal title={`Invoice ${viewing.id}`} onClose={() => setViewing(null)} size="lg">
+            <Modal open title={`Invoice ${viewing.id}`} onClose={() => setViewing(null)} size="lg">
               <div className="d-flex justify-content-between mb-3">
                 <div>
                   <p className="small text-muted mb-0">Bill to</p>
@@ -659,17 +656,10 @@ export default function Invoices() {
 
           {/* Delete confirm */}
           {deleting && (
-            <ConfirmDialog
-              title="Delete invoice"
-              message={`Delete invoice ${deleting.id} for ${deleting.customer.name}? This cannot be undone.`}
-              confirmLabel="Delete"
-              tone="danger"
-              onConfirm={confirmDelete}
-              onCancel={() => setDeleting(null)}
-            />
+            <Modal open title={"Delete invoice"} onClose={() => setDeleting(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setDeleting(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={confirmDelete}>Delete</button></>}><p className="small mb-0">{`Delete invoice ${deleting.id} for ${deleting.customer.name}? This cannot be undone.`}</p></Modal>
           )}
         </>
       )}
-    </ToastProvider>
+    </>
   );
 }

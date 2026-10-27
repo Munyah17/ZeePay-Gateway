@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ConfirmDialog, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast, useConfirm } from '@/components/ui';
+import { usePersistentState } from '@/components/ui';
 
 interface Card {
   id: string;
@@ -22,6 +23,8 @@ interface Card {
 
 export default function Cards() {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [cards, setCards] = useState<Card[]>([]);
@@ -42,12 +45,6 @@ export default function Cards() {
         router.push('/auth/login');
         return;
       }
-    }
-    try {
-      const saved = localStorage.getItem('zeepay_user_cards');
-      setCards(saved ? JSON.parse(saved) : seedCards);
-    } catch {
-      setCards(seedCards);
     }
     setLoading(false);
   }, [router]);
@@ -89,7 +86,7 @@ export default function Cards() {
     if (!removing) return;
     persist(cards.filter((c) => c.id !== removing.id));
     setRemoving(null);
-    toast('Card removed', 'info');
+    toast('Card removed', { tone: 'info' });
   };
 
   const seedCards: Card[] = [
@@ -153,8 +150,8 @@ export default function Cards() {
   };
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">My Cards</h2>
         <p className="text-muted">Manage your payment cards and wallets</p>
       </div>
@@ -423,7 +420,7 @@ export default function Cards() {
                     onClick={() => {
                       const def = cards.find((c) => c.isDefault) || cards[0];
                       if (def) setLockConfirm(def);
-                      else toast('No cards to lock', 'info');
+                      else toast('No cards to lock', { tone: 'info' });
                     }}
                   >
                     <i className="bi bi-lock me-2"></i>
@@ -436,7 +433,7 @@ export default function Cards() {
                     onClick={() => {
                       const def = cards.find((c) => c.isDefault) || cards[0];
                       if (def) setManaging(def);
-                      else toast('No cards to manage', 'info');
+                      else toast('No cards to manage', { tone: 'info' });
                     }}
                   >
                     <i className="bi bi-gear me-2"></i>
@@ -457,7 +454,7 @@ export default function Cards() {
 
       {/* Card details modal */}
       {managing && (
-        <Modal title={`${managing.type} •••• ${managing.last4}`} onClose={() => setManaging(null)}>
+        <Modal open title={`${managing.type} •••• ${managing.last4}`} onClose={() => setManaging(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Holder</span>
@@ -497,27 +494,13 @@ export default function Cards() {
 
       {/* Lock confirm */}
       {lockConfirm && (
-        <ConfirmDialog
-          title={lockConfirm.status === 'Blocked' ? 'Unlock card' : 'Lock card'}
-          message={`${lockConfirm.status === 'Blocked' ? 'Unlock' : 'Lock'} ${lockConfirm.type} •••• ${lockConfirm.last4}? ${lockConfirm.status === 'Blocked' ? '' : 'It cannot be used for payments while locked.'}`}
-          confirmLabel={lockConfirm.status === 'Blocked' ? 'Unlock' : 'Lock'}
-          tone="warning"
-          onConfirm={() => toggleLock(lockConfirm)}
-          onCancel={() => setLockConfirm(null)}
-        />
+        <Modal open title={lockConfirm.status === 'Blocked' ? 'Unlock card' : 'Lock card'} onClose={() => setLockConfirm(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setLockConfirm(null)}>Cancel</button><button className="btn btn-warning btn-sm" onClick={() => toggleLock(lockConfirm)}>{lockConfirm.status === 'Blocked' ? 'Unlock' : 'Lock'}</button></>}><p className="small mb-0">{`${lockConfirm.status === 'Blocked' ? 'Unlock' : 'Lock'} ${lockConfirm.type} •••• ${lockConfirm.last4}? ${lockConfirm.status === 'Blocked' ? '' : 'It cannot be used for payments while locked.'}`}</p></Modal>
       )}
 
       {/* Remove confirm */}
       {removing && (
-        <ConfirmDialog
-          title="Remove card"
-          message={`Remove ${removing.type} •••• ${removing.last4} from your account?`}
-          confirmLabel="Remove"
-          tone="danger"
-          onConfirm={confirmRemove}
-          onCancel={() => setRemoving(null)}
-        />
+        <Modal open title={"Remove card"} onClose={() => setRemoving(null)} size="sm" footer={<><button className="btn btn-light btn-sm" onClick={() => setRemoving(null)}>Cancel</button><button className="btn btn-danger btn-sm" onClick={confirmRemove}>Remove</button></>}><p className="small mb-0">{`Remove ${removing.type} •••• ${removing.last4} from your account?`}</p></Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }

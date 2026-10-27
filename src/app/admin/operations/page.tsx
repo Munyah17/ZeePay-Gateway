@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
-import { Modal, ToastProvider, toast } from '@/components/ui';
+import { Modal, useToast } from '@/components/ui';
 
 interface Task { task: string; priority: string; assigned: string; due: string }
 interface Alert { id: string; type: string; severity: string; message: string; time: string; status: string }
 
 export default function PaymentOperationsCentre() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [feedPaused, setFeedPaused] = useState(false);
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
@@ -147,8 +148,8 @@ export default function PaymentOperationsCentre() {
   ];
 
   return (
-    <ToastProvider>
-      <div className="mb-4">
+    <>
+    <div className="mb-4">
         <h2 className="h4">Payment Operations Centre</h2>
         <p className="text-muted">Real-time operational overview and actionable insights</p>
       </div>
@@ -273,7 +274,7 @@ export default function PaymentOperationsCentre() {
                   className="btn btn-sm btn-outline-secondary"
                   onClick={() => {
                     setFeedPaused(!feedPaused);
-                    toast(feedPaused ? 'Live feed resumed' : 'Live feed paused', 'info');
+                    toast(feedPaused ? 'Live feed resumed' : 'Live feed paused', { tone: 'info' });
                   }}
                 >
                   <i className={`bi ${feedPaused ? 'bi-play' : 'bi-pause'} me-1`}></i>
@@ -380,7 +381,7 @@ export default function PaymentOperationsCentre() {
 
       {/* Task detail modal */}
       {viewingTask && (
-        <Modal title={viewingTask.task} onClose={() => setViewingTask(null)}>
+        <Modal open title={viewingTask.task} onClose={() => setViewingTask(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between px-0">
               <span className="small text-muted">Priority</span>
@@ -406,7 +407,7 @@ export default function PaymentOperationsCentre() {
 
       {/* Alert detail modal */}
       {viewingAlert && (
-        <Modal title={`${viewingAlert.id} — ${viewingAlert.type}`} onClose={() => setViewingAlert(null)}>
+        <Modal open title={`${viewingAlert.id} — ${viewingAlert.type}`} onClose={() => setViewingAlert(null)}>
           <ul className="list-group list-group-flush">
             <li className="list-group-item px-0">
               <p className="small text-muted mb-1">Message</p>
@@ -427,12 +428,12 @@ export default function PaymentOperationsCentre() {
           </ul>
           <button
             className="btn btn-outline-primary btn-sm w-100 mt-3"
-            onClick={() => { setViewingAlert(null); toast(`${viewingAlert.id} acknowledged`, 'info'); }}
+            onClick={() => { setViewingAlert(null); toast(`${viewingAlert.id} acknowledged`, { tone: 'info' }); }}
           >
             Acknowledge alert
           </button>
         </Modal>
       )}
-    </ToastProvider>
+    </>
   );
 }
