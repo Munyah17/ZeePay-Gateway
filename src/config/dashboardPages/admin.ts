@@ -1110,4 +1110,243 @@ export const adminPageConfigs: Record<string, PageConfig> = {
       filterLabel: 'All severities',
     },
   },
+
+  'admin/sms': {
+    title: 'SMS Gateway',
+    description: 'Bulk SMS and transactional messaging via HTTP gateways and SMPP binds',
+    icon: 'bi-chat-square-text',
+    stats: [
+      { label: 'Messages (24h)', value: '48,210', tone: 'success' },
+      { label: 'Delivery Rate (24h)', value: '96.8%' },
+      { label: 'Failed (24h)', value: 612, tone: 'danger' },
+      { label: 'Active Gateways', value: 3 },
+    ],
+    alert: { tone: 'info', message: 'SMPP delivery receipts require a persistent bind worker — the API submits per-send and cannot receive deliver_sm on serverless deployments.' },
+    panels: [
+      {
+        title: 'Gateway Status',
+        items: [
+          { label: 'SMS HTTP Gateway (sms-http)', badge: 'Active' },
+          { label: 'SMPP Bind — smpp://smsc.aggregator.co.zw:2775', badge: 'Active' },
+          { label: 'Backup HTTP Gateway', badge: 'Inactive' },
+          { label: 'Delivery receipt polling', badge: 'Enabled' },
+        ],
+      },
+      {
+        title: 'Throughput',
+        items: [
+          { label: 'SMPP submits/sec', value: '30' },
+          { label: 'HTTP submits/sec', value: '100' },
+          { label: 'Per-merchant burst limit', value: '500/min' },
+          { label: 'Max recipients per batch', value: '10,000' },
+        ],
+      },
+    ],
+    table: {
+      title: 'Recent Messages',
+      columns: [
+        { key: 'id', label: 'Message ID' },
+        { key: 'merchant', label: 'Merchant' },
+        { key: 'recipient', label: 'Recipient' },
+        { key: 'gateway', label: 'Gateway' },
+        { key: 'senderId', label: 'Sender ID' },
+        { key: 'segments', label: 'Segments' },
+        { key: 'time', label: 'Time' },
+        { key: 'status', label: 'Status', badge: true },
+      ],
+      rows: [
+        { id: 'sms_9k2m1', merchant: 'Grace Store', recipient: '+263771234567', gateway: 'sms-http', senderId: 'ZEEPAY', segments: 1, time: '14:32:05', status: 'Delivered' },
+        { id: 'sms_9k2m2', merchant: 'Market Square', recipient: '+263772345678', gateway: 'sms-smpp', senderId: 'MKT-SQL', segments: 1, time: '14:31:40', status: 'Delivered' },
+        { id: 'sms_9k2m3', merchant: 'Kuda Traders', recipient: '+263773456789', gateway: 'sms-smpp', senderId: 'KUDA', segments: 2, time: '14:30:12', status: 'Sent' },
+        { id: 'sms_9k2m4', merchant: 'Chitungwiza Mart', recipient: '+263774567890', gateway: 'sms-http', senderId: 'ZEEPAY', segments: 1, time: '14:29:55', status: 'Failed' },
+        { id: 'sms_9k2m5', merchant: 'Bulawayo Electronics', recipient: '+263775678901', gateway: 'sms-smpp', senderId: 'BYO-ELC', segments: 1, time: '14:28:30', status: 'Delivered' },
+        { id: 'sms_9k2m6', merchant: 'Grace Store', recipient: '+263776789012', gateway: 'sms-http', senderId: 'ZEEPAY', segments: 1, time: '14:27:14', status: 'Queued' },
+        { id: 'sms_9k2m7', merchant: 'Nyanga Tours', recipient: '+263777890123', gateway: 'sms-smpp', senderId: 'NYANGA', segments: 3, time: '14:26:02', status: 'Rejected' },
+      ],
+      searchableFields: ['id', 'merchant', 'recipient', 'senderId'],
+      filterKey: 'status',
+      filterLabel: 'All statuses',
+      actions: false,
+    },
+  },
+
+  'admin/sms/gateways': {
+    title: 'SMS Gateways',
+    description: 'Configured SMS aggregators — HTTP endpoints and SMPP binds used for message submission',
+    icon: 'bi-hdd-network',
+    stats: [
+      { label: 'Connected', value: 2, tone: 'success' },
+      { label: 'Standby', value: 1 },
+      { label: 'Avg. Submit Latency', value: '310ms' },
+      { label: 'Bind Uptime (7d)', value: '99.7%' },
+    ],
+    table: {
+      title: 'Gateway Connections',
+      columns: [
+        { key: 'name', label: 'Gateway' },
+        { key: 'transport', label: 'Transport' },
+        { key: 'endpoint', label: 'Endpoint / Host' },
+        { key: 'merchants', label: 'Merchants' },
+        { key: 'volume24h', label: 'Volume (24h)' },
+        { key: 'status', label: 'Status', badge: true },
+      ],
+      rows: [
+        { name: 'sms-http', transport: 'HTTP POST (JSON)', endpoint: 'https://gw.aggregator.co.zw/api/send', merchants: 214, volume24h: '31,200', status: 'Active' },
+        { name: 'sms-smpp', transport: 'SMPP v3.4 (transceiver)', endpoint: 'smsc.aggregator.co.zw:2775', merchants: 96, volume24h: '17,010', status: 'Active' },
+        { name: 'backup-http', transport: 'HTTP POST (form)', endpoint: 'https://backup.telecom.co.zw/sms', merchants: 0, volume24h: '0', status: 'Inactive' },
+      ],
+      searchableFields: ['name', 'endpoint', 'transport'],
+      filterKey: 'status',
+      filterLabel: 'All statuses',
+    },
+    panels: [
+      {
+        title: 'HTTP Gateway Defaults',
+        items: [
+          { label: 'Submit endpoint', value: 'https://gw.aggregator.co.zw/api/send' },
+          { label: 'Body format', value: 'JSON' },
+          { label: 'Auth method', value: 'Bearer token' },
+          { label: 'Request timeout', value: '15s' },
+          { label: 'Status polling', badge: 'Enabled' },
+        ],
+      },
+      {
+        title: 'SMPP Bind Settings',
+        items: [
+          { label: 'Bind mode', value: 'Transceiver' },
+          { label: 'System type', value: 'SMS' },
+          { label: 'Source TON/NPI', value: '5 / 0 (alphanumeric)' },
+          { label: 'Dest TON/NPI', value: '1 / 1 (international)' },
+          { label: 'Enquire link interval', value: '30s' },
+        ],
+      },
+    ],
+  },
+
+  'admin/sms/sender-ids': {
+    title: 'Sender IDs',
+    description: 'Registered alphanumeric sender IDs, short codes and long numbers for outbound SMS',
+    icon: 'bi-person-badge',
+    stats: [
+      { label: 'Registered IDs', value: 38 },
+      { label: 'Pending Registration', value: 4, tone: 'warning' },
+      { label: 'Rejected', value: 2, tone: 'danger' },
+      { label: 'Countries Covered', value: 3 },
+    ],
+    table: {
+      title: 'Sender ID Registry',
+      columns: [
+        { key: 'senderId', label: 'Sender ID' },
+        { key: 'type', label: 'Type' },
+        { key: 'merchant', label: 'Merchant' },
+        { key: 'country', label: 'Country' },
+        { key: 'registered', label: 'Registered' },
+        { key: 'status', label: 'Status', badge: true },
+      ],
+      rows: [
+        { senderId: 'ZEEPAY', type: 'Alphanumeric', merchant: 'Platform default', country: 'Zimbabwe', registered: '2023-11-02', status: 'Active' },
+        { senderId: 'MKT-SQL', type: 'Alphanumeric', merchant: 'Market Square', country: 'Zimbabwe', registered: '2024-01-05', status: 'Active' },
+        { senderId: 'BYO-ELC', type: 'Alphanumeric', merchant: 'Bulawayo Electronics', country: 'Zimbabwe', registered: '2024-01-08', status: 'Active' },
+        { senderId: 'KUDA', type: 'Alphanumeric', merchant: 'Kuda Traders', country: 'Zimbabwe', registered: '2024-01-12', status: 'Pending' },
+        { senderId: '40404', type: 'Short code', merchant: 'Platform default', country: 'Zimbabwe', registered: '2023-12-15', status: 'Active' },
+        { senderId: 'NYANGA', type: 'Alphanumeric', merchant: 'Nyanga Tours', country: 'Zimbabwe', registered: '2024-01-10', status: 'Rejected' },
+        { senderId: '+263771000000', type: 'Long number', merchant: 'Platform default', country: 'Zimbabwe', registered: '2023-11-02', status: 'Active' },
+      ],
+      searchableFields: ['senderId', 'merchant', 'country'],
+      filterKey: 'status',
+      filterLabel: 'All statuses',
+    },
+    panels: [
+      {
+        title: 'Sender ID Policy',
+        items: [
+          { label: 'Max length', value: '11 characters' },
+          { label: 'Registration required', badge: 'Enabled' },
+          { label: 'Allow unregistered senders', badge: 'Disabled' },
+          { label: 'Default fallback sender', value: 'ZEEPAY' },
+        ],
+      },
+      {
+        title: 'Registration SLA',
+        items: [
+          { label: 'Econet', value: '3–5 business days' },
+          { label: 'NetOne', value: '2–4 business days' },
+          { label: 'Telecel', value: '2–4 business days' },
+        ],
+      },
+    ],
+  },
+
+  'admin/sms/settings': {
+    title: 'SMS Settings',
+    description: 'Gateway behaviour — retries, throughput, sender policy, opt-out compliance and templates',
+    icon: 'bi-sliders',
+    stats: [
+      { label: 'Opt-outs (30d)', value: 214 },
+      { label: 'Opt-out Rate', value: '0.4%', tone: 'success' },
+      { label: 'Templates', value: 12 },
+      { label: 'Retry Success', value: '71%' },
+    ],
+    panels: [
+      {
+        title: 'Delivery & Retries',
+        items: [
+          { label: 'Max retry attempts', value: '3' },
+          { label: 'Retry backoff', value: 'Exponential (30s → 5m)' },
+          { label: 'DLR wait window', value: '72 hours' },
+          { label: 'Failover to backup gateway', badge: 'Enabled' },
+          { label: 'Concatenated SMS limit', value: '10 segments' },
+        ],
+      },
+      {
+        title: 'Rate Limits',
+        items: [
+          { label: 'Per-merchant limit', value: '500 msgs/min' },
+          { label: 'Per-recipient limit', value: '10 msgs/hour' },
+          { label: 'Max batch size', value: '10,000 recipients' },
+          { label: 'Duplicate suppression window', value: '24 hours' },
+        ],
+      },
+      {
+        title: 'Opt-Out & Compliance',
+        items: [
+          { label: 'STOP/UNSUBSCRIBE handling', badge: 'Enabled' },
+          { label: 'Auto-append opt-out text', badge: 'Disabled' },
+          { label: 'Quiet hours', value: '21:00 – 07:00 CAT' },
+          { label: 'Quiet hours enforcement', badge: 'Enabled' },
+          { label: 'Message retention', value: '90 days' },
+        ],
+      },
+      {
+        title: 'Webhook Events',
+        items: [
+          { label: 'sms.sent', badge: 'Enabled' },
+          { label: 'sms.delivered', badge: 'Enabled' },
+          { label: 'sms.failed', badge: 'Enabled' },
+          { label: 'sms.rejected', badge: 'Enabled' },
+          { label: 'sms.optout', badge: 'Enabled' },
+        ],
+      },
+    ],
+    table: {
+      title: 'Message Templates',
+      columns: [
+        { key: 'id', label: 'Template' },
+        { key: 'name', label: 'Name' },
+        { key: 'body', label: 'Body', sortable: false },
+        { key: 'usage24h', label: 'Uses (24h)' },
+        { key: 'status', label: 'Status', badge: true },
+      ],
+      rows: [
+        { id: 'tpl_01', name: 'Payment receipt', body: 'Payment of {{amount}} received. Ref {{reference}}', usage24h: '12,400', status: 'Active' },
+        { id: 'tpl_02', name: 'OTP verification', body: 'Your ZeePay code is {{code}}. Valid for 5 minutes.', usage24h: '8,310', status: 'Active' },
+        { id: 'tpl_03', name: 'Payout notification', body: 'Payout of {{amount}} sent to {{account}}. Ref {{reference}}', usage24h: '1,940', status: 'Active' },
+        { id: 'tpl_04', name: 'Subscription reminder', body: 'Your subscription renews on {{date}} for {{amount}}.', usage24h: '620', status: 'Active' },
+        { id: 'tpl_05', name: 'Marketing blast', body: '{{merchant}}: {{campaign_text}} Reply STOP to opt out.', usage24h: '24,900', status: 'Active' },
+      ],
+      searchableFields: ['name', 'body'],
+      filterKey: 'status',
+      filterLabel: 'All statuses',
+    },
+  },
 };

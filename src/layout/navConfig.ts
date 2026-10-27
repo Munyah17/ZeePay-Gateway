@@ -60,6 +60,16 @@ export const adminNavGroups: NavGroup[] = [
     ],
   },
   {
+    name: "Messaging",
+    icon: "bi-chat-square-text",
+    items: [
+      { name: "SMS Gateway", path: "/admin/sms", icon: "bi-chat-dots" },
+      { name: "Gateways", path: "/admin/sms/gateways", icon: "bi-hdd-network" },
+      { name: "Sender IDs", path: "/admin/sms/sender-ids", icon: "bi-person-badge" },
+      { name: "SMS Settings", path: "/admin/sms/settings", icon: "bi-sliders" },
+    ],
+  },
+  {
     name: "Payment Network",
     icon: "bi-diagram-3",
     items: [
