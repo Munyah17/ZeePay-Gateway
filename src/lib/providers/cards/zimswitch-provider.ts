@@ -144,6 +144,9 @@ export class ZimSwitchProvider extends BasePaymentProvider {
       // testMode: 'EXTERNAL' for UAT sandbox, omit for production
       ...(isTest ? { testMode: 'EXTERNAL' } : {}),
       ...(input.metadata?.paymentBrand ? { paymentBrand: input.metadata.paymentBrand } : {}),
+      // Shopper identity — links registrations/charges to the merchant's customer
+      ...(input.customerEmail ? { 'customer.email': input.customerEmail } : {}),
+      ...(input.metadata?.customerReference ? { merchantCustomerId: input.metadata.customerReference } : {}),
       ...(input.metadata?.createRegistration ? { createRegistration: 'true' } : {}),
       // shopperResultUrl is set on the paymentWidgets form (recommended pattern)
       // but can be sent here as fallback if needed via metadata

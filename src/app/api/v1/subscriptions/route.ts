@@ -7,11 +7,17 @@ import { z } from 'zod';
 const createSubscriptionSchema = z.object({
   merchantReference: z.string().min(1).max(255),
   description: z.string().max(500).optional(),
-  amount: z.number().positive(),
-  currency: z.string().length(3),
-  interval: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
+  // Optional when planId is supplied — resolved from the plan
+  amount: z.number().positive().optional(),
+  currency: z.string().length(3).optional(),
+  interval: z.enum(['daily', 'weekly', 'monthly', 'yearly']).optional(),
   intervalCount: z.number().int().positive().optional(),
-  methodCode: z.string().min(1),
+  planId: z.string().uuid().optional(),
+  // Bill against an already-tokenised saved payment method — skips the
+  // mandate approval step entirely (one authorisation covers all debits)
+  savedPaymentMethodId: z.string().uuid().optional(),
+  methodCode: z.string().min(1).optional(),
+  customerId: z.string().uuid().optional(),
   customerEmail: z.string().email().optional(),
   customerPhone: z.string().optional(),
   returnUrl: z.string().url().optional(),

@@ -9,14 +9,45 @@ export type SubscriptionStatus =
   | 'paused'       // Merchant paused billing
   | 'cancelled';   // Terminated (by merchant, customer, or retries exhausted)
 
-export interface CreateSubscriptionInput {
-  merchantReference: string;
+// --- Subscription plans (reusable billing templates) ---
+
+export interface CreatePlanInput {
+  name: string;
   description?: string;
   amount: number;
   currency: string;
   interval: BillingInterval;
   intervalCount?: number;
-  methodCode: string; // ecocash, innbucks, omari, visa, mastercard, mock
+  metadata?: Record<string, any>;
+}
+
+export interface SubscriptionPlanResponse {
+  id: string;
+  name: string;
+  description?: string;
+  amount: number;
+  currency: string;
+  interval: BillingInterval;
+  intervalCount: number;
+  isActive: boolean;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface CreateSubscriptionInput {
+  merchantReference: string;
+  description?: string;
+  // Optional when planId is supplied — values resolve from the plan
+  amount?: number;
+  currency?: string;
+  interval?: BillingInterval;
+  intervalCount?: number;
+  planId?: string; // subscribe the customer to an existing plan
+  // Subscribe using an already-tokenised payment method — skips the
+  // mandate approval step entirely (customer authorised once already)
+  savedPaymentMethodId?: string;
+  methodCode?: string; // ecocash, innbucks, omari, zimswitch, mock — optional with savedPaymentMethodId
+  customerId?: string;
   customerEmail?: string;
   customerPhone?: string;
   returnUrl?: string;
@@ -44,6 +75,8 @@ export interface SubscriptionResponse {
   lastBilledAt?: string;
   approvalUrl?: string;
   mandateId: string;
+  planId?: string;
+  savedPaymentMethodId?: string;
   createdAt: string;
 }
 

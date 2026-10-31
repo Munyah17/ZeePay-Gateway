@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiKey, isErrorResponse } from '@/lib/auth/middleware';
-import { createPayment, listPayments } from '@/lib/services/payment-service';
+import { createPayment, chargeSavedPaymentMethod, listPayments } from '@/lib/services/payment-service';
 import { z } from 'zod';
 
 // Validation schema for creating a payment
@@ -12,9 +12,17 @@ const createPaymentSchema = z.object({
   cancelUrl: z.string().url().optional(),
   customerEmail: z.string().email().optional(),
   customerPhone: z.string().optional(),
+  // Merchant's own customer id — get-or-creates a customer record and
+  // associates the payment with it
+  customerReference: z.string().min(1).max(255).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
   idempotencyKey: z.string().optional(),
   paymentMethodId: z.string().uuid().optional(),
+  // One-click: charge a previously tokenised payment method directly —
+  // no checkout redirect, customer authorises with a single click
+  savedPaymentMethodId: z.string().uuid().optional(),
+  // Request card tokenisation during this payment (createRegistration)
+  saveCardForReuse: z.boolean().optional(),
 });
 
 /**
@@ -44,6 +52,25 @@ export async function POST(request: NextRequest) {
   const input = validationResult.data;
 
   try {
+    // One-click payment — charge a tokenised saved method directly
+    if (input.savedPaymentMethodId) {
+      const payment = await chargeSavedPaymentMethod({
+        merchantId,
+        input: {
+          savedPaymentMethodId: input.savedPaymentMethodId,
+          amount: input.amount,
+          currency: input.currency,
+          reference: input.reference,
+          returnUrl: input.returnUrl,
+          customerEmail: input.customerEmail,
+          customerPhone: input.customerPhone,
+          metadata: input.metadata,
+          idempotencyKey: input.idempotencyKey,
+        },
+      });
+      return NextResponse.json(payment, { status: 201 });
+    }
+
     const payment = await createPayment({
       merchantId,
       input: {
@@ -54,10 +81,16 @@ export async function POST(request: NextRequest) {
         cancelUrl: input.cancelUrl,
         customerEmail: input.customerEmail,
         customerPhone: input.customerPhone,
-        metadata: input.metadata,
+        metadata: {
+          ...input.metadata,
+          // Card tokenisation during checkout (ZimSwitch: createRegistration)
+          ...(input.saveCardForReuse ? { createRegistration: true } : {}),
+          ...(input.customerReference ? { customerReference: input.customerReference } : {}),
+        },
       },
       idempotencyKey: input.idempotencyKey,
       paymentMethodId: input.paymentMethodId,
+      customerReference: input.customerReference,
     });
 
     return NextResponse.json(payment, { status: 201 });

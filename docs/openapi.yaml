@@ -723,6 +723,362 @@ paths:
               schema:
                 $ref: '#/components/schemas/WebhookDeliveryListResponse'
 
+  /customers:
+    post:
+      tags:
+        - Customers
+      summary: Create customer
+      description: Create a customer record, or return the existing one for the same externalReference (idempotent).
+      operationId: createCustomer
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '201':
+          description: Customer created or returned
+    get:
+      tags:
+        - Customers
+      summary: List customers
+      operationId: listCustomers
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: email
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of customers
+
+  /saved-payment-methods:
+    post:
+      tags:
+        - Saved Payment Methods
+      summary: Tokenise a payment method
+      description: |
+        Register a customer's card/wallet for reuse. For cards the response contains
+        `approvalUrl` — the customer enters card details once on the ZimSwitch-hosted
+        tokenisation widget (SAQ-A scope; raw PAN/CVV never touch ZeePay). Activate with
+        `POST /saved-payment-methods/{id}/activate` after the customer completes the flow.
+        Pass `paymentId` instead to claim the token created during an earlier card payment.
+      operationId: registerPaymentMethod
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterPaymentMethodRequest'
+      responses:
+        '201':
+          description: Saved payment method created (pending or active)
+    get:
+      tags:
+        - Saved Payment Methods
+      summary: List saved payment methods
+      operationId: listSavedPaymentMethods
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: customerEmail
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, revoked, failed]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of saved payment methods
+
+  /saved-payment-methods/{id}:
+    get:
+      tags:
+        - Saved Payment Methods
+      summary: Get a saved payment method
+      operationId: getSavedPaymentMethod
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Saved payment method
+        '404':
+          description: Not found
+    patch:
+      tags:
+        - Saved Payment Methods
+      summary: Update a saved payment method
+      description: Rename the label or set the method as the customer's default.
+      operationId: updateSavedPaymentMethod
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                setAsDefault:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated saved payment method
+    delete:
+      tags:
+        - Saved Payment Methods
+      summary: Remove a saved payment method
+      description: Revokes the provider token — no further merchant-initiated charges are possible.
+      operationId: removeSavedPaymentMethod
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment method revoked
+        '409':
+          description: In use by active subscriptions
+
+  /saved-payment-methods/{id}/activate:
+    post:
+      tags:
+        - Saved Payment Methods
+      summary: Activate a pending token
+      description: |
+        Finalise tokenisation after the customer completes the hosted flow
+        (ZimSwitch registration widget / 3DS / wallet approval). Resolves the
+        durable provider token (registrationId) from the checkout reference.
+      operationId: activateSavedPaymentMethod
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Activated saved payment method
+
+  /plans:
+    post:
+      tags:
+        - Plans
+      summary: Create a subscription plan
+      description: Create a reusable billing template (amount, currency, interval) customers subscribe to.
+      operationId: createPlan
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlanRequest'
+      responses:
+        '201':
+          description: Plan created
+    get:
+      tags:
+        - Plans
+      summary: List subscription plans
+      operationId: listPlans
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of plans
+
+  /plans/{id}:
+    get:
+      tags:
+        - Plans
+      summary: Get a plan
+      operationId: getPlan
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Plan details
+        '404':
+          description: Not found
+    patch:
+      tags:
+        - Plans
+      summary: Update a plan
+      description: Changes affect only future subscriptions; move existing subscriptions via PATCH /subscriptions/{id} action=change_plan.
+      operationId: updatePlan
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlanRequest'
+      responses:
+        '200':
+          description: Updated plan
+    delete:
+      tags:
+        - Plans
+      summary: Deactivate a plan
+      operationId: deactivatePlan
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Plan deactivated
+
+  /checkout/{id}:
+    get:
+      tags:
+        - Checkout
+      summary: Checkout context
+      description: Public endpoint — payment details plus the customer's active saved payment methods for one-click checkout.
+      operationId: getCheckoutContext
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment + saved payment methods
+        '404':
+          description: Payment not found
+
+  /checkout/{id}/pay:
+    post:
+      tags:
+        - Checkout
+      summary: One-click payment
+      description: |
+        Public endpoint — charge a saved payment method for this checkout's amount.
+        The method must belong to the same merchant and customer as the payment.
+        Returns `requiresAction` + `checkoutUrl` when step-up auth (3DS) is needed.
+      operationId: oneClickPay
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [savedPaymentMethodId]
+              properties:
+                savedPaymentMethodId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Payment result
+        '402':
+          description: Payment failed
+        '403':
+          description: Method does not belong to this customer
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -745,7 +1101,8 @@ components:
           example: 10.00
         currency:
           type: string
-          length: 3
+          minLength: 3
+          maxLength: 3
           description: ISO 4217 currency code
           example: USD
         reference:
@@ -844,7 +1201,8 @@ components:
           description: Refund amount
         currency:
           type: string
-          length: 3
+          minLength: 3
+          maxLength: 3
           description: Currency code
         reason:
           type: string
@@ -1222,3 +1580,191 @@ components:
                 type: string
               message:
                 type: string
+
+    CreateCustomerRequest:
+      type: object
+      properties:
+        externalReference:
+          type: string
+          maxLength: 255
+          description: Merchant's own customer id — idempotent key
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        name:
+          type: string
+        metadata:
+          type: object
+
+    RegisterPaymentMethodRequest:
+      type: object
+      required:
+        - methodCode
+      properties:
+        methodCode:
+          type: string
+          description: Provider to tokenise with — zimswitch (default, recommended for cards), visa, mastercard, ecocash, mock
+          default: zimswitch
+        type:
+          type: string
+          enum: [card, wallet, mobile_money]
+          default: card
+        customerId:
+          type: string
+          format: uuid
+          description: Existing ZeePay customer id
+        customerReference:
+          type: string
+          description: Merchant's customer id — get-or-creates the customer
+        customerEmail:
+          type: string
+          format: email
+        customerPhone:
+          type: string
+        customerName:
+          type: string
+        amount:
+          type: number
+          description: Optional initial authorisation amount (0 for register-only)
+        currency:
+          type: string
+        returnUrl:
+          type: string
+          format: uri
+        cancelUrl:
+          type: string
+          format: uri
+        label:
+          type: string
+          maxLength: 100
+        setAsDefault:
+          type: boolean
+        paymentId:
+          type: string
+          format: uuid
+          description: Claim the token created during an earlier card payment
+        metadata:
+          type: object
+        idempotencyKey:
+          type: string
+
+    SavedPaymentMethod:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        methodCode:
+          type: string
+        provider:
+          type: string
+        type:
+          type: string
+          enum: [card, wallet, mobile_money]
+        status:
+          type: string
+          enum: [pending, active, revoked, failed]
+        cardBrand:
+          type: string
+        cardLast4:
+          type: string
+          description: Last 4 digits for display only — full PAN is never stored
+        cardExpMonth:
+          type: string
+        cardExpYear:
+          type: string
+        cardHolder:
+          type: string
+        label:
+          type: string
+        isDefault:
+          type: boolean
+        approvalUrl:
+          type: string
+          format: uri
+          description: Hosted tokenisation widget URL (present while pending)
+        createdAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: string
+          format: date-time
+
+    CreatePlanRequest:
+      type: object
+      required:
+        - name
+        - amount
+        - currency
+        - interval
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 500
+        amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        interval:
+          type: string
+          enum: [daily, weekly, monthly, yearly]
+        intervalCount:
+          type: integer
+          default: 1
+        metadata:
+          type: object
+
+    UpdatePlanRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        interval:
+          type: string
+          enum: [daily, weekly, monthly, yearly]
+        intervalCount:
+          type: integer
+        isActive:
+          type: boolean
+
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        interval:
+          type: string
+          enum: [daily, weekly, monthly, yearly]
+        intervalCount:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time

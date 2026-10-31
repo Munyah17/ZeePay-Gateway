@@ -5,12 +5,18 @@ import {
   pauseSubscription,
   resumeSubscription,
   cancelSubscription,
+  updateSubscriptionPlan,
 } from '@/lib/services/subscription-service';
 import { z } from 'zod';
 
 const updateSchema = z.object({
-  action: z.enum(['pause', 'resume', 'cancel']),
+  action: z.enum(['pause', 'resume', 'cancel', 'change_plan']),
   reason: z.string().max(500).optional(),
+  // change_plan — upgrade/downgrade takes effect on the next billing date
+  planId: z.string().uuid().optional(),
+  amount: z.number().positive().optional(),
+  interval: z.enum(['daily', 'weekly', 'monthly', 'yearly']).optional(),
+  intervalCount: z.number().int().positive().optional(),
 });
 
 /**
@@ -67,7 +73,7 @@ export async function PATCH(
     );
   }
 
-  const { action, reason } = validationResult.data;
+  const { action, reason, planId, amount, interval, intervalCount } = validationResult.data;
 
   try {
     const subscription =
@@ -75,7 +81,9 @@ export async function PATCH(
         ? await pauseSubscription(subscriptionId, merchantId)
         : action === 'resume'
           ? await resumeSubscription(subscriptionId, merchantId)
-          : await cancelSubscription(subscriptionId, merchantId, reason);
+          : action === 'change_plan'
+            ? await updateSubscriptionPlan(subscriptionId, merchantId, { planId, amount, interval, intervalCount })
+            : await cancelSubscription(subscriptionId, merchantId, reason);
 
     return NextResponse.json(subscription);
   } catch (error) {

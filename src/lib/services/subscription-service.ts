@@ -5,11 +5,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { getIdempotencyResult, recordIdempotencyKey } from '../utils/idempotency';
 import { deliverWebhookToMerchant } from '../webhooks/delivery';
 import {
+  CreatePlanInput,
   CreateSubscriptionInput,
+  SubscriptionPlanResponse,
   SubscriptionResponse,
   SubscriptionStatus,
   ProcessDueResult,
 } from '@/types/subscription';
+import { captureTokenForMandate } from './saved-payment-method-service';
 
 interface SubscriptionRow {
   id: string;
@@ -31,6 +34,9 @@ interface SubscriptionRow {
   start_date: string;
   end_date: string | null;
   cancelled_at: string | null;
+  plan_id: string | null;
+  saved_payment_method_id: string | null;
+  locked_at: string | null;
   metadata: Record<string, any>;
   created_at: string;
 }
@@ -109,8 +115,107 @@ function toResponse(row: SubscriptionRow, mandate?: MandateRow | null): Subscrip
     lastBilledAt: row.last_billed_at || undefined,
     approvalUrl: mandate?.approval_url || undefined,
     mandateId: row.mandate_id,
+    planId: row.plan_id || undefined,
+    savedPaymentMethodId: row.saved_payment_method_id || undefined,
     createdAt: row.created_at,
   };
+}
+
+// --- Subscription plans -------------------------------------------------
+
+function planToResponse(row: any): SubscriptionPlanResponse {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description || undefined,
+    amount: row.amount,
+    currency: row.currency,
+    interval: row.interval,
+    intervalCount: row.interval_count,
+    isActive: row.is_active,
+    metadata: row.metadata || undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export async function createPlan(
+  merchantId: string,
+  input: CreatePlanInput
+): Promise<SubscriptionPlanResponse> {
+  const { data, error } = await supabaseAdmin
+    .from('subscription_plans')
+    .insert({
+      id: uuidv4(),
+      merchant_id: merchantId,
+      name: input.name,
+      description: input.description,
+      amount: input.amount,
+      currency: input.currency,
+      interval: input.interval,
+      interval_count: input.intervalCount || 1,
+      is_active: true,
+      metadata: input.metadata || {},
+    })
+    .select()
+    .single();
+
+  if (error || !data) throw new Error(`Failed to create plan: ${error?.message}`);
+  return planToResponse(data);
+}
+
+export async function getPlan(planId: string, merchantId: string): Promise<SubscriptionPlanResponse> {
+  const { data } = await supabaseAdmin
+    .from('subscription_plans')
+    .select('*')
+    .eq('id', planId)
+    .eq('merchant_id', merchantId)
+    .single();
+  if (!data) throw new Error('Plan not found');
+  return planToResponse(data);
+}
+
+export async function listPlans(
+  merchantId: string,
+  options: { limit?: number; offset?: number; activeOnly?: boolean } = {}
+): Promise<SubscriptionPlanResponse[]> {
+  let query = supabaseAdmin
+    .from('subscription_plans')
+    .select('*')
+    .eq('merchant_id', merchantId)
+    .order('created_at', { ascending: false })
+    .range(options.offset || 0, (options.offset || 0) + (options.limit || 50) - 1);
+
+  if (options.activeOnly) query = query.eq('is_active', true);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Failed to list plans: ${error.message}`);
+  return (data || []).map(planToResponse);
+}
+
+export async function updatePlan(
+  planId: string,
+  merchantId: string,
+  input: Partial<CreatePlanInput> & { isActive?: boolean }
+): Promise<SubscriptionPlanResponse> {
+  const updates: Record<string, any> = {};
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.description !== undefined) updates.description = input.description;
+  if (input.amount !== undefined) updates.amount = input.amount;
+  if (input.currency !== undefined) updates.currency = input.currency;
+  if (input.interval !== undefined) updates.interval = input.interval;
+  if (input.intervalCount !== undefined) updates.interval_count = input.intervalCount;
+  if (input.isActive !== undefined) updates.is_active = input.isActive;
+
+  const { data, error } = await supabaseAdmin
+    .from('subscription_plans')
+    .update(updates)
+    .eq('id', planId)
+    .eq('merchant_id', merchantId)
+    .select()
+    .single();
+
+  if (error || !data) throw new Error('Plan not found or update failed');
+  return planToResponse(data);
 }
 
 /**
@@ -141,20 +246,72 @@ export async function createSubscription(options: {
     }
   }
 
-  const provider = resolveProvider(input.methodCode);
+  // Resolve billing terms from a plan when supplied
+  let amount = input.amount;
+  let currency = input.currency;
+  let interval = input.interval;
+  const planId: string | null = input.planId || null;
 
-  // Create the provider mandate (standing authorization)
-  const mandateResult = await provider.createMandate({
-    reference: input.merchantReference,
-    amount: input.amount,
-    currency: input.currency,
-    interval: `${intervalCount} ${input.interval}`,
-    customerEmail: input.customerEmail,
-    customerPhone: input.customerPhone,
-    returnUrl: input.returnUrl,
-    cancelUrl: input.cancelUrl,
-    metadata: input.metadata,
-  });
+  if (planId) {
+    const { data: plan } = await supabaseAdmin
+      .from('subscription_plans')
+      .select('*')
+      .eq('id', planId)
+      .eq('merchant_id', merchantId)
+      .single();
+    if (!plan) throw new Error('Plan not found');
+    if (!plan.is_active) throw new Error('Plan is not active');
+    amount = amount ?? plan.amount;
+    currency = currency ?? plan.currency;
+    interval = interval ?? plan.interval;
+    if (!input.intervalCount) {
+      input.intervalCount = plan.interval_count;
+    }
+  }
+
+  if (amount == null || !currency || !interval) {
+    throw new Error('amount, currency and interval are required (or supply planId)');
+  }
+  const intervalCountFinal = input.intervalCount || intervalCount;
+
+  // Subscribing via an already-tokenised payment method skips provider
+  // mandate creation — the customer authorised once already.
+  let mandateResult: { providerReference: string; status: string; approvalUrl?: string } | null = null;
+  let savedMethod: any = null;
+
+  if (input.savedPaymentMethodId) {
+    const { data: method } = await supabaseAdmin
+      .from('saved_payment_methods')
+      .select('*')
+      .eq('id', input.savedPaymentMethodId)
+      .eq('merchant_id', merchantId)
+      .single();
+    if (!method) throw new Error('Saved payment method not found');
+    if (method.status !== 'active') {
+      throw new Error(`Payment method is ${method.status} — subscribe requires an active method`);
+    }
+    savedMethod = method;
+    input.methodCode = method.method_code;
+  }
+
+  if (!input.methodCode) {
+    throw new Error('methodCode is required (or supply savedPaymentMethodId)');
+  }
+
+  if (!savedMethod) {
+    const provider = resolveProvider(input.methodCode);
+    mandateResult = await provider.createMandate({
+      reference: input.merchantReference,
+      amount,
+      currency,
+      interval: `${intervalCountFinal} ${interval}`,
+      customerEmail: input.customerEmail,
+      customerPhone: input.customerPhone,
+      returnUrl: input.returnUrl,
+      cancelUrl: input.cancelUrl,
+      metadata: input.metadata,
+    });
+  }
 
   const mandateId = uuidv4();
   const { error: mandateError } = await supabaseAdmin
@@ -163,16 +320,17 @@ export async function createSubscription(options: {
       id: mandateId,
       merchant_id: merchantId,
       provider_name: input.methodCode,
-      provider_reference: mandateResult.providerReference,
+      // Saved methods reuse the token already stored at the provider
+      provider_reference: savedMethod ? savedMethod.provider_reference : mandateResult!.providerReference,
       method_code: input.methodCode,
       customer_email: input.customerEmail,
       customer_phone: input.customerPhone,
-      amount: input.amount,
-      currency: input.currency,
-      status: mandateResult.status,
-      approval_url: mandateResult.approvalUrl,
-      approved_at: mandateResult.status === 'active' ? new Date().toISOString() : null,
-      metadata: input.metadata || {},
+      amount,
+      currency,
+      status: savedMethod ? 'active' : mandateResult!.status,
+      approval_url: savedMethod ? null : mandateResult!.approvalUrl,
+      approved_at: savedMethod || mandateResult!.status === 'active' ? new Date().toISOString() : null,
+      metadata: { ...(input.metadata || {}), subscription: true },
     });
 
   if (mandateError) {
@@ -180,7 +338,7 @@ export async function createSubscription(options: {
   }
 
   // Active mandates start billing immediately; pending ones wait for approval
-  const mandateActive = mandateResult.status === 'active';
+  const mandateActive = savedMethod ? true : mandateResult!.status === 'active';
   const startDate = input.startDate ? new Date(input.startDate) : new Date();
 
   const subscriptionId = uuidv4();
@@ -190,17 +348,20 @@ export async function createSubscription(options: {
       id: subscriptionId,
       merchant_id: merchantId,
       mandate_id: mandateId,
+      plan_id: planId,
+      saved_payment_method_id: savedMethod?.id || null,
       merchant_reference: input.merchantReference,
       description: input.description,
-      amount: input.amount,
-      currency: input.currency,
-      interval: input.interval,
-      interval_count: intervalCount,
+      amount,
+      currency,
+      interval,
+      interval_count: intervalCountFinal,
       customer_email: input.customerEmail,
       customer_phone: input.customerPhone,
       status: mandateActive ? 'active' : 'pending',
       next_billing_date: mandateActive ? startDate.toISOString() : null,
       max_retries: input.maxRetries || 3,
+      consecutive_failures: 0,
       start_date: startDate.toISOString(),
       end_date: input.endDate || null,
       metadata: input.metadata || {},
@@ -220,10 +381,10 @@ export async function createSubscription(options: {
     id: mandateId,
     merchant_id: merchantId,
     provider_name: input.methodCode,
-    provider_reference: mandateResult.providerReference,
+    provider_reference: savedMethod ? savedMethod.provider_reference : mandateResult!.providerReference,
     method_code: input.methodCode,
-    status: mandateResult.status,
-    approval_url: mandateResult.approvalUrl || null,
+    status: savedMethod ? 'active' : mandateResult!.status,
+    approval_url: savedMethod ? null : mandateResult!.approvalUrl || null,
   };
 
   await deliverWebhookToMerchant(merchantId, 'subscription.created', toResponse(subscription, mandate));
@@ -251,9 +412,15 @@ export async function approveSubscription(subscriptionId: string): Promise<Subsc
   const now = new Date();
   const nextBilling = advanceBillingDate(now, sub.interval, sub.interval_count);
 
+  // For card mandates created via a hosted registration checkout, the
+  // durable token (e.g. ZimSwitch registrationId) is issued only after
+  // the shopper completes the widget — capture it now.
+  const captured = await captureTokenForMandate(sub.payment_mandates);
+  const tokenReference = captured?.tokenReference || sub.payment_mandates.provider_reference;
+
   await supabaseAdmin
     .from('payment_mandates')
-    .update({ status: 'active', approved_at: now.toISOString() })
+    .update({ status: 'active', approved_at: now.toISOString(), provider_reference: tokenReference })
     .eq('id', sub.mandate_id);
 
   const { data: updated } = await supabaseAdmin
@@ -395,6 +562,7 @@ export async function processDueSubscriptions(options?: { limit?: number }): Pro
     .select('*')
     .in('status', ['active', 'past_due'])
     .lte('next_billing_date', now.toISOString())
+    .or(`locked_at.is.null,locked_at.lt.${new Date(now.getTime() - 10 * 60 * 1000).toISOString()}`)
     .order('next_billing_date', { ascending: true })
     .limit(limit);
 
@@ -415,6 +583,21 @@ export async function processDueSubscriptions(options?: { limit?: number }): Pro
       continue;
     }
 
+    // Claim the subscription for this run — prevents double deductions
+    // when two billing runs overlap (idempotency at the schedule level).
+    const { data: claimed } = await supabaseAdmin
+      .from('subscriptions')
+      .update({ locked_at: now.toISOString() })
+      .eq('id', sub.id)
+      .or(`locked_at.is.null,locked_at.lt.${new Date(now.getTime() - 10 * 60 * 1000).toISOString()}`)
+      .in('status', ['active', 'past_due'])
+      .lte('next_billing_date', now.toISOString())
+      .select('id');
+
+    if (!claimed || claimed.length === 0) {
+      continue; // Another run claimed it — skip, don't double-charge
+    }
+
     result.processed++;
     const attemptNumber = sub.consecutive_failures + 1;
 
@@ -430,6 +613,7 @@ export async function processDueSubscriptions(options?: { limit?: number }): Pro
             last_billed_at: now.toISOString(),
             next_billing_date: nextBilling.toISOString(),
             consecutive_failures: 0,
+            locked_at: null,
           })
           .eq('id', sub.id);
 
@@ -454,6 +638,7 @@ export async function processDueSubscriptions(options?: { limit?: number }): Pro
             next_billing_date: exhausted
               ? null
               : advanceBillingDate(now, 'daily', RETRY_DELAY_DAYS * failures).toISOString(),
+            locked_at: null,
           })
           .eq('id', sub.id);
 
@@ -495,6 +680,11 @@ export async function processDueSubscriptions(options?: { limit?: number }): Pro
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       result.errors.push({ subscriptionId: sub.id, error: message });
+      // Release the claim so a later run can retry this subscription
+      await supabaseAdmin
+        .from('subscriptions')
+        .update({ locked_at: null })
+        .eq('id', sub.id);
     }
   }
 
@@ -608,6 +798,68 @@ export async function getSubscription(subscriptionId: string, merchantId: string
 
   if (error || !sub) throw new Error('Subscription not found');
   return toResponse(sub, sub.payment_mandates);
+}
+
+/**
+ * List subscriptions for a merchant.
+ */
+/**
+ * Move a subscription to a different plan or override its billing
+ * terms — upgrades/downgrades take effect from the next billing date.
+ */
+export async function updateSubscriptionPlan(
+  subscriptionId: string,
+  merchantId: string,
+  options: { planId?: string; amount?: number; interval?: string; intervalCount?: number }
+): Promise<SubscriptionResponse> {
+  const { data: sub } = await supabaseAdmin
+    .from('subscriptions')
+    .select('*, payment_mandates(*)')
+    .eq('id', subscriptionId)
+    .eq('merchant_id', merchantId)
+    .single();
+
+  if (!sub) throw new Error('Subscription not found');
+  if (!['active', 'past_due', 'paused'].includes(sub.status)) {
+    throw new Error(`Cannot change plan on a ${sub.status} subscription`);
+  }
+
+  const updates: Record<string, any> = {};
+
+  if (options.planId) {
+    const { data: plan } = await supabaseAdmin
+      .from('subscription_plans')
+      .select('*')
+      .eq('id', options.planId)
+      .eq('merchant_id', merchantId)
+      .single();
+    if (!plan) throw new Error('Plan not found');
+    if (!plan.is_active) throw new Error('Plan is not active');
+    updates.plan_id = plan.id;
+    updates.amount = options.amount ?? plan.amount;
+    updates.interval = options.interval ?? plan.interval;
+    updates.interval_count = options.intervalCount ?? plan.interval_count;
+    updates.currency = plan.currency;
+  } else {
+    if (options.amount !== undefined) updates.amount = options.amount;
+    if (options.interval !== undefined) updates.interval = options.interval;
+    if (options.intervalCount !== undefined) updates.interval_count = options.intervalCount;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw new Error('Nothing to update — supply planId, amount, interval or intervalCount');
+  }
+
+  const { data: updated } = await supabaseAdmin
+    .from('subscriptions')
+    .update(updates)
+    .eq('id', subscriptionId)
+    .select('*, payment_mandates(*)')
+    .single();
+
+  await deliverWebhookToMerchant(merchantId, 'subscription.updated', toResponse(updated!, updated!.payment_mandates));
+
+  return toResponse(updated!, updated!.payment_mandates);
 }
 
 /**

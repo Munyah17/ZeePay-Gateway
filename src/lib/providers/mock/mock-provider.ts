@@ -38,7 +38,13 @@ export class MockProvider extends BasePaymentProvider {
   }
 
   protected onInitialize(): void {
-    // Clear payments on re-initialization for test isolation
+    // Intentionally a no-op — state persists across initialize() calls so
+    // mandate flows (create → charge → revoke) work across separate service
+    // invocations. Use reset() for explicit test isolation.
+  }
+
+  /** Clear all in-memory payments/mandates (test isolation). */
+  reset(): void {
     this.payments.clear();
     this.mandates.clear();
   }
@@ -138,14 +144,24 @@ export class MockProvider extends BasePaymentProvider {
   }
 
   /**
-   * Create a mandate for recurring debits.
+   * Create a mandate for recurring debits / card tokenisation.
    * In mock mode, mandates are created in 'active' status immediately
    * (simulating instant customer approval in test environment).
+   * Card metadata is simulated for tokenisation flows — real card
+   * details would come from the gateway registration response.
    */
   async createMandate(input: CreateMandateInput): Promise<MandateResult> {
     this.ensureInitialized();
 
     const providerReference = `mandate_${uuidv4()}`;
+    const simulatedCard = (input.metadata?.card as Record<string, any>) || {
+      brand: 'visa',
+      last4: '4242',
+      expMonth: '12',
+      expYear: String(new Date().getFullYear() + 2),
+      holder: 'TEST CARDHOLDER',
+    };
+
     const result: MandateResult = {
       id: uuidv4(),
       providerReference,
@@ -154,7 +170,12 @@ export class MockProvider extends BasePaymentProvider {
         amount: input.amount,
         currency: input.currency,
         interval: input.interval,
+        card: simulatedCard,
         ...input.metadata,
+      },
+      providerResponse: {
+        registrationId: providerReference,
+        card: simulatedCard,
       },
     };
 
@@ -177,12 +198,17 @@ export class MockProvider extends BasePaymentProvider {
       throw new Error(`Cannot charge mandate with status ${mandate.status}`);
     }
 
+    // Tests/simulator can force a failure via mandate metadata or
+    // per-charge metadata.simulateOutcome
+    const simulateOutcome =
+      input.metadata?.simulateOutcome || (mandate.metadata as any)?.simulateOutcome;
+
     const providerReference = `mock_${uuidv4()}`;
     const result: PaymentResult = {
       id: uuidv4(),
       providerReference,
       // Mock auto-deduct completes immediately
-      status: 'succeeded',
+      status: simulateOutcome === 'failed' ? 'failed' : 'succeeded',
       amount: input.amount,
       currency: input.currency,
       metadata: {
@@ -223,5 +249,17 @@ export class MockProvider extends BasePaymentProvider {
    */
   getAllPayments(): PaymentResult[] {
     return Array.from(this.payments.values());
+  }
+
+  /**
+   * Force the outcome of the next mandate charge (for testing failed
+   * auto-deducts / retries).
+   */
+  simulateMandateOutcome(mandateReference: string, outcome: 'success' | 'failed'): void {
+    const mandate = this.mandates.get(mandateReference);
+    if (mandate) {
+      mandate.metadata = { ...mandate.metadata, simulateOutcome: outcome === 'failed' ? 'failed' : undefined };
+      this.mandates.set(mandateReference, mandate);
+    }
   }
 }

@@ -12,8 +12,8 @@ DROP TRIGGER IF EXISTS update_refunds_updated_at ON refunds;
 DROP TRIGGER IF EXISTS update_webhook_endpoints_updated_at ON webhook_endpoints;
 DROP TRIGGER IF EXISTS update_settlement_records_updated_at ON settlement_records;
 
--- Drop existing function
-DROP FUNCTION IF EXISTS update_updated_at_column();
+-- Drop existing function (CASCADE: dependent triggers are recreated below)
+DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
 
 -- Merchants table
 CREATE TABLE IF NOT EXISTS merchants (
@@ -606,3 +606,118 @@ ON CONFLICT (name) DO UPDATE SET
   provider_type = EXCLUDED.provider_type,
   capabilities = EXCLUDED.capabilities,
   config_schema = EXCLUDED.config_schema;
+
+-- ============================================================
+-- Tokenisation: customers & saved payment methods
+-- ============================================================
+
+-- Customers — merchant-scoped payer records that saved payment
+-- methods, payments and subscriptions are associated with.
+CREATE TABLE IF NOT EXISTS customers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+  external_reference VARCHAR(255),
+  email VARCHAR(255),
+  phone VARCHAR(50),
+  name VARCHAR(255),
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(merchant_id, external_reference)
+);
+
+-- Saved payment methods — tokenised instruments (card registrations,
+-- wallet mandates) stored as provider token references. Raw PAN/CVV
+-- is never stored; only provider token + display metadata (brand/last4).
+CREATE TABLE IF NOT EXISTS saved_payment_methods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+  mandate_id UUID REFERENCES payment_mandates(id) ON DELETE SET NULL,
+  provider_name VARCHAR(50) NOT NULL,
+  method_code VARCHAR(50) NOT NULL,
+  type VARCHAR(20) NOT NULL DEFAULT 'card',
+  provider_reference VARCHAR(255),
+  card_brand VARCHAR(50),
+  card_last4 VARCHAR(4),
+  card_exp_month VARCHAR(2),
+  card_exp_year VARCHAR(4),
+  card_holder VARCHAR(255),
+  label VARCHAR(100),
+  status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, active, revoked, failed
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  approval_url VARCHAR(500),
+  customer_email VARCHAR(255),
+  customer_phone VARCHAR(50),
+  activated_at TIMESTAMP WITH TIME ZONE,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Subscription plans — reusable billing templates merchants subscribe
+-- customers to. Amount/currency/interval defined once, referenced by
+-- subscriptions.
+CREATE TABLE IF NOT EXISTS subscription_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  description VARCHAR(500),
+  amount DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  interval VARCHAR(20) NOT NULL,
+  interval_count INTEGER NOT NULL DEFAULT 1,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Link subscriptions to their plan and (optionally) the saved payment
+-- method they bill against; locked_at guards against concurrent
+-- billing runs double-charging the same subscription.
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS plan_id UUID REFERENCES subscription_plans(id);
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS saved_payment_method_id UUID REFERENCES saved_payment_methods(id);
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP WITH TIME ZONE;
+
+-- Link payments to the customer + saved payment method used
+-- (one-click / token-based charges).
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES customers(id);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS saved_payment_method_id UUID REFERENCES saved_payment_methods(id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_customers_merchant_id') THEN
+    CREATE INDEX idx_customers_merchant_id ON customers(merchant_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_customers_email') THEN
+    CREATE INDEX idx_customers_email ON customers(merchant_id, email);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_saved_pm_merchant_id') THEN
+    CREATE INDEX idx_saved_pm_merchant_id ON saved_payment_methods(merchant_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_saved_pm_customer_id') THEN
+    CREATE INDEX idx_saved_pm_customer_id ON saved_payment_methods(customer_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_saved_pm_status') THEN
+    CREATE INDEX idx_saved_pm_status ON saved_payment_methods(status);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_subscription_plans_merchant_id') THEN
+    CREATE INDEX idx_subscription_plans_merchant_id ON subscription_plans(merchant_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_subscriptions_plan_id') THEN
+    CREATE INDEX idx_subscriptions_plan_id ON subscriptions(plan_id);
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS update_customers_updated_at ON customers;
+CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_saved_payment_methods_updated_at ON saved_payment_methods;
+CREATE TRIGGER update_saved_payment_methods_updated_at BEFORE UPDATE ON saved_payment_methods
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_subscription_plans_updated_at ON subscription_plans;
+CREATE TRIGGER update_subscription_plans_updated_at BEFORE UPDATE ON subscription_plans
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

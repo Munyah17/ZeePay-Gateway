@@ -19,6 +19,18 @@ interface Payment {
   status: string;
 }
 
+interface SavedCard {
+  id: string;
+  type: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  cardExpMonth?: string;
+  cardExpYear?: string;
+  cardHolder?: string;
+  label?: string;
+  isDefault?: boolean;
+}
+
 function CheckoutContent() {
   const params = useParams();
   const router = useRouter();
@@ -26,24 +38,37 @@ function CheckoutContent() {
 
   const [payment, setPayment] = useState<Payment | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [savedMethods, setSavedMethods] = useState<SavedCard[]>([]);
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPaymentDetails();
+    fetchCheckoutContext();
     fetchPaymentMethods();
   }, [paymentId]);
 
-  const fetchPaymentDetails = async () => {
+  const fetchCheckoutContext = async () => {
     try {
-      const response = await fetch(`/api/v1/payments/${paymentId}`);
+      // Public checkout context — payment + customer's saved cards
+      const response = await fetch(`/api/v1/checkout/${paymentId}`);
       if (!response.ok) {
         throw new Error('Payment not found');
       }
       const data = await response.json();
-      setPayment(data);
+      setPayment({
+        id: data.id,
+        reference: data.reference,
+        amount: data.amount,
+        currency: data.currency,
+        status: data.status,
+      });
+      const saved: SavedCard[] = data.savedPaymentMethods || [];
+      setSavedMethods(saved);
+      // Preselect the default saved card for true one-click payment
+      const def = saved.find((m) => m.isDefault) || saved[0];
+      if (def) setSelectedMethod(`saved:${def.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load payment');
     } finally {
@@ -74,11 +99,29 @@ function CheckoutContent() {
     setError(null);
 
     try {
-      // In a real implementation, this would initiate the payment flow
-      // For now, we'll simulate success
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (selectedMethod.startsWith('saved:')) {
+        // One-click payment — charge the tokenised saved card
+        const response = await fetch(`/api/v1/checkout/${paymentId}/pay`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ savedPaymentMethodId: selectedMethod.slice(6) }),
+        });
+        const data = await response.json();
 
-      // Redirect to success page
+        if (data.requiresAction && data.checkoutUrl) {
+          // Step-up authentication required (e.g. 3DS)
+          window.location.href = data.checkoutUrl;
+          return;
+        }
+        if (!response.ok || data.status === 'failed') {
+          throw new Error(data.message || 'Payment failed');
+        }
+        router.push(`/checkout/${paymentId}/success`);
+        return;
+      }
+
+      // Other methods — provider redirect flow (simulated in sandbox)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       router.push(`/checkout/${paymentId}/success`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed');
@@ -129,8 +172,59 @@ function CheckoutContent() {
             </div>
           )}
 
+          {savedMethods.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-3">Pay with a saved card</h2>
+              <div className="space-y-3">
+                {savedMethods.map((card) => (
+                  <button
+                    key={card.id}
+                    onClick={() => setSelectedMethod(`saved:${card.id}`)}
+                    className={`w-full p-4 border-2 rounded-lg text-left transition-colors ${
+                      selectedMethod === `saved:${card.id}`
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">
+                          {card.cardBrand ? card.cardBrand.charAt(0).toUpperCase() + card.cardBrand.slice(1) : 'Card'}{' '}
+                          •••• {card.cardLast4}
+                          {card.isDefault && (
+                            <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Default</span>
+                          )}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {card.cardHolder || card.label || 'Saved card'}
+                          {card.cardExpMonth && card.cardExpYear ? ` · expires ${card.cardExpMonth}/${card.cardExpYear}` : ''}
+                        </p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 ${
+                        selectedMethod === `saved:${card.id}`
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-300'
+                      }`}>
+                        {selectedMethod === `saved:${card.id}` && (
+                          <svg className="w-3 h-3 text-white mx-auto mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                One click — your saved card is charged instantly, no card details needed.
+              </p>
+            </div>
+          )}
+
           <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">Choose your payment method</h2>
+            <h2 className="text-lg font-semibold mb-3">
+              {savedMethods.length > 0 ? 'Or pay another way' : 'Choose your payment method'}
+            </h2>
             <div className="space-y-3">
               {paymentMethods.map((method) => (
                 <button
