@@ -7,12 +7,15 @@ import { getIdempotencyResult, recordIdempotencyKey } from '../utils/idempotency
 import { deliverWebhookToMerchant } from '../webhooks/delivery';
 import { getOrCreateCustomer } from './customer-service';
 import { initializeProviderForMerchant } from './provider-credentials';
+import { config } from '../config';
 
 export interface CreatePaymentOptions {
   merchantId: string;
   input: CreatePaymentInput;
   idempotencyKey?: string;
   paymentMethodId?: string;
+  /** Merchant key environment — selects test vs live provider credentials */
+  environment?: 'test' | 'live';
   /** Merchant's own customer id — get-or-creates a customer record */
   customerReference?: string;
 }
@@ -33,7 +36,7 @@ export interface PaymentResponse {
 export async function createPayment(
   options: CreatePaymentOptions
 ): Promise<PaymentResponse> {
-  const { merchantId, input, idempotencyKey, paymentMethodId, customerReference } = options;
+  const { merchantId, input, idempotencyKey, paymentMethodId, environment, customerReference } = options;
 
   // Resolve the customer when a merchant-side reference is supplied
   let customerId: string | null = null;
@@ -101,42 +104,75 @@ export async function createPayment(
     await recordIdempotencyKey(merchantId, idempotencyKey, 'payment', paymentId);
   }
 
-  // For now, use mock provider
-  const provider = providerRegistry.get('mock');
+  // Resolve the provider for this payment. When a payment method is
+  // supplied we charge through that method's provider; providers with
+  // no saved credentials run in simulation mode (plug-and-play) until
+  // the merchant pastes keys on the dashboard.
+  let providerName = 'mock';
+  let providerRowId: string | null = null;
+
+  if (paymentMethodId) {
+    const { data: methodRow } = await supabaseAdmin
+      .from('payment_methods')
+      .select('method_code, provider_id, payment_providers(name)')
+      .eq('id', paymentMethodId)
+      .single();
+
+    if (methodRow) {
+      providerName = (methodRow.payment_providers as any)?.name || methodRow.method_code;
+      providerRowId = methodRow.provider_id;
+    }
+  }
+
+  const provider = providerRegistry.get(providerName) || providerRegistry.get('mock');
   if (!provider) {
     throw new Error('No payment provider available');
   }
 
-  // Initialize provider with mock config
-  provider.initialize({
-    credentials: {},
-    environment: 'test',
-  });
+  // Load merchant credentials for this provider when configured
+  await initializeProviderForMerchant(provider, merchantId, environment || 'test');
+
+  // Resolve the provider row id for the attempt record
+  if (!providerRowId) {
+    const { data: row } = await supabaseAdmin
+      .from('payment_providers')
+      .select('id')
+      .eq('name', provider.name)
+      .maybeSingle();
+    providerRowId = row?.id || null;
+  }
 
   // Create payment with provider
   const providerResult: PaymentResult = await provider.createPayment(input);
 
-  // Create payment attempt record
-  const { error: attemptError } = await supabaseAdmin
-    .from('payment_attempts')
-    .insert({
-      payment_id: paymentId,
-      provider_id: 'mock-provider-id', // TODO: Get actual provider ID
-      payment_method_id: paymentMethodId,
-      provider_reference: providerResult.providerReference,
-      status: providerResult.status,
-      provider_response: providerResult.providerResponse,
-    });
+  // Create payment attempt record (skipped when the provider isn't
+  // seeded in the database yet — attempt history is non-fatal)
+  if (providerRowId) {
+    const { error: attemptError } = await supabaseAdmin
+      .from('payment_attempts')
+      .insert({
+        payment_id: paymentId,
+        provider_id: providerRowId,
+        payment_method_id: paymentMethodId,
+        provider_reference: providerResult.providerReference,
+        status: providerResult.status,
+        provider_response: providerResult.providerResponse,
+      });
 
-  if (attemptError) {
-    throw new Error(`Failed to create payment attempt: ${attemptError.message}`);
+    if (attemptError) {
+      throw new Error(`Failed to create payment attempt: ${attemptError.message}`);
+    }
   }
 
-  // Update payment with checkout URL
+  // Update payment with checkout URL — the provider's own hosted page
+  // (gateway checkout, wallet deep link) when it has one, otherwise
+  // ZeePay's hosted checkout where the customer picks a method.
+  const providerCheckoutUrl =
+    provider.name !== 'mock' ? providerResult.checkoutUrl : undefined;
   const { error: updateError } = await supabaseAdmin
     .from('payments')
     .update({
-      checkout_url: providerResult.checkoutUrl,
+      checkout_url: providerCheckoutUrl || `${config.app.baseUrl}/checkout/${paymentId}`,
       status: providerResult.status,
     })
     .eq('id', paymentId);
@@ -150,8 +186,8 @@ export async function createPayment(
     reference: payment.merchant_reference,
     amount: payment.amount,
     currency: payment.currency,
-    status: payment.status,
-    checkoutUrl: providerResult.checkoutUrl,
+    status: providerResult.status,
+    checkoutUrl: providerCheckoutUrl || `${config.app.baseUrl}/checkout/${paymentId}`,
     createdAt: payment.created_at,
   };
 }

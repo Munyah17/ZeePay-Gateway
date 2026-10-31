@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/database/client';
+import { providerRegistry } from '@/lib/providers/registry';
+import { initializeProviderForMerchant } from '@/lib/services/provider-credentials';
 
 /**
  * GET /api/v1/checkout/:id
- * Public checkout context — returns the payment plus the customer's
- * saved payment methods so returning customers can pay in one click.
- * Saved methods are only exposed for the customer email on the payment.
+ * Public checkout context — returns the payment, the public payment
+ * method catalogue, and the customer's saved payment methods so
+ * returning customers can pay in one click.
+ *
+ * While a payment is in-flight (pending/processing) the endpoint also
+ * polls the provider's status endpoint once per request so the hosted
+ * checkout page can resolve PIN-prompt / redirect completions without
+ * waiting for a webhook.
  */
 export async function GET(
   request: NextRequest,
@@ -48,12 +55,104 @@ export async function GET(
       }));
     }
 
+    // Public method catalogue — method names/types only, no secrets.
+    const { data: methodRows } = await supabaseAdmin
+      .from('payment_methods')
+      .select('id, method_code, display_name, supported_currencies, payment_providers(name, provider_type)')
+      .eq('is_active', true)
+      .order('display_name');
+
+    // Registry fallback when the methods table isn't seeded yet —
+    // the catalogue is still plug-and-play.
+    const paymentMethods =
+      methodRows && methodRows.length > 0
+        ? methodRows.map((m: any) => ({
+            id: m.id,
+            code: m.method_code,
+            name: m.display_name,
+            provider: m.payment_providers?.name,
+            type: m.payment_providers?.provider_type,
+            supportedCurrencies: m.supported_currencies,
+          }))
+        : providerRegistry
+            .getAll()
+            .filter((p) => p.name !== 'mock')
+            .map((p) => ({
+              id: p.name,
+              code: p.name,
+              name: p.name
+                .split('-')
+                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(' '),
+              provider: p.name,
+              type: p.type,
+              supportedCurrencies: ['USD'],
+            }));
+
+    // ------------------------------------------------------------------
+    // Refresh in-flight payments — poll the provider once per request so
+    // PIN-prompt / redirect completions resolve while the shopper waits.
+    // ------------------------------------------------------------------
+    let status = payment.status;
+    if (['pending', 'processing'].includes(status)) {
+      const { data: attempt } = await supabaseAdmin
+        .from('payment_attempts')
+        .select('id, provider_reference, status, created_at, payment_providers(name)')
+        .eq('payment_id', paymentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const attemptAge = attempt ? Date.now() - new Date(attempt.created_at).getTime() : 0;
+      const providerName = (attempt?.payment_providers as any)?.name;
+      const provider = providerName ? providerRegistry.get(providerName) : undefined;
+
+      // Re-query at most every ~1.5s per attempt and only once the
+      // provider has had a moment to process the initiation call.
+      if (attempt?.provider_reference && provider?.getPayment && attemptAge > 1500) {
+        try {
+          await initializeProviderForMerchant(provider, payment.merchant_id);
+          const result = await provider.getPayment({
+            providerReference: attempt.provider_reference,
+          });
+
+          if (result.status !== status && result.status !== 'pending') {
+            const now = new Date().toISOString();
+            status = result.status;
+
+            await supabaseAdmin
+              .from('payments')
+              .update({
+                status,
+                completed_at: status === 'succeeded' ? now : null,
+                updated_at: now,
+              })
+              .eq('id', paymentId);
+
+            await supabaseAdmin
+              .from('payment_attempts')
+              .update({
+                status,
+                provider_response: result.providerResponse || {},
+                completed_at: ['succeeded', 'failed', 'cancelled'].includes(status) ? now : null,
+              })
+              .eq('id', attempt.id);
+          }
+        } catch {
+          // Provider unreachable / reference not yet registered —
+          // surface the stored status; the next poll retries.
+        }
+      }
+    }
+
     return NextResponse.json({
       id: payment.id,
       reference: payment.merchant_reference,
       amount: payment.amount,
       currency: payment.currency,
-      status: payment.status,
+      status,
+      checkoutUrl: payment.checkout_url,
+      paymentMethods,
       savedPaymentMethods: savedMethods,
     });
   } catch (error) {

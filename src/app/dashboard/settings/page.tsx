@@ -22,9 +22,34 @@ interface WebhookEndpoint {
   createdAt: string;
 }
 
+interface ProviderEnvStatus {
+  configured: boolean;
+  partiallyConfigured: boolean;
+  missingRequired: string[];
+  isActive: boolean;
+  updatedAt: string | null;
+  simulated: boolean;
+}
+
+interface CredentialField {
+  label: string;
+  required?: boolean;
+  secret?: boolean;
+  placeholder?: string;
+  help?: string;
+}
+
+interface ProviderDef {
+  name: string;
+  type: string;
+  capabilities: Record<string, boolean | undefined>;
+  configSchema: Record<string, CredentialField>;
+  environments: { test: ProviderEnvStatus; live: ProviderEnvStatus };
+}
+
 export default function SettingsPage() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'api-keys' | 'webhooks'>('api-keys');
+  const [activeTab, setActiveTab] = useState<'api-keys' | 'webhooks' | 'providers'>('api-keys');
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,9 +59,29 @@ export default function SettingsPage() {
   const [showWebhookModal, setShowWebhookModal] = useState(false);
   const [webhookForm, setWebhookForm] = useState({ url: '', events: 'payment.succeeded, payment.failed' });
 
+  // Provider connections (plug-and-play credentials)
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [providers, setProviders] = useState<ProviderDef[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providersError, setProvidersError] = useState<string | null>(null);
+  const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
+  const [envByProvider, setEnvByProvider] = useState<Record<string, 'test' | 'live'>>({});
+  const [credForm, setCredForm] = useState<Record<string, Record<string, string>>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+
   useEffect(() => {
     fetchSettings();
+    const stored = localStorage.getItem('zeepay_api_key');
+    if (stored) setApiKeyInput(stored);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'providers' && apiKeyInput) {
+      fetchProviders(apiKeyInput);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const fetchSettings = async () => {
     try {
@@ -121,6 +166,132 @@ export default function SettingsPage() {
     copyText(text).then((ok) => toast(ok ? 'Copied to clipboard' : 'Copy failed', ok ? undefined : { tone: 'danger' }));
   };
 
+  // ------------------------------------------------------------------
+  // Provider connections
+  // ------------------------------------------------------------------
+
+  const fetchProviders = async (key: string) => {
+    setProvidersLoading(true);
+    setProvidersError(null);
+    try {
+      const res = await fetch('/api/v1/provider-accounts', {
+        headers: { 'x-api-key': key },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setProvidersError(data.error || data.message || 'Failed to load providers');
+        setProviders([]);
+        return;
+      }
+      setProviders(data.data || []);
+      localStorage.setItem('zeepay_api_key', key);
+    } catch {
+      setProvidersError('Failed to reach the provider accounts API');
+    } finally {
+      setProvidersLoading(false);
+    }
+  };
+
+  const credFieldKey = (provider: string, env: string) => `${provider}:${env}`;
+
+  const updateCredField = (provider: string, env: string, field: string, value: string) => {
+    const key = credFieldKey(provider, env);
+    setCredForm((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), [field]: value } }));
+  };
+
+  const saveCredentials = async (provider: ProviderDef, env: 'test' | 'live') => {
+    const key = credFieldKey(provider.name, env);
+    const values = credForm[key] || {};
+    const hasAny = Object.values(values).some((v) => v.trim() !== '');
+    if (!hasAny) {
+      toast('Enter at least one credential field', { tone: 'warning' });
+      return;
+    }
+
+    setSaving(key);
+    try {
+      const res = await fetch('/api/v1/provider-accounts', {
+        method: 'PUT',
+        headers: { 'x-api-key': apiKeyInput, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: provider.name, environment: env, credentials: values }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.message || data.error || 'Save failed', { tone: 'danger' });
+        return;
+      }
+      setCredForm((prev) => ({ ...prev, [key]: {} }));
+      toast(
+        data.configured
+          ? `${provider.name} ${env} credentials saved — provider is live`
+          : `${provider.name} saved — ${data.missingRequired.length} required field(s) still missing`,
+        data.configured ? undefined : { tone: 'warning' }
+      );
+      await fetchProviders(apiKeyInput);
+    } catch {
+      toast('Failed to save credentials', { tone: 'danger' });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const testConnection = async (provider: ProviderDef, env: 'test' | 'live') => {
+    const key = credFieldKey(provider.name, env);
+    setTesting(key);
+    try {
+      const res = await fetch('/api/v1/provider-accounts', {
+        method: 'POST',
+        headers: { 'x-api-key': apiKeyInput, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test', provider: provider.name, environment: env }),
+      });
+      const data = await res.json();
+      if (data.simulated) {
+        toast(`${provider.name} is running in simulation mode — save credentials to go live`, { tone: 'info' });
+      } else {
+        toast(
+          `${provider.name} connection ${data.healthy ? 'healthy' : `failed${data.message ? `: ${data.message}` : ''}`}`,
+          data.healthy ? undefined : { tone: 'danger' }
+        );
+      }
+    } catch {
+      toast('Connection test failed', { tone: 'danger' });
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const deactivateProvider = async (provider: ProviderDef, env: 'test' | 'live') => {
+    try {
+      const res = await fetch('/api/v1/provider-accounts', {
+        method: 'DELETE',
+        headers: { 'x-api-key': apiKeyInput, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: provider.name, environment: env }),
+      });
+      if (res.ok) {
+        toast(`${provider.name} ${env} deactivated`, { tone: 'info' });
+        await fetchProviders(apiKeyInput);
+      }
+    } catch {
+      toast('Failed to deactivate', { tone: 'danger' });
+    }
+  };
+
+  const providerStatusBadge = (env: ProviderEnvStatus) => {
+    if (env.configured && env.isActive) {
+      return <span className="badge bg-success">Configured</span>;
+    }
+    if (env.partiallyConfigured) {
+      return <span className="badge bg-warning text-dark">Partial</span>;
+    }
+    return <span className="badge bg-secondary">Simulated</span>;
+  };
+
+  const providerDisplayName = (name: string) =>
+    name
+      .split('-')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+
   return (
     <>
     <div className="mb-4">
@@ -145,6 +316,15 @@ export default function SettingsPage() {
             type="button"
           >
             Webhooks
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            className={`nav-link ${activeTab === 'providers' ? 'active' : ''}`}
+            onClick={() => setActiveTab('providers')}
+            type="button"
+          >
+            Payment Providers
           </button>
         </li>
       </ul>
@@ -351,6 +531,158 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'providers' && (
+            <div className="space-y-4">
+              <div className="alert alert-info small" role="alert">
+                Plug-and-play: providers run in <strong>simulation mode</strong> until you paste
+                credentials here. Saving valid credentials switches that provider to the real
+                gateway instantly — no code changes needed.
+              </div>
+
+              <div className="card">
+                <div className="card-body">
+                  <label className="form-label small fw-medium">Your ZeePay API key</label>
+                  <div className="d-flex gap-2">
+                    <input
+                      type="password"
+                      className="form-control form-control-sm"
+                      placeholder="zp_test_..."
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                    />
+                    <button
+                      className="btn btn-primary btn-sm text-nowrap"
+                      onClick={() => fetchProviders(apiKeyInput)}
+                      disabled={!apiKeyInput || providersLoading}
+                    >
+                      {providersLoading ? 'Loading…' : 'Load providers'}
+                    </button>
+                  </div>
+                  <p className="small text-muted mt-2 mb-0">
+                    Used to authenticate against the provider accounts API. Stored only in your browser.
+                  </p>
+                  {providersError && (
+                    <p className="small text-danger mt-2 mb-0">{providersError}</p>
+                  )}
+                </div>
+              </div>
+
+              {providers.filter((p) => p.name !== 'mock').map((provider) => {
+                const env = envByProvider[provider.name] || 'test';
+                const envStatus = provider.environments[env];
+                const formKey = credFieldKey(provider.name, env);
+                const fields = credForm[formKey] || {};
+                const schemaEntries = Object.entries(provider.configSchema || {});
+
+                return (
+                  <div className="card" key={provider.name}>
+                    <div
+                      className="card-header d-flex justify-content-between align-items-center"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setExpandedProvider(expandedProvider === provider.name ? null : provider.name)}
+                    >
+                      <div className="d-flex align-items-center gap-2">
+                        <h5 className="card-title mb-0">{providerDisplayName(provider.name)}</h5>
+                        <span className="badge bg-light text-dark border">{provider.type}</span>
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        {providerStatusBadge(envStatus)}
+                        <i className={`bi bi-chevron-${expandedProvider === provider.name ? 'up' : 'down'}`}></i>
+                      </div>
+                    </div>
+
+                    {expandedProvider === provider.name && (
+                      <div className="card-body">
+                        <div className="d-flex align-items-center gap-3 mb-3">
+                          <label className="form-label small mb-0">Environment</label>
+                          <div className="btn-group btn-group-sm" role="group">
+                            {(['test', 'live'] as const).map((e) => (
+                              <button
+                                key={e}
+                                type="button"
+                                className={`btn ${env === e ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                onClick={() =>
+                                  setEnvByProvider((prev) => ({ ...prev, [provider.name]: e }))
+                                }
+                              >
+                                {e === 'test' ? 'Test' : 'Live'}
+                              </button>
+                            ))}
+                          </div>
+                          <span className="small text-muted">
+                            {envStatus.simulated
+                              ? 'Simulation mode — credentials not saved'
+                              : envStatus.configured
+                                ? 'Connected with saved credentials'
+                                : `${envStatus.missingRequired.length} required field(s) missing`}
+                          </span>
+                        </div>
+
+                        <div className="row g-3">
+                          {schemaEntries.map(([fieldKey, field]) => (
+                            <div className="col-md-6" key={fieldKey}>
+                              <label className="form-label small">
+                                {field.label}
+                                {field.required && <span className="text-danger"> *</span>}
+                                {envStatus.missingRequired.includes(fieldKey) && (
+                                  <span className="badge bg-warning text-dark ms-2">missing</span>
+                                )}
+                              </label>
+                              <input
+                                type={field.secret ? 'password' : 'text'}
+                                className="form-control form-control-sm"
+                                placeholder={
+                                  field.placeholder ||
+                                  (field.secret ? '••••••••  (leave blank to keep current)' : '')
+                                }
+                                value={fields[fieldKey] || ''}
+                                onChange={(e) =>
+                                  updateCredField(provider.name, env, fieldKey, e.target.value)
+                                }
+                              />
+                              {field.help && (
+                                <p className="small text-muted mt-1 mb-0">{field.help}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {schemaEntries.length === 0 && (
+                          <p className="small text-muted">This provider needs no credentials.</p>
+                        )}
+
+                        <div className="d-flex gap-2 mt-4">
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => saveCredentials(provider, env)}
+                            disabled={saving === formKey}
+                          >
+                            {saving === formKey ? 'Saving…' : 'Save credentials'}
+                          </button>
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            onClick={() => testConnection(provider, env)}
+                            disabled={testing === formKey}
+                          >
+                            {testing === formKey ? 'Testing…' : 'Test connection'}
+                          </button>
+                          {envStatus.isActive && (
+                            <button
+                              className="btn btn-outline-danger btn-sm"
+                              onClick={() => deactivateProvider(provider, env)}
+                            >
+                              Deactivate
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </>

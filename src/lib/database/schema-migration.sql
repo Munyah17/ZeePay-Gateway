@@ -809,3 +809,138 @@ END $$;
 DROP TRIGGER IF EXISTS update_disputes_updated_at ON disputes;
 CREATE TRIGGER update_disputes_updated_at BEFORE UPDATE ON disputes
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
+-- Seed: additional payment providers (plug-and-play adapters)
+-- ============================================================
+
+INSERT INTO payment_providers (name, provider_type, supports_test, supports_live, capabilities, config_schema)
+VALUES
+  ('onemoney', 'mobile_money', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": true}',
+   '{
+     "clientId": {"label": "Client ID", "required": true},
+     "clientSecret": {"label": "Client secret", "required": true, "secret": true},
+     "merchantCode": {"label": "Merchant code", "required": true},
+     "merchantNumber": {"label": "Merchant MSISDN", "required": false},
+     "terminalId": {"label": "Terminal ID", "required": false},
+     "notifyUrl": {"label": "Callback URL override", "required": false},
+     "baseUrl": {"label": "API base URL", "required": false}
+   }'),
+  ('mtn-momo', 'mobile_money', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": true}',
+   '{
+     "subscriptionKey": {"label": "Ocp-Apim subscription key", "required": true, "secret": true},
+     "apiUserId": {"label": "API user ID (UUID)", "required": true},
+     "apiKey": {"label": "API key", "required": true, "secret": true},
+     "targetEnvironment": {"label": "Target environment", "required": true, "placeholder": "sandbox | mtnzambia | mtnuganda | mtnghana | ..."},
+     "callbackHost": {"label": "Callback host (optional)", "required": false},
+     "baseUrl": {"label": "Base URL override (optional)", "required": false}
+   }'),
+  ('mpesa', 'mobile_money', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": true, "createPayout": true}',
+   '{
+     "consumerKey": {"label": "Consumer key", "required": true, "secret": true},
+     "consumerSecret": {"label": "Consumer secret", "required": true, "secret": true},
+     "shortCode": {"label": "Business short code", "required": true},
+     "passkey": {"label": "Lipa Na M-Pesa passkey", "required": true, "secret": true},
+     "initiatorName": {"label": "Initiator name (B2C/reversal)", "required": false},
+     "securityCredential": {"label": "Security credential (B2C/reversal)", "required": false, "secret": true},
+     "commandId": {"label": "B2C command ID", "required": false},
+     "callbackUrl": {"label": "Callback URL override", "required": false},
+     "baseUrl": {"label": "Base URL override (optional)", "required": false}
+   }'),
+  ('opay', 'mobile_money', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": false, "createPayout": true}',
+   '{
+     "merchantId": {"label": "Merchant ID", "required": true},
+     "publicKey": {"label": "Public key", "required": true},
+     "privateKey": {"label": "Private key", "required": true, "secret": true},
+     "shortName": {"label": "Merchant short name", "required": false},
+     "baseUrl": {"label": "Base URL override (optional)", "required": false}
+   }'),
+  ('palmpay', 'mobile_money', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": false, "createPayout": true}',
+   '{
+     "appId": {"label": "App ID", "required": true},
+     "merchantId": {"label": "Merchant ID", "required": true},
+     "secretKey": {"label": "Secret key (signing)", "required": true, "secret": true},
+     "baseUrl": {"label": "Base URL override (optional)", "required": false}
+   }'),
+  ('zelle', 'bank_transfer', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": false, "createPayout": true}',
+   '{
+     "baseUrl": {"label": "Partner API base URL", "required": true, "help": "Issued by your bank or Zelle aggregator"},
+     "clientId": {"label": "Client ID", "required": true},
+     "clientSecret": {"label": "Client secret", "required": true, "secret": true},
+     "merchantId": {"label": "Merchant/payee ID", "required": false},
+     "payeeAlias": {"label": "Merchant Zelle alias", "required": false}
+   }'),
+  ('cashapp', 'wallet', true, true,
+   '{"createPayment": true, "getPayment": true, "refundPayment": true, "supportsWebhooks": true, "supportsRecurring": false, "createPayout": false}',
+   '{
+     "clientId": {"label": "Client ID", "required": true},
+     "apiKey": {"label": "API key", "required": true, "secret": true},
+     "scopeId": {"label": "Scope/brand ID", "required": false},
+     "baseUrl": {"label": "Base URL override (optional)", "required": false}
+   }')
+ON CONFLICT (name) DO UPDATE SET
+  provider_type = EXCLUDED.provider_type,
+  capabilities = EXCLUDED.capabilities,
+  config_schema = EXCLUDED.config_schema;
+
+-- ============================================================
+-- Seed: payment methods offered on hosted checkout
+-- ============================================================
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'ecocash', 'EcoCash', '{USD,ZWG}', 0.01, true FROM payment_providers WHERE name = 'ecocash'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'innbucks', 'InnBucks', '{USD,ZWG}', 0.01, true FROM payment_providers WHERE name = 'innbucks'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'omari', 'Omari', '{USD,ZWG}', 0.01, true FROM payment_providers WHERE name = 'omari'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'onemoney', 'OneMoney', '{USD,ZWG}', 0.01, true FROM payment_providers WHERE name = 'onemoney'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'mtn-momo', 'MTN MoMo', '{ZMW,UGX,GHS,XAF,XOF,USD}', 0.01, true FROM payment_providers WHERE name = 'mtn-momo'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'mpesa', 'M-Pesa', '{KES,USD}', 0.01, true FROM payment_providers WHERE name = 'mpesa'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'opay', 'OPay', '{NGN}', 0.01, true FROM payment_providers WHERE name = 'opay'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'palmpay', 'PalmPay', '{NGN}', 0.01, true FROM payment_providers WHERE name = 'palmpay'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'zelle', 'Zelle', '{USD}', 0.01, true FROM payment_providers WHERE name = 'zelle'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'cashapp', 'Cash App Pay', '{USD}', 0.01, true FROM payment_providers WHERE name = 'cashapp'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'visa', 'Visa', '{USD}', 0.01, true FROM payment_providers WHERE name = 'visa'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'mastercard', 'Mastercard', '{USD}', 0.01, true FROM payment_providers WHERE name = 'mastercard'
+ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
+SELECT id, 'zimswitch', 'ZimSwitch', '{USD,ZWG}', 0.01, true FROM payment_providers WHERE name = 'zimswitch'
+ON CONFLICT (provider_id, method_code) DO NOTHING;

@@ -13,6 +13,7 @@ import {
   PayoutResult,
   GetPayoutInput,
   PaymentProviderCapabilities,
+  ProviderConfigSchema,
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -27,6 +28,14 @@ import { v4 as uuidv4 } from 'uuid';
  * board resolution, CR6, tax clearance, director IDs).
  */
 export class OmariProvider extends BasePaymentProvider {
+  private static readonly REQUIRED_KEYS = ['apiKey', 'merchantCode'];
+
+  readonly configSchema: ProviderConfigSchema = {
+    apiKey: { label: 'API key', required: true, secret: true },
+    merchantCode: { label: 'Merchant code', required: true },
+    baseUrl: { label: 'Base URL override (optional)', required: false },
+  };
+
   private baseUrl!: string;
   private apiKey!: string;
   private merchantCode!: string;
@@ -66,6 +75,9 @@ export class OmariProvider extends BasePaymentProvider {
 
   async createPayment(input: CreatePaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) {
+      return this.simulatedPayment(input);
+    }
 
     // Validate phone number for Omari (Zimbabwe format)
     const phoneNumber = this.validateAndFormatPhoneNumber(input.customerPhone);
@@ -102,6 +114,9 @@ export class OmariProvider extends BasePaymentProvider {
 
   async getPayment(input: GetPaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) {
+      return this.simulatedGetPayment(input);
+    }
 
     try {
       const response = await this.makeRequest(`/payments/${input.providerReference}`, 'GET');
@@ -122,6 +137,9 @@ export class OmariProvider extends BasePaymentProvider {
 
   async refundPayment(input: RefundPaymentInput): Promise<RefundResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) {
+      return this.simulatedRefund(input);
+    }
 
     const payload = {
       originalReference: input.paymentReference,
@@ -182,6 +200,7 @@ export class OmariProvider extends BasePaymentProvider {
   async healthCheck(): Promise<boolean> {
     try {
       this.ensureInitialized();
+      if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) return true;
       await this.makeRequest('/health', 'GET');
       return true;
     } catch (error) {
@@ -196,6 +215,9 @@ export class OmariProvider extends BasePaymentProvider {
    */
   async createMandate(input: CreateMandateInput): Promise<MandateResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) {
+      return this.simulatedMandate(input);
+    }
 
     const phoneNumber = this.validateAndFormatPhoneNumber(input.customerPhone);
 
@@ -233,6 +255,9 @@ export class OmariProvider extends BasePaymentProvider {
    */
   async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) {
+      return this.simulatedMandateCharge(input);
+    }
 
     const payload = {
       merchantCode: this.merchantCode,
@@ -262,6 +287,10 @@ export class OmariProvider extends BasePaymentProvider {
 
   async revokeMandate(input: RevokeMandateInput): Promise<void> {
     this.ensureInitialized();
+    if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) {
+      this.simulatedRevokeMandate(input);
+      return;
+    }
 
     try {
       await this.makeRequest(`/mandates/${input.mandateReference}`, 'DELETE', {
@@ -281,6 +310,9 @@ export class OmariProvider extends BasePaymentProvider {
 
     const msisdn = this.normalizeMsisdnEpg(input.recipientMsisdn);
     const externalReference = input.externalReference || `${Date.now()}${Math.floor(Math.random() * 10000)}`;
+    if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) {
+      return this.simulatedPayout(input, externalReference);
+    }
 
     const payload = {
       merchantCode: this.merchantCode,
@@ -324,6 +356,9 @@ export class OmariProvider extends BasePaymentProvider {
    */
   async getPayout(input: GetPayoutInput): Promise<PayoutResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(OmariProvider.REQUIRED_KEYS)) {
+      return this.simulatedGetPayout(input);
+    }
 
     const msisdn = this.normalizeMsisdnEpg(input.msisdn);
 

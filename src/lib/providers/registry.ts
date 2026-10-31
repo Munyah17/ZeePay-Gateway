@@ -3,6 +3,13 @@ import { MockProvider } from './mock/mock-provider';
 import { EcoCashProvider } from './ecocash/ecocash-provider';
 import { InnBucksProvider } from './innbucks/innbucks-provider';
 import { OmariProvider } from './omari/omari-provider';
+import { OneMoneyProvider } from './onemoney/onemoney-provider';
+import { MtnMomoProvider } from './mtn-momo/mtn-momo-provider';
+import { MpesaProvider } from './mpesa/mpesa-provider';
+import { OPayProvider } from './opay/opay-provider';
+import { PalmPayProvider } from './palmpay/palmpay-provider';
+import { ZelleProvider } from './zelle/zelle-provider';
+import { CashAppProvider } from './cashapp/cashapp-provider';
 import { VisaProvider } from './cards/visa-provider';
 import { MastercardProvider } from './cards/mastercard-provider';
 import { ZimSwitchProvider } from './cards/zimswitch-provider';
@@ -17,11 +24,22 @@ export class PaymentProviderRegistry {
   constructor() {
     // Register mock provider for testing
     this.register(new MockProvider());
-    
-    // Register Zimbabwean payment providers (Milestone 2)
+
+    // Zimbabwean payment providers
     this.register(new EcoCashProvider());
     this.register(new InnBucksProvider());
     this.register(new OmariProvider());
+    this.register(new OneMoneyProvider());
+
+    // Regional & international mobile money / wallet providers
+    this.register(new MtnMomoProvider());
+    this.register(new MpesaProvider());
+    this.register(new OPayProvider());
+    this.register(new PalmPayProvider());
+    this.register(new ZelleProvider());
+    this.register(new CashAppProvider());
+
+    // Card providers
     this.register(new VisaProvider());
     this.register(new MastercardProvider());
     this.register(new ZimSwitchProvider());

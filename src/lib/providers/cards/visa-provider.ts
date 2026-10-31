@@ -10,6 +10,7 @@ import {
   ChargeMandateInput,
   RevokeMandateInput,
   PaymentProviderCapabilities,
+  ProviderConfigSchema,
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -20,6 +21,14 @@ import { v4 as uuidv4 } from 'uuid';
  * Supports 3D Secure verification and card-not-present transactions.
  */
 export class VisaProvider extends BasePaymentProvider {
+  private static readonly REQUIRED_KEYS = ['apiKey', 'merchantId'];
+
+  readonly configSchema: ProviderConfigSchema = {
+    apiKey: { label: 'API key', required: true, secret: true },
+    merchantId: { label: 'Merchant ID', required: true },
+    baseUrl: { label: 'Base URL override (optional)', required: false },
+  };
+
   private baseUrl!: string;
   private apiKey!: string;
   private merchantId!: string;
@@ -55,6 +64,9 @@ export class VisaProvider extends BasePaymentProvider {
 
   async createPayment(input: CreatePaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(VisaProvider.REQUIRED_KEYS)) {
+      return this.simulatedPayment(input);
+    }
 
     const payload = {
       merchantId: this.merchantId,
@@ -89,6 +101,9 @@ export class VisaProvider extends BasePaymentProvider {
 
   async getPayment(input: GetPaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(VisaProvider.REQUIRED_KEYS)) {
+      return this.simulatedGetPayment(input);
+    }
 
     try {
       const response = await this.makeRequest(`/payments/${input.providerReference}`, 'GET');
@@ -109,6 +124,9 @@ export class VisaProvider extends BasePaymentProvider {
 
   async refundPayment(input: RefundPaymentInput): Promise<RefundResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(VisaProvider.REQUIRED_KEYS)) {
+      return this.simulatedRefund(input);
+    }
 
     const payload = {
       originalReference: input.paymentReference,
@@ -169,6 +187,7 @@ export class VisaProvider extends BasePaymentProvider {
   async healthCheck(): Promise<boolean> {
     try {
       this.ensureInitialized();
+      if (this.shouldSimulate(VisaProvider.REQUIRED_KEYS)) return true;
       await this.makeRequest('/health', 'GET');
       return true;
     } catch (error) {
@@ -183,6 +202,9 @@ export class VisaProvider extends BasePaymentProvider {
    */
   async createMandate(input: CreateMandateInput): Promise<MandateResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(VisaProvider.REQUIRED_KEYS)) {
+      return this.simulatedMandate(input);
+    }
 
     const payload = {
       merchantId: this.merchantId,
@@ -220,6 +242,9 @@ export class VisaProvider extends BasePaymentProvider {
    */
   async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(VisaProvider.REQUIRED_KEYS)) {
+      return this.simulatedMandateCharge(input);
+    }
 
     const payload = {
       merchantId: this.merchantId,
@@ -252,6 +277,10 @@ export class VisaProvider extends BasePaymentProvider {
 
   async revokeMandate(input: RevokeMandateInput): Promise<void> {
     this.ensureInitialized();
+    if (this.shouldSimulate(VisaProvider.REQUIRED_KEYS)) {
+      this.simulatedRevokeMandate(input);
+      return;
+    }
 
     try {
       await this.makeRequest(`/tokens/${input.mandateReference}`, 'DELETE', {

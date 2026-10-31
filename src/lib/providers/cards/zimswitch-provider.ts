@@ -65,6 +65,14 @@ import { config } from '../../config';
  *   - Implement idempotent fulfilment to handle duplicate callbacks or retries
  */
 export class ZimSwitchProvider extends BasePaymentProvider {
+  private static readonly REQUIRED_KEYS = ['entityId', 'accessToken'];
+
+  readonly configSchema = {
+    entityId: { label: 'Entity ID (issued by acquiring bank)', required: true },
+    accessToken: { label: 'Bearer access token', required: true, secret: true },
+    baseUrl: { label: 'Base URL override (optional)', required: false },
+  };
+
   private baseUrl!: string;
   private entityId!: string;
   private accessToken!: string;
@@ -118,6 +126,9 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async createPayment(input: CreatePaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      return this.simulatedPayment(input);
+    }
 
     // Server-to-server flow with card data (PCI DSS compliance required)
     if (input.cardData) {
@@ -267,6 +278,9 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async getPayment(input: GetPaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      return this.simulatedGetPayment(input);
+    }
 
     try {
       let response;
@@ -321,6 +335,9 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async refundPayment(input: RefundPaymentInput): Promise<RefundResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      return this.simulatedRefund(input);
+    }
 
     const params = new URLSearchParams({
       entityId: this.entityId,
@@ -385,6 +402,21 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async createPaymentLink(input: CreatePaymentLinkInput): Promise<PaymentLinkResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      const linkId = `sim_link_${uuidv4()}`;
+      return {
+        id: uuidv4(),
+        providerReference: linkId,
+        linkUrl: `https://test.zimswitchonline.co.zw/v1/paymentLinks/${linkId}`,
+        status: 'active',
+        amount: input.amount,
+        currency: input.currency || 'USD',
+        reference: input.reference,
+        expiryDate: input.expiryDate,
+        metadata: { ...input.metadata, simulated: true },
+        providerResponse: { simulated: true, provider: this.name },
+      };
+    }
 
     const isTest = this.config?.environment === 'test';
 
@@ -445,6 +477,18 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async getPaymentLink(linkId: string): Promise<PaymentLinkResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      return {
+        id: uuidv4(),
+        providerReference: linkId,
+        linkUrl: `https://test.zimswitchonline.co.zw/v1/paymentLinks/${linkId}`,
+        status: 'active',
+        amount: 0,
+        currency: 'USD',
+        reference: linkId,
+        providerResponse: { simulated: true, provider: this.name },
+      };
+    }
 
     try {
       const response = await this.request(
@@ -483,6 +527,9 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async deactivatePaymentLink(linkId: string): Promise<void> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      return;
+    }
 
     try {
       await this.request(
@@ -502,6 +549,9 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async createMandate(input: CreateMandateInput): Promise<MandateResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      return this.simulatedMandate(input);
+    }
 
     const result = await this.createPayment({
       amount: input.amount,
@@ -530,6 +580,9 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      return this.simulatedMandateCharge(input);
+    }
 
     const isTest = this.config?.environment === 'test';
 
@@ -583,6 +636,10 @@ export class ZimSwitchProvider extends BasePaymentProvider {
    */
   async revokeMandate(input: RevokeMandateInput): Promise<void> {
     this.ensureInitialized();
+    if (this.shouldSimulate(ZimSwitchProvider.REQUIRED_KEYS)) {
+      this.simulatedRevokeMandate(input);
+      return;
+    }
 
     await this.request(
       `/v1/registrations/${input.mandateReference}?entityId=${encodeURIComponent(this.entityId)}`,

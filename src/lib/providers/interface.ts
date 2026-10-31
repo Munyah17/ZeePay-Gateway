@@ -15,10 +15,11 @@ import {
   PaymentProviderCapabilities,
   CreatePaymentLinkInput,
   PaymentLinkResult,
+  ProviderConfigSchema,
 } from '@/types/provider';
 
 // Re-export ProviderConfig for use in base class
-export type { ProviderConfig };
+export type { ProviderConfig, ProviderConfigSchema };
 
 /**
  * Base interface that all payment providers must implement.
@@ -34,6 +35,12 @@ export interface PaymentProvider {
    * Provider type (e.g., 'mobile_money', 'card', 'wallet')
    */
   readonly type: string;
+
+  /**
+   * Credential fields this provider needs — drives the dashboard's
+   * plug-and-play credential form and the "configured" check.
+   */
+  readonly configSchema?: ProviderConfigSchema;
 
   /**
    * Get provider capabilities

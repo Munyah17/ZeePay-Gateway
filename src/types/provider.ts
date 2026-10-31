@@ -192,6 +192,23 @@ export interface ProviderCredentials {
   [key: string]: string | number | boolean;
 }
 
+/**
+ * Declarative description of one credential field — used to render
+ * the plug-and-play credential form on the dashboard and to decide
+ * whether a provider is configured (all required fields present).
+ */
+export interface ProviderCredentialField {
+  label: string;
+  required?: boolean;
+  /** Render as a password field; never echoed back in API responses */
+  secret?: boolean;
+  placeholder?: string;
+  help?: string;
+}
+
+/** Credential field set a provider needs — keyed by credentials key. */
+export type ProviderConfigSchema = Record<string, ProviderCredentialField>;
+
 export interface ProviderConfig {
   credentials: ProviderCredentials;
   environment: 'test' | 'live';

@@ -11,8 +11,10 @@ import {
   RevokeMandateInput,
   PayoutInput,
   PayoutResult,
+  GetPayoutInput,
   PaymentProviderCapabilities,
   PaymentStatus,
+  ProviderConfigSchema,
 } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
@@ -49,6 +51,22 @@ import { config } from '../../config';
  *   baseUrl                           Optional override (defaults by environment)
  */
 export class EcoCashProvider extends BasePaymentProvider {
+  readonly configSchema: ProviderConfigSchema = {
+    onlineUsername: { label: 'Instant Payment username', required: true },
+    onlinePassword: { label: 'Instant Payment password', required: true, secret: true },
+    merchantCode: { label: 'Merchant code', required: true },
+    merchantNumber: { label: 'Merchant MSISDN (263...)', required: true },
+    merchantPin: { label: 'Merchant PIN', required: true, secret: true },
+    clientId: { label: 'EPG X-Client-Id', required: false },
+    clientSecret: { label: 'EPG X-Client-Secret', required: false, secret: true },
+    username: { label: 'EPG channel API user', required: false },
+    password: { label: 'EPG channel password', required: false, secret: true },
+    encryptionKey: { label: 'EPG encryption key', required: false, secret: true },
+    terminalId: { label: 'Terminal ID', required: false },
+    location: { label: 'Merchant location', required: false },
+    merchantName: { label: 'Merchant display name', required: false },
+  };
+
   private baseUrl!: string;
   private clientId!: string;
   private clientSecret!: string;
@@ -119,8 +137,14 @@ export class EcoCashProvider extends BasePaymentProvider {
   // Collections — Online Payments API
   // ------------------------------------------------------------------
 
+  private static readonly ONLINE_KEYS = ['onlineUsername', 'onlinePassword', 'merchantCode', 'merchantNumber'];
+  private static readonly EPG_KEYS = ['clientId', 'clientSecret', 'username', 'password'];
+
   async createPayment(input: CreatePaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(EcoCashProvider.ONLINE_KEYS)) {
+      return this.simulatedPayment(input);
+    }
 
     const correlator = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const endUserId = this.normalizeMsisdn(input.customerPhone);
@@ -184,6 +208,9 @@ export class EcoCashProvider extends BasePaymentProvider {
 
   async getPayment(input: GetPaymentInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(EcoCashProvider.ONLINE_KEYS)) {
+      return this.simulatedGetPayment(input);
+    }
 
     const { correlator, msisdn } = this.resolveCorrelator(input.providerReference);
 
@@ -209,6 +236,9 @@ export class EcoCashProvider extends BasePaymentProvider {
 
   async refundPayment(input: RefundPaymentInput): Promise<RefundResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(EcoCashProvider.ONLINE_KEYS)) {
+      return this.simulatedRefund(input);
+    }
 
     const { correlator, msisdn } = this.resolveCorrelator(input.paymentReference);
 
@@ -280,10 +310,14 @@ export class EcoCashProvider extends BasePaymentProvider {
    */
   async createPayout(input: PayoutInput): Promise<PayoutResult> {
     this.ensureInitialized();
-
     const service = this.payoutServiceConfig(input.serviceType);
+    const earlyExternalReference = input.externalReference || `${Date.now()}${Math.floor(Math.random() * 10000)}`;
+    if (this.shouldSimulate(EcoCashProvider.EPG_KEYS)) {
+      return this.simulatedPayout(input, earlyExternalReference);
+    }
+
     const msisdn = this.normalizeMsisdnEpg(input.recipientMsisdn);
-    const externalReference = input.externalReference || `${Date.now()}${Math.floor(Math.random() * 10000)}`;
+    const externalReference = earlyExternalReference;
 
     const base = {
       serviceType: service.code,
@@ -348,8 +382,11 @@ export class EcoCashProvider extends BasePaymentProvider {
    * Look up an EPG transaction by the externalReference used when it was
    * created (EXTERNALTRANSACTIONLOOKUP — client credentials only).
    */
-  async getPayout(input: { externalTransactionId: string; msisdn: string; currency: string }): Promise<PayoutResult> {
+  async getPayout(input: GetPayoutInput): Promise<PayoutResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(EcoCashProvider.EPG_KEYS)) {
+      return this.simulatedGetPayout(input);
+    }
 
     const body = {
       serviceType: 'EXTERNALTRANSACTIONLOOKUP',
@@ -394,6 +431,9 @@ export class EcoCashProvider extends BasePaymentProvider {
    */
   async createMandate(input: CreateMandateInput): Promise<MandateResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(EcoCashProvider.ONLINE_KEYS)) {
+      return this.simulatedMandate(input);
+    }
 
     const result = await this.createPayment({
       amount: input.amount,
@@ -428,6 +468,9 @@ export class EcoCashProvider extends BasePaymentProvider {
    */
   async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
     this.ensureInitialized();
+    if (this.shouldSimulate(EcoCashProvider.ONLINE_KEYS)) {
+      return this.simulatedMandateCharge(input);
+    }
 
     const { msisdn } = this.resolveCorrelator(input.mandateReference);
 
@@ -442,6 +485,7 @@ export class EcoCashProvider extends BasePaymentProvider {
 
   async revokeMandate(input: RevokeMandateInput): Promise<void> {
     this.ensureInitialized();
+    this.simulatedRevokeMandate(input);
     // EcoCash mandates are ZeePay-side records; nothing to cancel provider-side.
   }
 

@@ -51,6 +51,15 @@ Payment state transitions are managed by a state machine in `src/lib/services/st
 ### Webhook Delivery
 Webhooks are delivered with retries using exponential backoff. Signatures are verified using HMAC-SHA256. Implementation in `src/lib/webhooks/delivery.ts`.
 
+### Provider plug-and-play (simulation mode)
+Every provider adapter declares a `configSchema` (credential fields with `required`/`secret` flags). When a merchant has NOT saved credentials, `shouldSimulate()` in `src/lib/providers/base.ts` returns true and the provider answers with simulated results (PIN-prompt style: `processing` → `succeeded`). Saving credentials via `PUT /api/v1/provider-accounts` (AES-256-GCM into `merchant_provider_accounts`) switches the same code paths to the real gateway instantly. `GET /api/v1/provider-accounts` lists providers + config status; `POST` with `{action:'test'}` runs a health check; `DELETE` deactivates. Dashboard UI: Settings → Payment Providers tab. Live environment NEVER simulates.
+
+Registered providers: mock, ecocash, innbucks, omari, onemoney, mtn-momo, mpesa, opay, palmpay, zelle, cashapp, visa, mastercard, zimswitch.
+
+- `POST /api/v1/payments` resolves the provider via `paymentMethodId` → `payment_methods` → registry (mock when no method given).
+- `POST /api/v1/checkout/:id/pay` accepts `paymentMethodId` + `customerPhone` (or `savedPaymentMethodId` for one-click). `GET /api/v1/checkout/:id` returns the public method catalogue and polls the provider once per request to resolve in-flight payments.
+- `POST /api/v1/provider-webhooks/:provider` is the generic inbound receiver (EcoCash has its own correlator-keyed route that takes precedence).
+
 ### EcoCash Provider (real API)
 `src/lib/providers/ecocash/ecocash-provider.ts` implements the real EcoCash developer API: Online Payments (Basic auth, `/payment/v1/transactions/amount/` + `/refund/`, lookup keyed on `endUserId`+`clientCorrelator`) for collections, and the shared EPG `/api/serviceRequest` endpoint (`X-Client-Id`/`X-Client-Secret` headers + channel API user) for disbursements — `ENTERPRISECASHINV2`, `CHANGEDISBURSEV2`, `MERCHTOSUBV2`, `EXTERNALTRANSACTIONLOOKUP`. Provider references encode `correlator|msisdn` for lookups. Merchant provider credentials live in `merchant_provider_accounts.credentials_encrypted` (AES-256-GCM via `src/lib/utils/crypto.ts`).
 

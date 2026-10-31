@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       },
       idempotencyKey: input.idempotencyKey,
       paymentMethodId: input.paymentMethodId,
+      environment,
       customerReference: input.customerReference,
     });
 
