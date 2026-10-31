@@ -142,7 +142,7 @@ const payment = await zee.payments.create({
               <h2 className="h5 mb-3">Subscriptions & Auto-Deduct</h2>
               <p className="small">
                 ZeePay subscriptions debit your customers automatically on each billing date —
-                <strong> including EcoCash, InnBucks and Omari wallets that don't natively support
+                <strong> including EcoCash, InnBucks and Omari wallets that don&apos;t natively support
                 recurring payments</strong>. A mandate is created when you create a subscription; the
                 customer approves it once, then ZeePay handles every debit.
               </p>
@@ -188,7 +188,7 @@ const payment = await zee.payments.create({
                   <thead><tr><th>serviceType</th><th>Use case</th></tr></thead>
                   <tbody>
                     <tr><td><code>enterprise_cash_in</code></td><td>Bulk disbursement — payroll, growers, grants, claims</td></tr>
-                    <tr><td><code>change_disbursement</code></td><td>POS change paid into the customer's wallet</td></tr>
+                    <tr><td><code>change_disbursement</code></td><td>POS change paid into the customer&apos;s wallet</td></tr>
                     <tr><td><code>merchant_to_subscriber</code></td><td>Single merchant payout to a subscriber</td></tr>
                   </tbody>
                 </table>

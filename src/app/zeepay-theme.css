@@ -33,6 +33,65 @@
 }
 [data-bs-theme="dark"] body { background: var(--zp-bg); color: var(--zp-text); }
 
+/* ------------------------------------------------------------------
+ * Dark-mode remap for hardcoded Tailwind utility colours.
+ * The console dark toggle (data-bs-theme) flips the zp-* vars, but
+ * hundreds of pages use literal Tailwind classes (bg-white,
+ * text-gray-900, border-gray-200…) that ignore it — producing
+ * black-on-black and white-on-white text. Remap them here so the
+ * dark palette applies consistently. Light mode is untouched.
+ * ------------------------------------------------------------------ */
+[data-bs-theme="dark"] .bg-white,
+[data-bs-theme="dark"] .bg-\[\#f4f5fb\] { background-color: var(--zp-surface) !important; }
+
+[data-bs-theme="dark"] .bg-gray-50,
+[data-bs-theme="dark"] .bg-gray-100,
+[data-bs-theme="dark"] .bg-\[\#f6f7fd\],
+[data-bs-theme="dark"] .bg-\[\#dfe3fa\] { background-color: var(--zp-surface-2) !important; }
+
+[data-bs-theme="dark"] .bg-gray-200,
+[data-bs-theme="dark"] .bg-gray-300 { background-color: #2e345f !important; }
+
+[data-bs-theme="dark"] .bg-\[\#eef7f0\] { background-color: rgba(16, 185, 129, 0.12) !important; }
+
+[data-bs-theme="dark"] .hover\:bg-gray-50:hover,
+[data-bs-theme="dark"] .hover\:bg-gray-100:hover { background-color: var(--zp-surface-2) !important; }
+[data-bs-theme="dark"] .disabled\:bg-gray-300:disabled,
+[data-bs-theme="dark"] .disabled\:bg-gray-200:disabled { background-color: #2e345f !important; }
+[data-bs-theme="dark"] .hover\:bg-indigo-50:hover,
+[data-bs-theme="dark"] .bg-indigo-50 { background-color: rgba(99, 102, 241, 0.14) !important; }
+
+[data-bs-theme="dark"] .text-gray-900,
+[data-bs-theme="dark"] .text-gray-800,
+[data-bs-theme="dark"] .text-\[\#1a1650\],
+[data-bs-theme="dark"] .text-black { color: var(--zp-text) !important; }
+
+[data-bs-theme="dark"] .text-gray-700,
+[data-bs-theme="dark"] .text-gray-600 { color: #c3c6e8 !important; }
+
+[data-bs-theme="dark"] .text-gray-500,
+[data-bs-theme="dark"] .text-gray-400 { color: var(--zp-muted) !important; }
+
+[data-bs-theme="dark"] .text-indigo-900,
+[data-bs-theme="dark"] .text-green-900 { color: #a5b4fc !important; }
+[data-bs-theme="dark"] .text-green-900 { color: #34d399 !important; }
+[data-bs-theme="dark"] .text-indigo-600,
+[data-bs-theme="dark"] .text-indigo-700 { color: #a5b4fc !important; }
+
+[data-bs-theme="dark"] .border-gray-100,
+[data-bs-theme="dark"] .border-gray-200,
+[data-bs-theme="dark"] .border-gray-300,
+[data-bs-theme="dark"] .border-gray-500,
+[data-bs-theme="dark"] .border-white,
+[data-bs-theme="dark"] .border-green-200,
+[data-bs-theme="dark"] .border-indigo-200 { border-color: var(--zp-border) !important; }
+
+[data-bs-theme="dark"] .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+[data-bs-theme="dark"] .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--zp-border) !important; }
+
+/* Subtle white overlays/borders on navy stay as-is — they're
+ * already designed for dark surfaces. */
+
 .min-w-0 { min-width: 0; }
 
 /* Buttons */
