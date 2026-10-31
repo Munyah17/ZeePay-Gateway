@@ -190,6 +190,11 @@ export class ZimSwitchProvider extends BasePaymentProvider {
   private async createServerToServerPayment(input: CreatePaymentInput): Promise<PaymentResult> {
     const isTest = this.config?.environment === 'test';
     const paymentType = input.paymentType || 'DB';
+    // paymentBrand is REQUIRED for S2S — metadata override wins,
+    // otherwise detect from the card BIN.
+    const paymentBrand =
+      (input.metadata?.paymentBrand as string | undefined) ||
+      (input.cardData ? this.detectCardBrand(input.cardData.number) : undefined);
 
     const params = new URLSearchParams({
       entityId: this.entityId,
@@ -198,7 +203,7 @@ export class ZimSwitchProvider extends BasePaymentProvider {
       paymentType,
       merchantTransactionId: input.reference,
       ...(isTest ? { testMode: 'EXTERNAL' } : {}),
-      ...(input.metadata?.paymentBrand ? { paymentBrand: input.metadata.paymentBrand } : {}),
+      ...(paymentBrand ? { paymentBrand } : {}),
       // shopperResultUrl required for async flows
       ...(input.returnUrl ? { shopperResultUrl: input.returnUrl } : {}),
     });
@@ -224,20 +229,19 @@ export class ZimSwitchProvider extends BasePaymentProvider {
         throw new Error('ZimSwitch API returned invalid response: missing payment ID');
       }
 
-      // Check for async redirect (3DS, issuer validation)
+      // Check for async redirect (3DS, issuer validation) — the
+      // browser must submit the gateway-supplied parameters, not just
+      // navigate to the URL.
       if (response.redirect) {
         return {
           id: uuidv4(),
           providerReference: paymentId,
           status: 'processing',
           checkoutUrl: response.redirect.url,
+          redirect: this.parseRedirect(response.redirect),
           amount: input.amount,
           currency: input.currency,
-          metadata: {
-            ...input.metadata,
-            redirectMethod: response.redirect.method,
-            redirectParameters: response.redirect.parameters,
-          },
+          metadata: input.metadata,
           providerResponse: response,
         };
       }
@@ -265,11 +269,33 @@ export class ZimSwitchProvider extends BasePaymentProvider {
     this.ensureInitialized();
 
     try {
-      const response = await this.request(
-        `/v1/checkouts/${input.providerReference}/payment?entityId=${encodeURIComponent(this.entityId)}`,
-        undefined,
-        'GET'
-      );
+      let response;
+      if (input.resourcePath) {
+        // Gateway-supplied verify path from the shopper redirect —
+        // query it verbatim (pay-by-link uses paybylink/v1/{id}/checkouts/{id}/payment).
+        const path = input.resourcePath.startsWith('/') ? input.resourcePath : `/${input.resourcePath}`;
+        response = await this.request(
+          `${path}?entityId=${encodeURIComponent(this.entityId)}`,
+          undefined,
+          'GET'
+        );
+      } else {
+        try {
+          // S2S references are payment IDs → /v1/payments/{id}
+          response = await this.request(
+            `/v1/payments/${input.providerReference}?entityId=${encodeURIComponent(this.entityId)}`,
+            undefined,
+            'GET'
+          );
+        } catch {
+          // Hosted-checkout references are checkout IDs → /v1/checkouts/{id}/payment
+          response = await this.request(
+            `/v1/checkouts/${input.providerReference}/payment?entityId=${encodeURIComponent(this.entityId)}`,
+            undefined,
+            'GET'
+          );
+        }
+      }
 
       return {
         id: uuidv4(),
@@ -369,8 +395,16 @@ export class ZimSwitchProvider extends BasePaymentProvider {
       paymentType: 'DB',
       merchantTransactionId: input.reference,
       ...(isTest ? { testMode: 'EXTERNAL' } : {}),
-      ...(input.description ? { description: input.description } : {}),
+      // Required so the customer returns to the merchant after paying —
+      // the redirect carries id + checkoutId + resourcePath to verify.
+      ...(input.shopperResultUrl ? { shopperResultUrl: input.shopperResultUrl } : {}),
+      // OPE link validity: validUntil + validUntilUnit (HOUR|DAY),
+      // defaults to 90 days on the gateway when omitted.
+      ...(input.validUntil != null ? { validUntil: String(input.validUntil) } : {}),
+      ...(input.validUntilUnit ? { validUntilUnit: input.validUntilUnit } : {}),
       ...(input.expiryDate ? { expiryDate: input.expiryDate } : {}),
+      ...(input.createQRCode ? { createQRCode: 'true' } : {}),
+      ...(input.description ? { description: input.description } : {}),
       ...(input.customerEmail ? { customerEmail: input.customerEmail } : {}),
       ...(input.customerPhone ? { customerPhone: input.customerPhone } : {}),
     });
@@ -391,6 +425,7 @@ export class ZimSwitchProvider extends BasePaymentProvider {
         id: uuidv4(),
         providerReference: checkoutId,
         linkUrl,
+        qrCode: response.qrCode,
         status: 'active',
         amount: input.amount,
         currency: input.currency,
@@ -401,6 +436,62 @@ export class ZimSwitchProvider extends BasePaymentProvider {
       };
     } catch (error) {
       throw new Error(`ZimSwitch Pay by Link creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Pay by Link status — GET /paybylink/v1/{id}.
+   * Returns whether the link is active, paid, expired or deactivated.
+   */
+  async getPaymentLink(linkId: string): Promise<PaymentLinkResult> {
+    this.ensureInitialized();
+
+    try {
+      const response = await this.request(
+        `/paybylink/v1/${linkId}?entityId=${encodeURIComponent(this.entityId)}`,
+        undefined,
+        'GET'
+      );
+
+      const state = (response.status || response.state || '').toLowerCase();
+      const status: PaymentLinkResult['status'] =
+        state === 'paid' ? 'paid'
+        : state === 'expired' ? 'expired'
+        : state === 'deactivated' || state === 'cancelled' ? 'cancelled'
+        : 'active';
+
+      return {
+        id: uuidv4(),
+        providerReference: linkId,
+        linkUrl: response.link || '',
+        qrCode: response.qrCode,
+        status,
+        amount: parseFloat(response.amount || '0'),
+        currency: response.currency || 'USD',
+        reference: response.merchantTransactionId || '',
+        expiryDate: response.validUntil,
+        providerResponse: response,
+      };
+    } catch (error) {
+      throw new Error(`ZimSwitch link status failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Deactivate a Pay by Link — DELETE /paybylink/v1/{id}.
+   * The link can no longer be used for payment after this call.
+   */
+  async deactivatePaymentLink(linkId: string): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      await this.request(
+        `/paybylink/v1/${linkId}?entityId=${encodeURIComponent(this.entityId)}`,
+        undefined,
+        'DELETE'
+      );
+    } catch (error) {
+      throw new Error(`ZimSwitch link deactivation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -440,17 +531,38 @@ export class ZimSwitchProvider extends BasePaymentProvider {
   async chargeMandate(input: ChargeMandateInput): Promise<PaymentResult> {
     this.ensureInitialized();
 
+    const isTest = this.config?.environment === 'test';
+
     const params = new URLSearchParams({
       entityId: this.entityId,
       amount: input.amount.toFixed(2),
-      currency: input.currency,
+      currency: input.currency || 'USD',
       paymentType: 'DB',
       recurringType: 'REPEATED',
       merchantTransactionId: input.reference,
+      // Same test-mode flag as every other ZimSwitch request — without it
+      // UAT recurring debits run with live semantics and fail.
+      ...(isTest ? { testMode: 'EXTERNAL' } : {}),
     });
 
     try {
       const response = await this.request(`/v1/registrations/${input.mandateReference}/payments`, params);
+
+      // Some issuers step MIT debits up to 3DS — surface the redirect
+      // so the caller can route the shopper through validation.
+      if (response.redirect) {
+        return {
+          id: uuidv4(),
+          providerReference: response.id || input.mandateReference,
+          status: 'processing',
+          checkoutUrl: response.redirect.url,
+          redirect: this.parseRedirect(response.redirect),
+          amount: input.amount,
+          currency: input.currency,
+          metadata: input.metadata,
+          providerResponse: response,
+        };
+      }
 
       return {
         id: uuidv4(),
@@ -558,6 +670,47 @@ export class ZimSwitchProvider extends BasePaymentProvider {
     }
 
     return data;
+  }
+
+  /**
+   * Infer the OPE paymentBrand from the card BIN when the caller
+   * doesn't supply one. Covers the brands the gateway accepts.
+   */
+  private detectCardBrand(number: string): string | undefined {
+    const pan = (number || '').replace(/\D/g, '');
+    if (!pan) return undefined;
+    if (/^4/.test(pan)) return 'VISA';
+    if (/^(5[1-5]|2[2-7])/.test(pan)) return 'MASTER';
+    if (/^(34|37)/.test(pan)) return 'AMEX';
+    if (/^6/.test(pan)) return 'ZIMSWITCH';
+    return undefined;
+  }
+
+  /**
+   * Normalise the gateway's async redirect object. OPE returns
+   * { url, method, parameters } where parameters may be an array of
+   * { name, value } pairs or a plain map — accept both.
+   */
+  private parseRedirect(
+    redirect: { url?: string; method?: string; parameters?: unknown } | null | undefined
+  ): { url: string; method: 'GET' | 'POST'; parameters?: Record<string, string> } | undefined {
+    if (!redirect?.url) return undefined;
+    let parameters: Record<string, string> | undefined;
+    if (Array.isArray(redirect.parameters)) {
+      parameters = {};
+      for (const p of redirect.parameters as Array<{ name?: string; value?: unknown }>) {
+        if (p?.name != null) parameters[p.name] = String(p.value ?? '');
+      }
+    } else if (redirect.parameters && typeof redirect.parameters === 'object') {
+      parameters = Object.fromEntries(
+        Object.entries(redirect.parameters as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+      );
+    }
+    return {
+      url: redirect.url,
+      method: redirect.method === 'GET' ? 'GET' : 'POST',
+      parameters,
+    };
   }
 
   /**

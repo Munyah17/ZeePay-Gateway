@@ -29,6 +29,13 @@ export interface PaymentResult {
   providerReference: string;
   status: PaymentStatus;
   checkoutUrl?: string;
+  /** Async (3DS/issuer validation) redirect returned by S2S flows —
+   * the browser must submit these parameters to url via method. */
+  redirect?: {
+    url: string;
+    method: 'GET' | 'POST';
+    parameters?: Record<string, string>;
+  };
   amount: number;
   currency: string;
   metadata?: Record<string, any>;
@@ -37,6 +44,9 @@ export interface PaymentResult {
 
 export interface GetPaymentInput {
   providerReference: string;
+  /** Gateway-supplied verify path (e.g. paybylink/v1/{id}/checkouts/{id}/payment)
+   * returned on the shopper redirect — query it verbatim when present. */
+  resourcePath?: string;
 }
 
 export interface RefundPaymentInput {
@@ -53,6 +63,13 @@ export interface CreatePaymentLinkInput {
   reference: string;
   description?: string;
   expiryDate?: string;
+  /** HTTPS redirect target after the customer pays on the hosted page */
+  shopperResultUrl?: string;
+  /** Link validity — gateway defaults to 90 days when omitted */
+  validUntil?: number;
+  validUntilUnit?: 'HOUR' | 'DAY';
+  /** Request a qrCode in the response for in-person sharing */
+  createQRCode?: boolean;
   customerEmail?: string;
   customerPhone?: string;
   metadata?: Record<string, any>;

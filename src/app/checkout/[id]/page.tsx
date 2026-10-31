@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 interface PaymentMethod {
   id: string;
@@ -43,11 +43,36 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [widget, setWidget] = useState<{ scriptUrl: string } | null>(null);
+  const widgetRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
 
+  // Server-side verification failures land back here with ?error=
   useEffect(() => {
-    fetchCheckoutContext();
-    fetchPaymentMethods();
-  }, [paymentId]);
+    const e = searchParams.get('error');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (e) setError(e);
+  }, [searchParams]);
+
+  // Inject the COPYandPAY hosted widget: form must exist before the
+  // gateway script loads so it can hydrate the .paymentWidgets element.
+  useEffect(() => {
+    if (!widget || !widgetRef.current) return;
+    const container = widgetRef.current;
+    container.innerHTML = '';
+
+    const form = document.createElement('form');
+    form.className = 'paymentWidgets';
+    form.action = `/api/v1/checkout/${paymentId}/verify`;
+    form.setAttribute('data-brands', 'VISA MASTER ZIMSWITCH');
+    container.appendChild(form);
+
+    const script = document.createElement('script');
+    script.src = widget.scriptUrl;
+    container.appendChild(script);
+
+    return () => { container.innerHTML = ''; };
+  }, [widget, paymentId]);
 
   const fetchCheckoutContext = async () => {
     try {
@@ -89,6 +114,13 @@ function CheckoutContent() {
     }
   };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCheckoutContext();
+    fetchPaymentMethods();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentId]);
+
   const handlePayment = async () => {
     if (!selectedMethod) {
       setError('Please select a payment method');
@@ -108,8 +140,38 @@ function CheckoutContent() {
         });
         const data = await response.json();
 
+        if (data.requiresAction && data.redirect) {
+          // S2S async (3DS / issuer validation): the browser must POST
+          // the gateway-supplied parameters — a plain navigation loses them.
+          if (data.redirect.method === 'GET') {
+            const qs = new URLSearchParams(data.redirect.parameters || {}).toString();
+            window.location.href = qs ? `${data.redirect.url}?${qs}` : data.redirect.url;
+          } else {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = data.redirect.url;
+            Object.entries(data.redirect.parameters || {}).forEach(([k, v]) => {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = k;
+              input.value = String(v);
+              form.appendChild(input);
+            });
+            document.body.appendChild(form);
+            form.submit();
+          }
+          return;
+        }
+
         if (data.requiresAction && data.checkoutUrl) {
-          // Step-up authentication required (e.g. 3DS)
+          if (data.checkoutUrl.includes('paymentWidgets.js')) {
+            // COPYandPAY: the URL is a widget SCRIPT, not a page —
+            // redirecting to it shows raw JavaScript. Embed instead.
+            setWidget({ scriptUrl: data.checkoutUrl });
+            setProcessing(false);
+            return;
+          }
+          // Step-up authentication required (e.g. 3DS redirect page)
           window.location.href = data.checkoutUrl;
           return;
         }
@@ -258,6 +320,22 @@ function CheckoutContent() {
             </div>
           </div>
 
+          {widget && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-3">Enter card details</h2>
+              <div ref={widgetRef} className="rounded-lg border border-gray-200 bg-white p-3"></div>
+              <p className="text-xs text-gray-500 mt-2">
+                Card details are entered on ZimSwitch Online&apos;s hosted form — they never touch ZeePay.
+              </p>
+              <button
+                onClick={() => setWidget(null)}
+                className="mt-3 text-sm text-gray-600 hover:text-gray-900"
+              >
+                ← Choose a different payment method
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
               {error}
@@ -266,7 +344,7 @@ function CheckoutContent() {
 
           <button
             onClick={handlePayment}
-            disabled={!selectedMethod || processing}
+            disabled={!selectedMethod || processing || !!widget}
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             {processing ? 'Processing...' : 'Pay Now'}

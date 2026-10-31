@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getIdempotencyResult, recordIdempotencyKey } from '../utils/idempotency';
 import { deliverWebhookToMerchant } from '../webhooks/delivery';
 import { getOrCreateCustomer } from './customer-service';
+import { initializeProviderForMerchant } from './provider-credentials';
 import {
   RegisterPaymentMethodInput,
   SavedPaymentMethodResponse,
@@ -54,7 +55,7 @@ interface SavedMethodRow {
 type MandateCapableProvider = PaymentProvider &
   Required<Pick<PaymentProvider, 'createMandate' | 'chargeMandate' | 'revokeMandate'>>;
 
-function resolveMandateProvider(methodCode: string): MandateCapableProvider {
+async function resolveMandateProvider(methodCode: string, merchantId?: string): Promise<MandateCapableProvider> {
   const provider = providerRegistry.get(methodCode);
   if (!provider) {
     throw new Error(`No provider available for method '${methodCode}'`);
@@ -65,7 +66,7 @@ function resolveMandateProvider(methodCode: string): MandateCapableProvider {
     throw new Error(`Provider '${methodCode}' does not support tokenisation`);
   }
 
-  provider.initialize({ credentials: {}, environment: 'test' });
+  await initializeProviderForMerchant(provider, merchantId);
   return provider as MandateCapableProvider;
 }
 
@@ -126,12 +127,16 @@ export async function captureTokenForMandate(mandate: {
   provider_name: string;
   method_code: string;
   provider_reference: string;
+  merchant_id?: string;
 }): Promise<{ tokenReference: string; card: ReturnType<typeof extractCardDetails> } | null> {
   const provider = providerRegistry.get(mandate.provider_name);
   if (!provider?.getPayment) return null;
 
   try {
-    provider.initialize({ credentials: {}, environment: 'test' });
+    // Real merchant credentials are required — without them the
+    // registrationId lookup 401s and the transient checkoutId gets
+    // stored as the durable token, breaking all recurring debits.
+    await initializeProviderForMerchant(provider, mandate.merchant_id);
     const result = await provider.getPayment({ providerReference: mandate.provider_reference });
     const registrationId = result.metadata?.registrationId;
     if (!registrationId) return null;
@@ -203,8 +208,7 @@ export async function registerPaymentMethod(options: {
     });
     customerId = customer.id;
   }
-
-  const provider = resolveMandateProvider(methodCode);
+  const provider = await resolveMandateProvider(methodCode, merchantId);
   const reference = input.reference || `pm_${uuidv4()}`;
 
   // Create the provider-side tokenisation mandate. For cards this is a
@@ -343,12 +347,37 @@ export async function registerPaymentMethodFromPayment(options: {
   const provider = providerRegistry.get(providerName);
   if (!provider?.getPayment) throw new Error(`Provider '${providerName}' cannot verify payments`);
 
-  provider.initialize({ credentials: {}, environment: 'test' });
+  await initializeProviderForMerchant(provider, merchantId);
   const result = await provider.getPayment({ providerReference: attempt.provider_reference });
 
-  const token = result.metadata?.registrationId || result.providerReference;
+  // A reusable token only exists when the payment was run with
+  // registration enabled — the gateway then issues a registrationId.
+  // A plain paymentId is NOT a token: storing it would produce a
+  // saved method that can never be charged.
+  const registrationId = result.metadata?.registrationId;
+  if (result.status === 'succeeded' && !registrationId) {
+    throw new Error(
+      'Payment completed but issued no reusable token — it was not run with createRegistration enabled'
+    );
+  }
+  const token = registrationId || result.providerReference;
   const card = extractCardDetails(result.providerResponse || result.metadata);
-  const active = result.status === 'succeeded' || result.status === 'processing';
+  const active = result.status === 'succeeded';
+
+  // Dedupe: the same provider token claimed twice for the merchant
+  // returns the existing saved method instead of duplicating it.
+  if (registrationId) {
+    const { data: existing } = await supabaseAdmin
+      .from('saved_payment_methods')
+      .select('*')
+      .eq('merchant_id', merchantId)
+      .eq('provider_name', providerName)
+      .eq('provider_reference', registrationId)
+      .neq('status', 'revoked')
+      .limit(1)
+      .single();
+    if (existing) return toResponse(existing);
+  }
 
   let customerId = input.customerId || payment.customer_id || null;
   if (!customerId && (input.customerReference || input.customerEmail || input.customerPhone)) {
@@ -366,8 +395,11 @@ export async function registerPaymentMethodFromPayment(options: {
     id: mandateId,
     merchant_id: merchantId,
     provider_name: providerName,
-    provider_reference: token,
     method_code: providerName,
+    provider_reference: token,
+    // Keep the approval marker while the payment is pending so
+    // activateSavedPaymentMethod re-verifies before activating.
+    approval_url: active ? null : 'pending-verification',
     customer_email: input.customerEmail || payment.customer_email,
     customer_phone: input.customerPhone || payment.customer_phone,
     amount: payment.amount,
@@ -449,7 +481,14 @@ export async function activateSavedPaymentMethod(
   if (!mandate) throw new Error('Underlying mandate not found');
 
   // Resolve the durable provider token (registrationId for card checkouts)
+  // Hosted-checkout mandates (approval_url set): the shopper MUST have
+  // completed the widget and produced a durable token. Never activate on
+  // the transient checkoutId — that token is worthless for billing and
+  // would let an unapproved method charge nobody ever consented to.
   const captured = await captureTokenForMandate(mandate);
+  if (mandate.approval_url && !captured) {
+    throw new Error('Customer approval not complete — the durable token is not yet available');
+  }
   const tokenReference = captured?.tokenReference || mandate.provider_reference;
   const card = captured?.card || extractCardDetails(mandate.metadata?.card);
 
@@ -594,15 +633,18 @@ export async function removeSavedPaymentMethod(
 
   // Revoke the provider token (DELETE registration / mandate revoke)
   const provider = providerRegistry.get(method.provider_name);
+  let revokeFailed = false;
   if (provider?.revokeMandate && method.status === 'active') {
     try {
-      provider.initialize({ credentials: {}, environment: 'test' });
+      await initializeProviderForMerchant(provider, merchantId);
       await provider.revokeMandate({
         mandateReference: method.provider_reference!,
         reason: 'payment_method_removed',
       });
     } catch {
-      // Revocation is best-effort — the token is marked revoked locally regardless
+      // Record for ops follow-up — the token may still be chargeable at
+      // the provider even though we blocked it locally.
+      revokeFailed = true;
     }
   }
 
@@ -616,7 +658,11 @@ export async function removeSavedPaymentMethod(
 
   const { data: updated } = await supabaseAdmin
     .from('saved_payment_methods')
-    .update({ status: 'revoked', is_default: false })
+    .update({
+      status: 'revoked',
+      is_default: false,
+      metadata: { ...method.metadata, providerRevokeFailed: revokeFailed || undefined },
+    })
     .eq('id', methodId)
     .select()
     .single();

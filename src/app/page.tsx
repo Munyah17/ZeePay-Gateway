@@ -483,17 +483,19 @@ export default function Home() {
                 Accept payments from all major Zimbabwean and international providers
               </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
               {[
-                { name: 'EcoCash', type: 'Mobile Money', color: 'from-green-400 to-green-600', icon: '📱' },
-                { name: 'InnBucks', type: 'Mobile Money', color: 'from-blue-400 to-blue-600', icon: '💰' },
-                { name: 'Omari', type: 'Mobile Money', color: 'from-purple-400 to-purple-600', icon: '💳' },
-                { name: 'Visa', type: 'Card', color: 'from-blue-700 to-blue-900', icon: '💎' },
-                { name: 'Mastercard', type: 'Card', color: 'from-red-500 to-orange-500', icon: '🔴' },
+                { name: 'EcoCash', type: 'Mobile Money', logo: '/logos/ecocash.png' },
+                { name: 'OneMoney', type: 'Mobile Money', logo: '/logos/onemoney.jpg' },
+                { name: 'InnBucks', type: 'Mobile Money', logo: '/logos/innbucks.png' },
+                { name: 'Omari', type: 'Mobile Money', logo: '/logos/omari.webp' },
+                { name: 'Visa', type: 'Card', logo: '/logos/visa.png' },
+                { name: 'Mastercard', type: 'Card', logo: '/logos/mastercard.png' },
               ].map((method) => (
                 <div key={method.name} className="bg-[#f6f7fd] rounded-3xl p-6 sm:p-8 text-center hover:shadow-md transition-shadow">
-                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${method.color} flex items-center justify-center text-3xl mb-4 mx-auto`}>
-                    {method.icon}
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white border border-gray-100 shadow-sm flex items-center justify-center mb-4 mx-auto overflow-hidden p-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={method.logo} alt={`${method.name} logo`} className="max-w-full max-h-full object-contain" />
                   </div>
                   <p className="font-bold text-[#1a1650]">{method.name}</p>
                   <p className="text-xs text-gray-500 mt-1">{method.type}</p>

@@ -721,3 +721,91 @@ CREATE TRIGGER update_saved_payment_methods_updated_at BEFORE UPDATE ON saved_pa
 DROP TRIGGER IF EXISTS update_subscription_plans_updated_at ON subscription_plans;
 CREATE TRIGGER update_subscription_plans_updated_at BEFORE UPDATE ON subscription_plans
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Disputes — merchant/customer disagreement on a payment
+CREATE TABLE IF NOT EXISTS disputes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+  payment_id UUID NOT NULL REFERENCES payments(id),
+  type VARCHAR(50) NOT NULL, -- payment_not_received | goods_not_delivered | not_as_described | unauthorized | duplicate_charge | other
+  status VARCHAR(50) NOT NULL DEFAULT 'open', -- open | awaiting_evidence | under_review | resolved_customer | resolved_merchant | closed | expired
+  description TEXT NOT NULL,
+  opened_by VARCHAR(20) NOT NULL, -- customer | merchant
+  customer_email VARCHAR(255),
+  amount DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  evidence JSONB DEFAULT '[]',
+  resolution JSONB,
+  ai_assessment JSONB,
+  evidence_deadline TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Dispute audit trail — every action on a dispute
+CREATE TABLE IF NOT EXISTS dispute_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  dispute_id UUID NOT NULL REFERENCES disputes(id) ON DELETE CASCADE,
+  event VARCHAR(50) NOT NULL, -- opened | evidence_submitted | resolved | expired
+  actor VARCHAR(100),
+  details JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Fraud signals — observable identity markers used to enforce
+-- one-account-per-person (IP, device fingerprint, national ID).
+-- MAC addresses are NOT observable over HTTP and are never stored.
+CREATE TABLE IF NOT EXISTS fraud_signals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  entity_type VARCHAR(50) NOT NULL, -- merchant | customer | payment
+  entity_id VARCHAR(255) NOT NULL,
+  signal_type VARCHAR(50) NOT NULL, -- signup_ip | device_fingerprint | national_id | account_flag
+  signal_value TEXT NOT NULL,
+  flagged BOOLEAN DEFAULT false,
+  details JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Multi-account review requests — legitimate second-account applications
+CREATE TABLE IF NOT EXISTS multi_account_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) NOT NULL,
+  business_name VARCHAR(255) NOT NULL,
+  reason TEXT NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending | approved | rejected
+  scan_score INTEGER,
+  scan_details JSONB DEFAULT '{}',
+  reviewed_by VARCHAR(255),
+  review_note TEXT,
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_disputes_merchant_id') THEN
+    CREATE INDEX idx_disputes_merchant_id ON disputes(merchant_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_disputes_payment_id') THEN
+    CREATE INDEX idx_disputes_payment_id ON disputes(payment_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_disputes_status') THEN
+    CREATE INDEX idx_disputes_status ON disputes(status);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_dispute_events_dispute_id') THEN
+    CREATE INDEX idx_dispute_events_dispute_id ON dispute_events(dispute_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_fraud_signals_lookup') THEN
+    CREATE INDEX idx_fraud_signals_lookup ON fraud_signals(signal_type, signal_value);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_fraud_signals_entity') THEN
+    CREATE INDEX idx_fraud_signals_entity ON fraud_signals(entity_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_multi_acct_email') THEN
+    CREATE INDEX idx_multi_acct_email ON multi_account_requests(email, status);
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS update_disputes_updated_at ON disputes;
+CREATE TRIGGER update_disputes_updated_at BEFORE UPDATE ON disputes
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

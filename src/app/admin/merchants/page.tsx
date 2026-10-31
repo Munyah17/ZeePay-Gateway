@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { exportCSV } from '@/lib/export';
-import { Modal, useToast, useConfirm } from '@/components/ui';
+import { Modal, useToast } from '@/components/ui';
+import MerchantOnboardingModal, { OnboardingData } from '@/components/MerchantOnboardingModal';
 
 interface Merchant {
   name: string;
@@ -17,27 +18,32 @@ interface Merchant {
 export default function AdminMerchantsPage() {
   const router = useRouter();
   const toast = useToast();
-  const confirm = useConfirm();
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [managing, setManaging] = useState<Merchant | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<Merchant | null>(null);
+  const [onboarding, setOnboarding] = useState(false);
+
+  const handleOnboard = (data: OnboardingData) => {
+    setMerchants((prev) => [
+      {
+        name: data.tradingName || data.businessName,
+        email: data.email,
+        status: 'Pending review',
+        joined: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        volume: 0,
+      },
+      ...prev,
+    ]);
+    setOnboarding(false);
+    toast(`${data.businessName} onboarded — pending review${data.sendInvite ? ', invitation sent' : ''}`);
+  };
 
   const updateStatus = (m: Merchant, status: string, msg: string) => {
     setMerchants((prev) => prev.map((x) => (x.email === m.email ? { ...x, status } : x)));
     setManaging(null);
     toast(msg);
   };
-
-  useEffect(() => {
-    const authed = localStorage.getItem('zeepay_authed');
-    if (!authed) {
-      router.push('/auth/login');
-      return;
-    }
-
-    fetchMerchants();
-  }, [router]);
 
   const fetchMerchants = async () => {
     try {
@@ -54,6 +60,17 @@ export default function AdminMerchantsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const authed = localStorage.getItem('zeepay_authed');
+    if (!authed) {
+      router.push('/auth/login');
+      return;
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchMerchants();
+  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem('zeepay_authed');
@@ -106,18 +123,26 @@ export default function AdminMerchantsPage() {
             <h1 className="text-sm font-semibold text-gray-900">Merchants</h1>
             <p className="text-xs text-gray-600 mt-1">Review onboarding, monitor accounts, and manage access</p>
           </div>
-          <button
-            className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50"
-            onClick={() => {
-              exportCSV(
-                'merchants',
-                merchants.map((m) => ({ name: m.name, email: m.email, status: m.status, volume: m.volume, joined: m.joined })),
-              );
-              toast(`Exported ${merchants.length} merchants`);
-            }}
-          >
-            ⇩ Export CSV
-          </button>
+          <div className="d-flex gap-2">
+            <button
+              className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800"
+              onClick={() => setOnboarding(true)}
+            >
+              ＋ Onboard merchant
+            </button>
+            <button
+              className="text-xs border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50"
+              onClick={() => {
+                exportCSV(
+                  'merchants',
+                  merchants.map((m) => ({ name: m.name, email: m.email, status: m.status, volume: m.volume, joined: m.joined })),
+                );
+                toast(`Exported ${merchants.length} merchants`);
+              }}
+            >
+              ⇩ Export CSV
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -244,6 +269,9 @@ export default function AdminMerchantsPage() {
             </div>
           </Modal>
         )}
+
+        {/* Onboard merchant wizard */}
+        <MerchantOnboardingModal open={onboarding} onClose={() => setOnboarding(false)} onSubmit={handleOnboard} />
 
         {/* Suspend confirm */}
         {suspendTarget && (

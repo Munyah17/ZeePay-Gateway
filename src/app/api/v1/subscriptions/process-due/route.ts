@@ -14,6 +14,15 @@ export async function POST(request: NextRequest) {
   const token = authHeader.replace(/^Bearer\s+/i, '');
   const cronSecret = process.env.CRON_SECRET || 'dev-cron-secret';
 
+  // In production a missing CRON_SECRET would fall back to a known
+  // public value — this endpoint debits real money, so refuse to run.
+  if (process.env.NODE_ENV === 'production' && !process.env.CRON_SECRET) {
+    return NextResponse.json(
+      { error: 'Misconfigured', message: 'CRON_SECRET is not set' },
+      { status: 500 }
+    );
+  }
+
   if (token !== cronSecret) {
     return NextResponse.json(
       { error: 'Unauthorized', message: 'Invalid or missing cron secret' },

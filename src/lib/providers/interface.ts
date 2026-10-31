@@ -116,4 +116,14 @@ export interface PaymentProvider {
    * Optional - only providers supporting Pay by Link implement this.
    */
   createPaymentLink?(input: CreatePaymentLinkInput): Promise<PaymentLinkResult>;
+
+  /**
+   * Get payment link status — active, paid, expired or deactivated.
+   */
+  getPaymentLink?(linkId: string): Promise<PaymentLinkResult>;
+
+  /**
+   * Deactivate a payment link so it can no longer be used.
+   */
+  deactivatePaymentLink?(linkId: string): Promise<void>;
 }

@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getIdempotencyResult, recordIdempotencyKey } from '../utils/idempotency';
 import { deliverWebhookToMerchant } from '../webhooks/delivery';
 import { getOrCreateCustomer } from './customer-service';
+import { initializeProviderForMerchant } from './provider-credentials';
 
 export interface CreatePaymentOptions {
   merchantId: string;
@@ -266,6 +267,8 @@ export interface OneClickPaymentResponse extends PaymentResponse {
   savedPaymentMethodId: string;
   /** True when the provider requires an extra step (e.g. 3DS redirect) */
   requiresAction: boolean;
+  /** Async redirect the shopper must submit (3DS / issuer validation) */
+  redirect?: { url: string; method: 'GET' | 'POST'; parameters?: Record<string, string> };
 }
 
 /**
@@ -281,6 +284,11 @@ export async function chargeSavedPaymentMethod(options: {
   input: ChargeSavedMethodInput;
 }): Promise<OneClickPaymentResponse> {
   const { merchantId, input } = options;
+
+  if (!input.savedPaymentMethodId) throw new Error('savedPaymentMethodId is required');
+  if (!input.amount || input.amount <= 0) throw new Error('amount must be greater than zero');
+  if (!input.currency) throw new Error('currency is required');
+  if (!input.reference) throw new Error('reference is required');
 
   // Idempotency — repeat calls return the same payment
   if (input.idempotencyKey) {
@@ -327,7 +335,9 @@ export async function chargeSavedPaymentMethod(options: {
   if (!provider?.chargeMandate) {
     throw new Error(`Provider '${method.provider_name}' does not support token charges`);
   }
-  provider.initialize({ credentials: {}, environment: 'test' });
+  // The merchant's stored provider credentials are required — without
+  // them token charges are sent unauthenticated and fail at the gateway.
+  await initializeProviderForMerchant(provider, merchantId);
 
   // Create the payment record
   const paymentId = uuidv4();
@@ -375,7 +385,7 @@ export async function chargeSavedPaymentMethod(options: {
     });
 
     const succeeded = result.status === 'succeeded';
-    const requiresAction = result.status === 'processing' && !!result.checkoutUrl;
+    const requiresAction = result.status === 'processing' && (!!result.checkoutUrl || !!result.redirect);
 
     await supabaseAdmin
       .from('payments')
@@ -424,6 +434,7 @@ export async function chargeSavedPaymentMethod(options: {
       currency: input.currency,
       status: result.status,
       checkoutUrl: result.checkoutUrl,
+      redirect: result.redirect,
       createdAt: payment.created_at,
       savedPaymentMethodId: method.id,
       requiresAction,

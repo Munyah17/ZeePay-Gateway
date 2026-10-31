@@ -1,11 +1,11 @@
 import { supabaseAdmin } from '../database/client';
 import { providerRegistry } from '../providers/registry';
 import { PaymentProvider } from '../providers/interface';
-import { PayoutInput, PayoutResult, ProviderCredentials } from '@/types/provider';
+import { PayoutInput, PayoutResult } from '@/types/provider';
 import { v4 as uuidv4 } from 'uuid';
 import { getIdempotencyResult, recordIdempotencyKey } from '../utils/idempotency';
 import { deliverWebhookToMerchant } from '../webhooks/delivery';
-import { decrypt } from '../utils/crypto';
+import { initializeProviderForMerchant } from './provider-credentials';
 
 export interface CreatePayoutOptions {
   merchantId: string;
@@ -62,32 +62,7 @@ async function resolveProvider(
   }
 
   // Load the merchant's stored credentials for this provider, if configured
-  let credentials: ProviderCredentials = {};
-  const { data: providerRow } = await supabaseAdmin
-    .from('payment_providers')
-    .select('id')
-    .eq('name', providerName)
-    .maybeSingle();
-
-  const { data: account } = providerRow
-    ? await supabaseAdmin
-        .from('merchant_provider_accounts')
-        .select('credentials_encrypted')
-        .eq('merchant_id', merchantId)
-        .eq('provider_id', providerRow.id)
-        .eq('environment', environment)
-        .eq('is_active', true)
-        .maybeSingle()
-    : { data: null };
-
-  if (account?.credentials_encrypted) {
-    const decrypted = decrypt(account.credentials_encrypted);
-    if (decrypted) {
-      credentials = decrypted;
-    }
-  }
-
-  provider.initialize({ credentials, environment });
+  await initializeProviderForMerchant(provider, merchantId, environment);
   return provider as PayoutCapableProvider;
 }
 
@@ -216,7 +191,7 @@ export async function getPayout(externalReference: string, merchantId: string): 
   const getPayoutFn = provider?.getPayout?.bind(provider);
   if (getPayoutFn && payout.status !== 'succeeded' && payout.status !== 'failed') {
     try {
-      provider!.initialize({ credentials: {}, environment: 'test' });
+      await initializeProviderForMerchant(provider!, merchantId);
       const result = await getPayoutFn({
         externalTransactionId: externalReference,
         msisdn: payout.recipient_msisdn,

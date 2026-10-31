@@ -13,6 +13,7 @@ import {
   ProcessDueResult,
 } from '@/types/subscription';
 import { captureTokenForMandate } from './saved-payment-method-service';
+import { initializeProviderForMerchant } from './provider-credentials';
 
 interface SubscriptionRow {
   id: string;
@@ -61,7 +62,7 @@ const RETRY_DELAY_DAYS = 1;
 type MandateCapableProvider = PaymentProvider &
   Required<Pick<PaymentProvider, 'createMandate' | 'chargeMandate'>>;
 
-function resolveProvider(methodCode: string): MandateCapableProvider {
+async function resolveProvider(methodCode: string, merchantId?: string): Promise<MandateCapableProvider> {
   const provider = providerRegistry.get(methodCode);
   if (!provider) {
     throw new Error(`No provider available for method '${methodCode}'`);
@@ -72,7 +73,7 @@ function resolveProvider(methodCode: string): MandateCapableProvider {
     throw new Error(`Provider '${methodCode}' does not support recurring auto-deduct`);
   }
 
-  provider.initialize({ credentials: {}, environment: 'test' });
+  await initializeProviderForMerchant(provider, merchantId);
   return provider as MandateCapableProvider;
 }
 
@@ -299,7 +300,7 @@ export async function createSubscription(options: {
   }
 
   if (!savedMethod) {
-    const provider = resolveProvider(input.methodCode);
+    const provider = await resolveProvider(input.methodCode, merchantId);
     mandateResult = await provider.createMandate({
       reference: input.merchantReference,
       amount,
@@ -416,6 +417,11 @@ export async function approveSubscription(subscriptionId: string): Promise<Subsc
   // durable token (e.g. ZimSwitch registrationId) is issued only after
   // the shopper completes the widget — capture it now.
   const captured = await captureTokenForMandate(sub.payment_mandates);
+  // Hosted mandates (approval_url set) must yield a durable token —
+  // never activate a subscription billing a transient checkoutId.
+  if (sub.payment_mandates?.approval_url && !captured) {
+    throw new Error('Customer approval not complete — the durable token is not yet available');
+  }
   const tokenReference = captured?.tokenReference || sub.payment_mandates.provider_reference;
 
   await supabaseAdmin
@@ -451,7 +457,7 @@ async function chargeSubscription(subscription: SubscriptionRow, attemptNumber: 
     throw new Error('Mandate is not active');
   }
 
-  const provider = resolveProvider(mandate.method_code);
+  const provider = await resolveProvider(mandate.method_code, subscription.merchant_id);
   const chargeReference = `${subscription.merchant_reference}-auto-${Date.now()}`;
 
   // Record the payment + attempt
@@ -501,9 +507,14 @@ async function chargeSubscription(subscription: SubscriptionRow, attemptNumber: 
 
     const succeeded = result.status === 'succeeded';
 
+    // A 'processing' MIT charge means 3DS step-up — there is no shopper
+    // to redirect in an auto-deduct, so treat it as failed and let the
+    // retry engine re-attempt rather than leaving it stuck.
+    const finalStatus = succeeded ? 'succeeded' : 'failed';
+
     await supabaseAdmin
       .from('payments')
-      .update({ status: result.status, completed_at: succeeded ? new Date().toISOString() : null })
+      .update({ status: finalStatus, completed_at: succeeded ? new Date().toISOString() : null })
       .eq('id', paymentId);
 
     if (providerRow?.id) {
@@ -511,7 +522,7 @@ async function chargeSubscription(subscription: SubscriptionRow, attemptNumber: 
         payment_id: paymentId,
         provider_id: providerRow.id,
         provider_reference: result.providerReference,
-        status: result.status,
+        status: finalStatus,
         provider_response: result.providerResponse || {},
         completed_at: succeeded ? new Date().toISOString() : null,
       });
@@ -662,7 +673,7 @@ export async function processDueSubscriptions(options?: { limit?: number }): Pro
           const provider = providerRegistry.get(mandate?.method_code || 'mock');
 
           if (mandate && provider?.revokeMandate) {
-            provider.initialize({ credentials: {}, environment: 'test' });
+            await initializeProviderForMerchant(provider, sub.merchant_id);
             await provider.revokeMandate({ mandateReference: mandate.provider_reference, reason: 'max_retries_exceeded' }).catch(() => {});
             await supabaseAdmin
               .from('payment_mandates')
@@ -758,7 +769,7 @@ export async function cancelSubscription(
   // Revoke the mandate at the provider so no further debits are possible
   const provider = providerRegistry.get(sub.payment_mandates?.method_code || 'mock');
   if (provider?.revokeMandate && sub.payment_mandates?.status === 'active') {
-    provider.initialize({ credentials: {}, environment: 'test' });
+    await initializeProviderForMerchant(provider, sub.merchant_id);
     await provider.revokeMandate({
       mandateReference: sub.payment_mandates.provider_reference,
       reason: reason || 'subscription_cancelled',
