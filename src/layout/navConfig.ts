@@ -19,6 +19,7 @@ export const merchantNavItems: NavItem[] = [
   { name: "Payment Links", path: "/dashboard/links", icon: "bi-link-45deg" },
   { name: "Subscriptions", path: "/dashboard/subscriptions", icon: "bi-arrow-repeat" },
   { name: "Plans", path: "/dashboard/plans", icon: "bi-collection" },
+  { name: "Products", path: "/dashboard/products", icon: "bi-box-seam" },
   { name: "Saved Methods", path: "/dashboard/saved-methods", icon: "bi-credit-card-2-front" },
   { name: "Payouts", path: "/dashboard/payouts", icon: "bi-send" },
   { name: "Invoices", path: "/dashboard/invoices", icon: "bi-file-earmark-text" },

@@ -944,3 +944,48 @@ ON CONFLICT (provider_id, method_code) DO NOTHING;
 INSERT INTO payment_methods (provider_id, method_code, display_name, supported_currencies, min_amount, is_active)
 SELECT id, 'zimswitch', 'ZimSwitch', '{USD,ZWG}', 0.01, true FROM payment_providers WHERE name = 'zimswitch'
 ON CONFLICT (provider_id, method_code) DO NOTHING;
+
+-- ============================================================
+-- Products — merchant catalogue (ZeePay as back store)
+-- Merchants manage sellable items here; their storefront pulls
+-- them via GET /api/v1/products and sells via POST /api/v1/payments
+-- with productId (amount/currency resolved server-side).
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+  external_reference VARCHAR(255), -- Merchant's SKU/product id (idempotent create key)
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  price DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  images JSONB DEFAULT '[]', -- Array of image URLs
+  category VARCHAR(100),
+  stock_quantity INTEGER, -- NULL = unlimited / digital goods
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(merchant_id, external_reference)
+);
+
+-- Link payments to the catalogue product they were created for
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS product_id UUID REFERENCES products(id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_products_merchant_id') THEN
+    CREATE INDEX idx_products_merchant_id ON products(merchant_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_products_is_active') THEN
+    CREATE INDEX idx_products_is_active ON products(is_active);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_payments_product_id') THEN
+    CREATE INDEX idx_payments_product_id ON payments(product_id);
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
+CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

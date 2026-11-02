@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiKey, isErrorResponse } from '@/lib/auth/middleware';
 import { createPayment, chargeSavedPaymentMethod, listPayments } from '@/lib/services/payment-service';
+import { getProduct } from '@/lib/services/product-service';
 import { z } from 'zod';
 
 // Validation schema for creating a payment
 const createPaymentSchema = z.object({
-  amount: z.number().positive(),
-  currency: z.string().length(3),
+  // amount/currency are optional when productId is given — the price
+  // is resolved server-side from the merchant's catalogue so a
+  // storefront never sets its own prices.
+  amount: z.number().positive().optional(),
+  currency: z.string().length(3).optional(),
+  // Back-store sale: charge for a catalogue product. quantity defaults
+  // to 1; amount = product.price * quantity.
+  productId: z.string().uuid().optional(),
+  quantity: z.number().int().positive().optional(),
   reference: z.string().min(1).max(255),
   returnUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
@@ -51,6 +59,32 @@ export async function POST(request: NextRequest) {
 
   const input = validationResult.data;
 
+  // Resolve the charge amount. With productId the catalogue is the
+  // source of truth — amount = price × quantity in the product's
+  // currency; otherwise the caller must send amount + currency.
+  let amount = input.amount;
+  let currency = input.currency;
+
+  if (input.productId) {
+    const product = await getProduct(input.productId, merchantId);
+    if (!product || !product.isActive) {
+      return NextResponse.json(
+        { error: 'Product not found or inactive' },
+        { status: 400 }
+      );
+    }
+    const quantity = input.quantity ?? 1;
+    amount = Math.round(product.price * quantity * 100) / 100;
+    currency = product.currency;
+  }
+
+  if (amount === undefined || !currency) {
+    return NextResponse.json(
+      { error: 'Provide productId or amount + currency' },
+      { status: 400 }
+    );
+  }
+
   try {
     // One-click payment — charge a tokenised saved method directly
     if (input.savedPaymentMethodId) {
@@ -58,13 +92,17 @@ export async function POST(request: NextRequest) {
         merchantId,
         input: {
           savedPaymentMethodId: input.savedPaymentMethodId,
-          amount: input.amount,
-          currency: input.currency,
+          amount,
+          currency,
           reference: input.reference,
+          productId: input.productId,
           returnUrl: input.returnUrl,
           customerEmail: input.customerEmail,
           customerPhone: input.customerPhone,
-          metadata: input.metadata,
+          metadata: {
+            ...input.metadata,
+            ...(input.productId ? { productId: input.productId, quantity: input.quantity ?? 1 } : {}),
+          },
           idempotencyKey: input.idempotencyKey,
         },
       });
@@ -74,8 +112,8 @@ export async function POST(request: NextRequest) {
     const payment = await createPayment({
       merchantId,
       input: {
-        amount: input.amount,
-        currency: input.currency,
+        amount,
+        currency,
         reference: input.reference,
         returnUrl: input.returnUrl,
         cancelUrl: input.cancelUrl,
@@ -86,10 +124,12 @@ export async function POST(request: NextRequest) {
           // Card tokenisation during checkout (ZimSwitch: createRegistration)
           ...(input.saveCardForReuse ? { createRegistration: true } : {}),
           ...(input.customerReference ? { customerReference: input.customerReference } : {}),
+          ...(input.productId ? { productId: input.productId, quantity: input.quantity ?? 1 } : {}),
         },
       },
       idempotencyKey: input.idempotencyKey,
       paymentMethodId: input.paymentMethodId,
+      productId: input.productId,
       environment,
       customerReference: input.customerReference,
     });

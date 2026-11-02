@@ -213,6 +213,28 @@ CREATE TABLE payouts (
   UNIQUE(merchant_id, external_reference)
 );
 
+-- Products table (merchant catalogue — ZeePay as back store)
+CREATE TABLE products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+  external_reference VARCHAR(255), -- Merchant's SKU/product id (idempotent create key)
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  price DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  images JSONB DEFAULT '[]', -- Array of image URLs
+  category VARCHAR(100),
+  stock_quantity INTEGER, -- NULL = unlimited / digital goods
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(merchant_id, external_reference)
+);
+
+-- Link payments to the catalogue product they were created for
+ALTER TABLE payments ADD COLUMN product_id UUID REFERENCES products(id);
+
 -- Webhook endpoints table
 CREATE TABLE webhook_endpoints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -304,6 +326,9 @@ CREATE INDEX idx_subscription_charges_subscription_id ON subscription_charges(su
 CREATE INDEX idx_payouts_merchant_id ON payouts(merchant_id);
 CREATE INDEX idx_payouts_status ON payouts(status);
 CREATE INDEX idx_payouts_external_reference ON payouts(external_reference);
+CREATE INDEX idx_products_merchant_id ON products(merchant_id);
+CREATE INDEX idx_products_is_active ON products(is_active);
+CREATE INDEX idx_payments_product_id ON payments(product_id);
 CREATE INDEX idx_payment_attempts_payment_id ON payment_attempts(payment_id);
 CREATE INDEX idx_payment_attempts_provider_reference ON payment_attempts(provider_reference);
 CREATE INDEX idx_webhook_deliveries_endpoint_id ON webhook_deliveries(webhook_endpoint_id);
@@ -354,6 +379,9 @@ CREATE TRIGGER update_subscription_charges_updated_at BEFORE UPDATE ON subscript
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_payouts_updated_at BEFORE UPDATE ON payouts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_webhook_endpoints_updated_at BEFORE UPDATE ON webhook_endpoints

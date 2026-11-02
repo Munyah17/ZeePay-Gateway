@@ -16,6 +16,11 @@ import {
   Payout,
   ListPayoutsOptions,
   ListPayoutsResponse,
+  CreateProductInput,
+  UpdateProductInput,
+  Product,
+  ListProductsOptions,
+  ListProductsResponse,
   ApiResponse,
 } from './types';
 
@@ -288,6 +293,64 @@ export class ZeePayClient {
 
     return this.request<ListPayoutsResponse>(endpoint);
   }
+
+  /**
+   * Create a catalogue product. ZeePay is the back store — your
+   * storefront lists what this returns. Re-sending the same
+   * externalReference (SKU) returns the existing product.
+   */
+  async createProduct(input: CreateProductInput): Promise<Product> {
+    return this.request<Product>('/products', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  /**
+   * Get a product by ID
+   */
+  async getProduct(productId: string): Promise<Product> {
+    return this.request<Product>(`/products/${productId}`);
+  }
+
+  /**
+   * List catalogue products — the "pull" endpoint a storefront
+   * calls to render its shop. Pass activeOnly: true to show only
+   * sellable items.
+   */
+  async listProducts(options?: ListProductsOptions): Promise<ListProductsResponse> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.offset) params.append('offset', options.offset.toString());
+    if (options?.activeOnly) params.append('activeOnly', 'true');
+    if (options?.search) params.append('search', options.search);
+    if (options?.category) params.append('category', options.category);
+
+    const queryString = params.toString();
+    const endpoint = `/products${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<ListProductsResponse>(endpoint);
+  }
+
+  /**
+   * Update a product — price, stock, images, availability
+   */
+  async updateProduct(productId: string, updates: UpdateProductInput): Promise<Product> {
+    return this.request<Product>(`/products/${productId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  /**
+   * Deactivate a product — removes it from storefront listings but
+   * keeps the record and payment history.
+   */
+  async deleteProduct(productId: string): Promise<Product> {
+    return this.request<Product>(`/products/${productId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 /**
@@ -414,5 +477,34 @@ export class Payouts {
 
   async list(options?: ListPayoutsOptions): Promise<ListPayoutsResponse> {
     return this.client.listPayouts(options);
+  }
+}
+
+/**
+ * Products resource — merchant catalogue (back store). A storefront
+ * pulls the catalogue with list(), then sells items by creating a
+ * payment with { productId } — the price is resolved server-side.
+ */
+export class Products {
+  constructor(private client: ZeePayClient) {}
+
+  async create(input: CreateProductInput): Promise<Product> {
+    return this.client.createProduct(input);
+  }
+
+  async get(productId: string): Promise<Product> {
+    return this.client.getProduct(productId);
+  }
+
+  async list(options?: ListProductsOptions): Promise<ListProductsResponse> {
+    return this.client.listProducts(options);
+  }
+
+  async update(productId: string, updates: UpdateProductInput): Promise<Product> {
+    return this.client.updateProduct(productId, updates);
+  }
+
+  async delete(productId: string): Promise<Product> {
+    return this.client.deleteProduct(productId);
   }
 }

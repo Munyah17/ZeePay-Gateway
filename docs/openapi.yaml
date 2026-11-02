@@ -49,6 +49,8 @@ tags:
     description: Recurring billing with auto-deduct
   - name: Payouts
     description: Disbursements to customer wallets
+  - name: Products
+    description: Merchant product catalogue — ZeePay as back store
 
 paths:
   /payments:
@@ -1079,6 +1081,138 @@ paths:
         '403':
           description: Method does not belong to this customer
 
+  /products:
+    post:
+      tags:
+        - Products
+      summary: Create a product
+      description: |
+        Add an item to the merchant catalogue. Supplying the same
+        `externalReference` (merchant SKU) twice returns the existing
+        product — create is idempotent.
+      operationId: createProduct
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Invalid request
+    get:
+      tags:
+        - Products
+      summary: List products
+      description: |
+        Pull the merchant catalogue — the endpoint a storefront calls
+        to render its shop front. ZeePay is the back store; the
+        merchant's website is the front store.
+      operationId: listProducts
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of products
+
+  /products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Get a product
+      operationId: getProduct
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Not found
+    patch:
+      tags:
+        - Products
+      summary: Update a product
+      description: Update price, stock, images, category or availability.
+      operationId: updateProduct
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductRequest'
+      responses:
+        '200':
+          description: Updated product
+    delete:
+      tags:
+        - Products
+      summary: Deactivate a product
+      description: Removes the product from storefront listings (activeOnly) while keeping the record and payment history.
+      operationId: deactivateProduct
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product deactivated
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -1090,21 +1224,27 @@ components:
     CreatePaymentRequest:
       type: object
       required:
-        - amount
-        - currency
         - reference
       properties:
         amount:
           type: number
           format: decimal
-          description: Payment amount
+          description: Payment amount. Optional when productId is given — resolved from the catalogue price.
           example: 10.00
         currency:
           type: string
           minLength: 3
           maxLength: 3
-          description: ISO 4217 currency code
+          description: ISO 4217 currency code. Optional when productId is given.
           example: USD
+        productId:
+          type: string
+          format: uuid
+          description: Catalogue product to charge for. amount = product.price × quantity, currency = product.currency (server-side resolution).
+        quantity:
+          type: integer
+          minimum: 1
+          description: Units of the product (default 1). Only used with productId.
         reference:
           type: string
           maxLength: 255
@@ -1766,5 +1906,122 @@ components:
         isActive:
           type: boolean
         createdAt:
+          type: string
+          format: date-time
+
+    CreateProductRequest:
+      type: object
+      required:
+        - name
+        - price
+        - currency
+      properties:
+        externalReference:
+          type: string
+          maxLength: 255
+          description: Merchant's SKU/product id — idempotent create key
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        price:
+          type: number
+          format: decimal
+          example: 18.00
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: USD
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+          maxItems: 10
+        category:
+          type: string
+          maxLength: 100
+        stockQuantity:
+          type: integer
+          nullable: true
+          description: Omit or null for unlimited stock (digital goods, services)
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        price:
+          type: number
+          format: decimal
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+          maxItems: 10
+        category:
+          type: string
+          maxLength: 100
+        stockQuantity:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+          description: Merchant's externalReference
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: decimal
+        currency:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        category:
+          type: string
+        stockQuantity:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
           type: string
           format: date-time

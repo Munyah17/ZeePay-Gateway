@@ -1,5 +1,5 @@
-import { ZeePayClient, Payments, Refunds, Webhooks, Subscriptions, Payouts } from './client';
-export { ZeePayClient, Payments, Refunds, Webhooks, Subscriptions, Payouts };
+import { ZeePayClient, Payments, Refunds, Webhooks, Subscriptions, Payouts, Products } from './client';
+export { ZeePayClient, Payments, Refunds, Webhooks, Subscriptions, Payouts, Products };
 export * from './types';
 
 /**
@@ -30,6 +30,7 @@ export default class ZeePay {
   public readonly webhooks: Webhooks;
   public readonly subscriptions: Subscriptions;
   public readonly payouts: Payouts;
+  public readonly products: Products;
 
   constructor(config: { apiKey: string; apiUrl?: string }) {
     const client = new ZeePayClient(config);
@@ -38,5 +39,6 @@ export default class ZeePay {
     this.webhooks = new Webhooks(client);
     this.subscriptions = new Subscriptions(client);
     this.payouts = new Payouts(client);
+    this.products = new Products(client);
   }
 }

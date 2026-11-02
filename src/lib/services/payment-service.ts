@@ -14,6 +14,8 @@ export interface CreatePaymentOptions {
   input: CreatePaymentInput;
   idempotencyKey?: string;
   paymentMethodId?: string;
+  /** Catalogue product this payment is for (back-store sale) */
+  productId?: string;
   /** Merchant key environment — selects test vs live provider credentials */
   environment?: 'test' | 'live';
   /** Merchant's own customer id — get-or-creates a customer record */
@@ -36,7 +38,7 @@ export interface PaymentResponse {
 export async function createPayment(
   options: CreatePaymentOptions
 ): Promise<PaymentResponse> {
-  const { merchantId, input, idempotencyKey, paymentMethodId, environment, customerReference } = options;
+  const { merchantId, input, idempotencyKey, paymentMethodId, productId, environment, customerReference } = options;
 
   // Resolve the customer when a merchant-side reference is supplied
   let customerId: string | null = null;
@@ -90,6 +92,7 @@ export async function createPayment(
       customer_email: input.customerEmail,
       customer_phone: input.customerPhone,
       customer_id: customerId,
+      product_id: productId || null,
       metadata: input.metadata || {},
     })
     .select()
@@ -391,6 +394,7 @@ export async function chargeSavedPaymentMethod(options: {
       customer_phone: input.customerPhone || method.customer_phone,
       customer_id: method.customer_id,
       saved_payment_method_id: method.id,
+      product_id: input.productId || null,
       metadata: { ...input.metadata, initiator: 'one_click', paymentMethodId: method.id },
     })
     .select()

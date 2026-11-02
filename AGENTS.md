@@ -72,6 +72,9 @@ Registered providers: mock, ecocash, innbucks, omari, onemoney, mtn-momo, mpesa,
 ### Subscriptions / Auto-Deduct
 Recurring billing is implemented via **payment mandates** — standing authorizations the customer approves once, after which ZeePay debits automatically (including mobile money methods with no native recurring support). Service: `src/lib/services/subscription-service.ts`. Provider mandate methods: `createMandate`, `chargeMandate`, `revokeMandate` on the `PaymentProvider` interface. The billing engine runs via `POST /api/v1/subscriptions/process-due` (secured by `CRON_SECRET` env, schedule hourly).
 
+### Product Catalogue (back store)
+Merchants manage sellable products in ZeePay (`products` table, service: `src/lib/services/product-service.ts`) — ZeePay is the back store, the merchant's website is the front store. `GET /api/v1/products?activeOnly=true` is the pull endpoint storefronts call; `POST /api/v1/payments` accepts `productId` + `quantity` and resolves amount/currency server-side from the catalogue (price can't be tampered with from the front store). Create is idempotent on `externalReference` (merchant SKU). `payments.product_id` records which product a payment sold. Dashboard UI: `/dashboard/products`.
+
 ## Testing
 
 Use the payment simulator at `/dashboard/simulator` to test payment scenarios without processing real money.

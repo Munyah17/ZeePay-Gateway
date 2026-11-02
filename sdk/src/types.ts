@@ -204,3 +204,64 @@ export interface ListPayoutsResponse {
     count: number;
   };
 }
+
+// --- Products (merchant catalogue — ZeePay as back store) ---
+
+export interface CreateProductInput {
+  /** Merchant's own SKU/product id — idempotent create key */
+  externalReference?: string;
+  name: string;
+  description?: string;
+  price: number;
+  currency: string;
+  images?: string[];
+  category?: string;
+  /** Omit or pass null for unlimited stock (digital goods, services) */
+  stockQuantity?: number | null;
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateProductInput {
+  name?: string;
+  description?: string;
+  price?: number;
+  currency?: string;
+  images?: string[];
+  category?: string;
+  stockQuantity?: number | null;
+  isActive?: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface Product {
+  id: string;
+  sku?: string;
+  name: string;
+  description?: string;
+  price: number;
+  currency: string;
+  images: string[];
+  category?: string;
+  stockQuantity?: number | null;
+  isActive: boolean;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListProductsOptions {
+  limit?: number;
+  offset?: number;
+  activeOnly?: boolean;
+  search?: string;
+  category?: string;
+}
+
+export interface ListProductsResponse {
+  data: Product[];
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
+}

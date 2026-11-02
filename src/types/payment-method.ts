@@ -83,6 +83,7 @@ export interface ChargeSavedMethodInput {
   amount: number;
   currency: string;
   reference: string;
+  productId?: string; // catalogue product this charge is for
   returnUrl?: string;
   customerEmail?: string;
   customerPhone?: string;
