@@ -302,9 +302,9 @@ export default function DeveloperPlatform() {
                         role="button"
                         style={{ cursor: 'pointer' }}
                         title="Click to copy"
-                        onClick={() => { copyToClipboard('npm install zeepay-node'); toast('Install command copied'); }}
+                        onClick={() => { copyToClipboard('npm install zeepay-sdk'); toast('Install command copied'); }}
                       >
-                        npm install zeepay-node
+                        npm install zeepay-sdk
                       </code>
                     </div>
                   </div>
@@ -316,16 +316,8 @@ export default function DeveloperPlatform() {
                         <i className="bi bi-file-code me-2"></i>
                         Python SDK
                       </h6>
-                      <p className="text-muted small mb-2">Official Python library for ZeePay API</p>
-                      <code
-                        className="small d-block"
-                        role="button"
-                        style={{ cursor: 'pointer' }}
-                        title="Click to copy"
-                        onClick={() => { copyToClipboard('pip install zeepay-python'); toast('Install command copied'); }}
-                      >
-                        pip install zeepay-python
-                      </code>
+                      <p className="text-muted small mb-2">Generate a typed client from our OpenAPI spec — official SDK coming soon</p>
+                      <span className="badge bg-secondary">Coming soon</span>
                     </div>
                   </div>
                 </div>
@@ -336,16 +328,8 @@ export default function DeveloperPlatform() {
                         <i className="bi bi-file-code me-2"></i>
                         PHP SDK
                       </h6>
-                      <p className="text-muted small mb-2">Official PHP library for ZeePay API</p>
-                      <code
-                        className="small d-block"
-                        role="button"
-                        style={{ cursor: 'pointer' }}
-                        title="Click to copy"
-                        onClick={() => { copyToClipboard('composer require zeepay/php'); toast('Install command copied'); }}
-                      >
-                        composer require zeepay/php
-                      </code>
+                      <p className="text-muted small mb-2">Generate a typed client from our OpenAPI spec — official SDK coming soon</p>
+                      <span className="badge bg-secondary">Coming soon</span>
                     </div>
                   </div>
                 </div>

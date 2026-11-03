@@ -1,0 +1,156 @@
+# ZeePay — Full API Integration Guide
+
+ZeePay is a payment gateway for African businesses. One REST API for EcoCash, OneMoney, InnBucks, Omari, cards (Visa/Mastercard/domestic via ZimSwitch) and bank transfers. Checkout is hosted by ZeePay, so merchants never touch card data. ZeePay also acts as a product back-store: merchants manage a product catalogue in ZeePay and their own website (the "front store") pulls products and creates product-linked payments with server-trusted pricing.
+
+## Authentication
+
+All merchant API calls send a secret key in the `X-API-Key` header:
+
+```
+X-API-Key: zp_test_<key>   # sandbox, no real money
+X-API-Key: zp_live_<key>   # production
+```
+
+- Create keys in the merchant dashboard (Developers section).
+- Secret keys are server-side only. Never embed them in a browser app, mobile app, or committed code.
+- The environment is derived from the key itself — a `zp_test_` key can never charge a real wallet.
+
+## Conventions
+
+- Base URL: `https://api.zeepay.co.zw/v1`
+- JSON in/out. `Content-Type: application/json` on POST/PATCH.
+- Errors: `{ "error": "<message>", "details"?: [...] }` with 4xx/5xx status.
+- Idempotency: pass `idempotencyKey` (or a unique `reference`/`externalReference` where noted) on create operations; retries return the original result.
+- Amounts are decimal numbers in the major unit (e.g. `10` = $10.00). Currency is ISO-4217 (`USD`, `ZWG`).
+
+## Payments
+
+### POST /payments — create a payment
+
+```json
+{
+  "amount": 10,
+  "currency": "USD",
+  "reference": "invoice_1042",
+  "returnUrl": "https://shop.com/success",
+  "cancelUrl": "https://shop.com/cancel",
+  "customerEmail": "customer@example.com",
+  "customerPhone": "+263771234567",
+  "customerReference": "cust_42",
+  "metadata": { "orderId": "12345" },
+  "idempotencyKey": "optional-unique-key",
+  "paymentMethodId": "optional-uuid"
+}
+```
+
+Response includes `id`, `status`, `checkoutUrl`, `reference`. Redirect the customer to `checkoutUrl`; ZeePay hosts the wallet/card interaction and returns them to `returnUrl`/`cancelUrl`.
+
+Product-linked payment (back-store sale — amount is resolved server-side from the catalogue, so storefronts cannot tamper with prices):
+
+```json
+{ "productId": "product-uuid", "quantity": 2, "reference": "order_77" }
+```
+
+`amount`/`currency` are optional and ignored when `productId` is present. Stock is validated and decremented on success.
+
+Direct charge variants:
+- `savedPaymentMethodId` (uuid) — one-click charge of a tokenised method, no checkout redirect.
+- `saveCardForReuse: true` — tokenises the card during a hosted checkout for future one-click/recurring charges.
+
+### GET /payments — list payments (params: `limit`, `offset`, `status`)
+### GET /payments/{id} — fetch status (`pending`, `processing`, `succeeded`, `failed`, `cancelled`, `refunded`)
+### POST /payments/{id} — `{"action": "cancel"}` cancels a pending payment
+
+## Refunds
+
+- `POST /refunds` — `{ "paymentId", "amount"?, "currency"?, "reason"?, "metadata"? }`. Omit amount for full refund.
+- `GET /refunds/{id}` — refund status.
+
+## Products (back-store catalogue)
+
+Merchants create products in ZeePay; their storefront pulls them and creates `productId` payments.
+
+- `GET /products?activeOnly=true` — storefront pull endpoint. Also `limit`, `offset`, `search`, `category`.
+- `POST /products` — create. Idempotent on `externalReference` (merchant SKU): re-posting the same SKU updates rather than duplicates.
+- `GET /products/{id}` · `PATCH /products/{id}` · `DELETE /products/{id}` (deactivates)
+
+```json
+{
+  "externalReference": "sku-tshirt-black-m",
+  "name": "Black Tee (M)",
+  "description": "Cotton t-shirt",
+  "price": 25,
+  "currency": "USD",
+  "images": ["https://shop.com/img/tee.png"],
+  "category": "Apparel",
+  "stockQuantity": 40,
+  "isActive": true,
+  "metadata": {}
+}
+```
+
+`stockQuantity: null` = unlimited/digital goods.
+
+## Webhooks (outbound)
+
+- `POST /webhooks` — `{ "url", "events": ["payment.succeeded", "payment.failed", "payment.refunded"] }`. Response includes `secret` — store it.
+- `GET /webhooks` · `GET|PATCH|DELETE /webhooks/{id}` · `GET /webhooks/{id}/deliveries` (retry history)
+
+Verification: compute `sha256=` + hex HMAC-SHA256 of the **raw request body** with the webhook secret; compare (constant-time) to the `X-ZeePay-Signature` header. Reject on mismatch. Deliveries retry with exponential backoff — handlers must be idempotent.
+
+```ts
+const expected = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+```
+
+## Saved payment methods (one-click + auto-deduct)
+
+Cards are tokenised via hosted registration checkout — ZeePay stores only a provider token.
+
+- `POST /saved-payment-methods` — `{ "customerReference", "methodType": "card" | "mobile_money", "returnUrl"? }`. Returns `approvalUrl` (hosted flow) for cards.
+- `POST /saved-payment-methods/{id}/activate` — call after the customer completes the hosted flow; resolves the durable token. Pending methods cannot charge.
+- `GET /saved-payment-methods?customerReference=...` · `GET|PATCH|DELETE /saved-payment-methods/{id}`
+- Charge via `POST /payments` with `savedPaymentMethodId`.
+
+## Subscriptions (recurring billing)
+
+- `POST /plans` — `{ "name", "amount", "currency", "interval": "daily"|"weekly"|"monthly"|"yearly", ... }`
+- `POST /subscriptions` — `{ "planId", "customerReference", ... }` → customer approves a mandate once.
+- `POST /subscriptions/{id}/approve` — link the approved mandate.
+- `GET|PATCH /subscriptions/{id}` · `POST /subscriptions/{id}` cancel.
+- ZeePay debits automatically each cycle via `POST /subscriptions/process-due` (cron, `CRON_SECRET`).
+
+Recurring reality check: cards (ZimSwitch `registrationId`) debit silently — true merchant-initiated transactions, occasional issuer 3DS step-up. Mobile money auto-deduct works but the subscriber still approves each debit by PIN prompt.
+
+## Customers & payouts
+
+- `POST /customers` `{ "customerReference", "email"?, "phone"?, "name"? }` · `GET /customers`
+- `POST /payouts` — disburse to a wallet/bank; `externalReference` is the idempotency key. `GET /payouts`, `GET /payouts/{reference}`.
+
+## Public checkout endpoints (unauthenticated, called by the hosted page)
+
+- `GET /checkout/{id}` — public checkout context + payment-method catalogue; polls provider once per request to resolve in-flight payments.
+- `POST /checkout/{id}/pay` — `{ "paymentMethodId", "customerPhone"? }` or `{ "savedPaymentMethodId" }`.
+
+## Integration recipes
+
+**Minimal hosted checkout (any backend):**
+
+```ts
+const res = await fetch("https://api.zeepay.co.zw/v1/payments", {
+  method: "POST",
+  headers: { "X-API-Key": process.env.ZEEPAY_SECRET_KEY, "Content-Type": "application/json" },
+  body: JSON.stringify({ amount: 10, currency: "USD", reference: orderId,
+                         returnUrl: `${site}/success`, cancelUrl: `${site}/cancel` }),
+});
+const { checkoutUrl } = await res.json();
+// redirect customer to checkoutUrl; confirm result via webhook, never via return URL alone
+```
+
+**Headless storefront (front store / back store):**
+1. Merchant creates products in ZeePay (API or dashboard).
+2. Front-store backend calls `GET /products?activeOnly=true`, renders catalogue.
+3. Buy button → server calls `POST /payments` `{ productId, quantity, reference }` → redirect to `checkoutUrl`.
+4. `payment.succeeded` webhook → fulfil order.
+
+**Never trust `returnUrl` for fulfilment.** Fulfil only on a verified `payment.succeeded` webhook (or `GET /payments/{id}` server-side check).

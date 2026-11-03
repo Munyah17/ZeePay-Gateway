@@ -1,0 +1,19 @@
+# ZeePay
+
+> Payment gateway for African businesses. Merchants accept EcoCash, OneMoney, InnBucks, Omari, cards (Visa/Mastercard via ZimSwitch) and bank transfers through one REST API. ZeePay can also act as the merchant's product back-store: products are created in ZeePay and pulled into the merchant's own storefront.
+
+## Key facts
+
+- Base URL: `https://api.zeepay.co.zw/v1`
+- Auth: `X-API-Key` header. `zp_test_*` keys hit sandbox (no real money), `zp_live_*` keys hit production.
+- Secret keys are server-side only — never expose them in client-side code.
+- Checkout is hosted: create a payment server-side, redirect the customer to `checkoutUrl`.
+- Webhooks sign payloads with `X-ZeePay-Signature: sha256=<hmac-sha256(payload, secret)>`.
+- All create operations support idempotency keys to prevent duplicates.
+
+## Docs
+
+- [Full integration guide](/llms-full.txt): complete API surface, request/response shapes, integration recipes
+- [OpenAPI 3 spec](/openapi.yaml): machine-readable spec — feed to openapi-generator/orval/openapi-typescript to generate typed clients in any language
+- [Human docs](/docs): API reference tables and quickstart
+- [Node.js/TypeScript SDK](https://github.com/Munyah17/ZeePay-Gateway/tree/master/sdk): `npm install zeepay-sdk`

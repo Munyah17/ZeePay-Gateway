@@ -83,9 +83,9 @@ export default function DocsPage() {
               <p className="small">Install the SDK and create your first payment:</p>
               <div className="card bg-dark text-light mb-3">
                 <div className="card-body">
-                  <pre className="mb-0 small" style={{ color: '#c7d2fe' }}>{`npm install zeepay
+                  <pre className="mb-0 small" style={{ color: '#c7d2fe' }}>{`npm install zeepay-sdk
 
-import ZeePay from "zeepay";
+import ZeePay from "zeepay-sdk";
 const zee = new ZeePay(process.env.ZEEPAY_SECRET_KEY);
 
 const payment = await zee.payments.create({
@@ -101,9 +101,9 @@ const payment = await zee.payments.create({
             <section id="auth" className="mb-5">
               <h2 className="h5 mb-3">Authentication</h2>
               <p className="small">
-                Authenticate with a secret key in the <code>Authorization: Bearer zp_sk_...</code> header.
-                Use <code>zp_test_sk_...</code> keys in sandbox mode — no real payments are processed.
-                Never expose secret keys in client-side code.
+                Authenticate with a secret key in the <code>X-API-Key: zp_test_...</code> header.
+                Use <code>zp_test_...</code> keys in sandbox mode — no real payments are processed.
+                Use <code>zp_live_...</code> keys for production. Never expose secret keys in client-side code.
               </p>
             </section>
 

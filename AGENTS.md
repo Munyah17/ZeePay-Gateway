@@ -81,4 +81,7 @@ Use the payment simulator at `/dashboard/simulator` to test payment scenarios wi
 
 ## API Documentation
 
-Complete OpenAPI specification available in `docs/openapi.yaml`.
+- `docs/openapi.yaml` — OpenAPI spec (source of truth), served at `/openapi.yaml` via `src/app/openapi.yaml/route.ts` for codegen tools and AI agents
+- `public/llms.txt` — agent-facing index served at `/llms.txt`
+- `public/llms-full.txt` — full integration guide served at `/llms-full.txt` (endpoint shapes, recipes); keep it in sync when the API surface changes
+- `sdk/AGENTS.md` — canonical integration recipe for AI agents using the SDK

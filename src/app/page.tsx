@@ -520,12 +520,12 @@ export default function Home() {
                   {
                     step: 1,
                     title: 'Install the SDK',
-                    code: 'npm install zeepay',
+                    code: 'npm install zeepay-sdk',
                   },
                   {
                     step: 2,
                     title: 'Create a payment on your server',
-                    code: `import ZeePay from "zeepay";
+                    code: `import ZeePay from "zeepay-sdk";
 
 const zee = new ZeePay(
   process.env.ZEEPAY_SECRET_KEY
