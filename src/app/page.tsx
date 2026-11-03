@@ -515,7 +515,7 @@ export default function Home() {
               </p>
             </div>
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-start">
-              <div className="space-y-6">
+              <div className="space-y-6 min-w-0">
                 {[
                   {
                     step: 1,
@@ -556,7 +556,7 @@ const payment = await zee.payments.create({
                   </div>
                 ))}
               </div>
-              <div className="bg-white rounded-3xl p-6 sm:p-10 border border-gray-100 shadow-sm">
+              <div className="bg-white rounded-3xl p-6 sm:p-10 border border-gray-100 shadow-sm min-w-0">
                 <h3 className="text-xl font-bold text-[#1a1650] mb-4">Developer quickstart</h3>
                 <p className="text-base text-gray-600 mb-8 leading-relaxed">
                   Get started with our test environment. No real payments are processed in sandbox mode.
