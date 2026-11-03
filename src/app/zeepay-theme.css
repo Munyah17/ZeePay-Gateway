@@ -136,7 +136,11 @@ html .form-label { color: var(--zp-text); }
 .zp-side-search input { width: 100%; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.05); color: #fff; border-radius: 10px; padding: 7px 10px 7px 32px; font-size: 13px; outline: none; }
 .zp-side-search input:focus { border-color: rgba(165, 180, 252, 0.6); }
 .zp-side-search input::placeholder { color: #8e90c2; }
-.zp-nav { flex: 1; overflow-y: auto; padding: 4px 10px 12px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
+.zp-nav { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 10px 12px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+.zp-nav::-webkit-scrollbar { width: 6px; }
+.zp-nav::-webkit-scrollbar-track { background: transparent; }
+.zp-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 6px; }
+.zp-nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
 .zp-nav-group { margin-bottom: 2px; }
 .zp-nav-group-btn, .zp-nav-link { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: transparent; color: #c3c5ea; padding: 8px 10px; border-radius: 10px; font-size: 13.5px; text-decoration: none; transition: background 0.15s, color 0.15s; }
 .zp-nav-group-btn { font-weight: 600; }
@@ -320,12 +324,24 @@ html .btn-close-sm { font-size: 10px; }
 
 /* Mobile */
 @media (max-width: 991.98px) {
-  .zp-sidebar { position: fixed; left: 0; top: 0; transform: translateX(-100%); width: 280px !important; box-shadow: var(--zp-shadow-lg); }
+  .zp-sidebar { position: fixed; left: 0; top: 0; transform: translateX(-100%); width: 280px !important; height: 100vh; height: 100dvh; box-shadow: var(--zp-shadow-lg); }
   .zp-mobile-open .zp-sidebar { transform: none; }
   .zp-mobile-open .zp-backdrop { display: block; position: fixed; inset: 0; background: rgba(15, 13, 45, 0.45); z-index: 1035; }
+
+  /* The mobile drawer always renders expanded — neutralize the desktop
+     collapsed state so labels, brand text, search and group indents
+     are correct even when the user collapsed the sidebar on desktop.
+     (display: initial on a div resolves to inline, which breaks
+     .zp-side-search — hence the block override below.) */
   .zp-collapsed .zp-hide-collapsed { display: initial !important; }
+  .zp-collapsed div.zp-hide-collapsed { display: block !important; }
+  .zp-collapsed .zp-brand-text { display: inline !important; }
+  .zp-collapsed .zp-portal-pill { justify-content: flex-start; margin: 4px 16px 12px; }
+  .zp-collapsed .zp-nav-group-btn, .zp-collapsed .zp-nav-link { justify-content: flex-start; }
+  .zp-collapsed .zp-nav-sub { padding-left: 14px; margin: 2px 0 6px; border-left: 1px solid rgba(255, 255, 255, 0.07); margin-left: 19px; }
+
   .zp-topbar { padding: 0 14px; gap: 8px; }
-  .zp-cmd { flex: 1 1 auto; margin-left: 0; }
+  .zp-cmd { flex: 1 1 auto; margin-left: 0; min-width: 44px; }
   .zp-content { padding: 18px 14px; }
 }
 @media (max-width: 575.98px) {

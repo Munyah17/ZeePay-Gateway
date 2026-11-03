@@ -10,26 +10,66 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-export const merchantNavItems: NavItem[] = [
-  { name: "Dashboard", path: "/dashboard", icon: "bi-speedometer2" },
-  { name: "Transactions", path: "/dashboard/transactions", icon: "bi-credit-card" },
-  { name: "Customers", path: "/dashboard/customers", icon: "bi-people" },
-  { name: "Payment Methods", path: "/dashboard/methods", icon: "bi-wallet2" },
-  { name: "Refunds", path: "/dashboard/refunds", icon: "bi-arrow-counterclockwise" },
-  { name: "Payment Links", path: "/dashboard/links", icon: "bi-link-45deg" },
-  { name: "Subscriptions", path: "/dashboard/subscriptions", icon: "bi-arrow-repeat" },
-  { name: "Plans", path: "/dashboard/plans", icon: "bi-collection" },
-  { name: "Products", path: "/dashboard/products", icon: "bi-box-seam" },
-  { name: "Saved Methods", path: "/dashboard/saved-methods", icon: "bi-credit-card-2-front" },
-  { name: "Payouts", path: "/dashboard/payouts", icon: "bi-send" },
-  { name: "Invoices", path: "/dashboard/invoices", icon: "bi-file-earmark-text" },
-  { name: "Checkout Config", path: "/dashboard/checkout", icon: "bi-shop" },
-  { name: "Developers", path: "/dashboard/developers", icon: "bi-code-slash" },
-  { name: "API Keys", path: "/dashboard/api-keys", icon: "bi-key" },
-  { name: "Webhooks", path: "/dashboard/webhooks", icon: "bi-broadcast" },
-  { name: "Settings", path: "/dashboard/settings", icon: "bi-gear" },
-  { name: "Simulator", path: "/dashboard/simulator", icon: "bi-play-circle" },
+export const merchantNavGroups: NavGroup[] = [
+  {
+    name: "Overview",
+    icon: "bi-speedometer2",
+    items: [
+      { name: "Dashboard", path: "/dashboard", icon: "bi-speedometer2" },
+    ],
+  },
+  {
+    name: "Payments",
+    icon: "bi-credit-card",
+    items: [
+      { name: "Transactions", path: "/dashboard/transactions", icon: "bi-credit-card" },
+      { name: "Customers", path: "/dashboard/customers", icon: "bi-people" },
+      { name: "Payment Methods", path: "/dashboard/methods", icon: "bi-wallet2" },
+      { name: "Refunds", path: "/dashboard/refunds", icon: "bi-arrow-counterclockwise" },
+      { name: "Payment Links", path: "/dashboard/links", icon: "bi-link-45deg" },
+      { name: "Payouts", path: "/dashboard/payouts", icon: "bi-send" },
+    ],
+  },
+  {
+    name: "Billing",
+    icon: "bi-arrow-repeat",
+    items: [
+      { name: "Subscriptions", path: "/dashboard/subscriptions", icon: "bi-arrow-repeat" },
+      { name: "Plans", path: "/dashboard/plans", icon: "bi-collection" },
+      { name: "Saved Methods", path: "/dashboard/saved-methods", icon: "bi-credit-card-2-front" },
+      { name: "Invoices", path: "/dashboard/invoices", icon: "bi-file-earmark-text" },
+    ],
+  },
+  {
+    name: "Store",
+    icon: "bi-shop",
+    items: [
+      { name: "Products", path: "/dashboard/products", icon: "bi-box-seam" },
+      { name: "Checkout Config", path: "/dashboard/checkout", icon: "bi-shop" },
+    ],
+  },
+  {
+    name: "Developers",
+    icon: "bi-code-slash",
+    items: [
+      { name: "Developers", path: "/dashboard/developers", icon: "bi-code-slash" },
+      { name: "API Keys", path: "/dashboard/api-keys", icon: "bi-key" },
+      { name: "Webhooks", path: "/dashboard/webhooks", icon: "bi-broadcast" },
+      { name: "Simulator", path: "/dashboard/simulator", icon: "bi-play-circle" },
+    ],
+  },
+  {
+    name: "Account",
+    icon: "bi-gear",
+    items: [
+      { name: "Settings", path: "/dashboard/settings", icon: "bi-gear" },
+    ],
+  },
 ];
+
+// Flat list derived from the groups — kept for consumers that still
+// iterate items directly (command palette, legacy layouts).
+export const merchantNavItems: NavItem[] = merchantNavGroups.flatMap((g) => g.items);
 
 export const adminNavGroups: NavGroup[] = [
   {
@@ -145,16 +185,36 @@ export const adminNavGroups: NavGroup[] = [
   },
 ];
 
-export const userNavItems = [
-  { name: "My Payments", path: "/user", icon: "bi-credit-card" },
-  { name: "Send Money", path: "/user/send", icon: "bi-send" },
-  { name: "Airtime", path: "/user/airtime", icon: "bi-phone" },
-  { name: "Bills", path: "/user/bills", icon: "bi-receipt" },
-  { name: "Subscriptions", path: "/user/subscriptions", icon: "bi-arrow-repeat" },
-  { name: "History", path: "/user/history", icon: "bi-clock-history" },
-  { name: "Cards", path: "/user/cards", icon: "bi-credit-card-2-front" },
-  { name: "Settings", path: "/user/settings", icon: "bi-gear" },
+export const userNavGroups: NavGroup[] = [
+  {
+    name: "Payments",
+    icon: "bi-credit-card",
+    items: [
+      { name: "My Payments", path: "/user", icon: "bi-credit-card" },
+      { name: "Send Money", path: "/user/send", icon: "bi-send" },
+      { name: "History", path: "/user/history", icon: "bi-clock-history" },
+    ],
+  },
+  {
+    name: "Services",
+    icon: "bi-grid",
+    items: [
+      { name: "Airtime", path: "/user/airtime", icon: "bi-phone" },
+      { name: "Bills", path: "/user/bills", icon: "bi-receipt" },
+      { name: "Subscriptions", path: "/user/subscriptions", icon: "bi-arrow-repeat" },
+      { name: "Cards", path: "/user/cards", icon: "bi-credit-card-2-front" },
+    ],
+  },
+  {
+    name: "Account",
+    icon: "bi-gear",
+    items: [
+      { name: "Settings", path: "/user/settings", icon: "bi-gear" },
+    ],
+  },
 ];
+
+export const userNavItems: NavItem[] = userNavGroups.flatMap((g) => g.items);
 
 export const superAdminNavGroups: NavGroup[] = [
   {

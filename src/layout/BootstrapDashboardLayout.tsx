@@ -6,7 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { UIProvider } from "@/components/ui/UIProvider";
 import { useActivity, markAllActivityRead, clearActivity, timeAgo, currentUser } from "@/lib/store/activity";
 import { Avatar } from "@/components/ui/records";
-import { adminNavGroups, merchantNavItems, superAdminNavGroups, userNavItems, NavGroup, NavItem } from "./navConfig";
+import { adminNavGroups, merchantNavGroups, superAdminNavGroups, userNavGroups, NavGroup, NavItem } from "./navConfig";
 
 interface BootstrapDashboardLayoutProps {
   children: React.ReactNode;
@@ -42,9 +42,11 @@ function DashboardShell({ children, isAdmin = false, isUser = false, isSuperAdmi
   const groups: NavGroup[] = useMemo(() => {
     if (isSuperAdmin) return superAdminNavGroups;
     if (isAdmin) return adminNavGroups;
-    return [{ name: isUser ? "Personal" : "Merchant", icon: "bi-grid", items: (isUser ? userNavItems : merchantNavItems) as NavItem[] }];
+    return isUser ? userNavGroups : merchantNavGroups;
   }, [isAdmin, isSuperAdmin, isUser]);
-  const grouped = isAdmin || isSuperAdmin;
+  // Every portal renders collapsible groups; a single-group portal
+  // would just render its items flat.
+  const grouped = groups.length > 1;
   const allItems = useMemo(() => groups.flatMap((g) => g.items.map((i) => ({ ...i, group: g.name }))), [groups]);
 
   // Longest matching nav path wins so "/admin" doesn't light up on every admin page.
