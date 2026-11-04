@@ -38,7 +38,6 @@ export default function Home() {
               <nav className="hidden lg:flex items-center gap-7 text-[15px] font-medium text-gray-700">
                 <Link href="#payments" className="hover:text-indigo-600 transition-colors">Product</Link>
                 <Link href="/docs" className="hover:text-indigo-600 transition-colors">Developers</Link>
-                <Link href="#pricing" className="hover:text-indigo-600 transition-colors">Pricing</Link>
                 <Link href="/docs" className="hover:text-indigo-600 transition-colors">Resources</Link>
               </nav>
             </div>
@@ -77,7 +76,6 @@ export default function Home() {
               {[
                 { label: 'Product', href: '#payments' },
                 { label: 'Developers', href: '/docs' },
-                { label: 'Pricing', href: '#pricing' },
                 { label: 'Resources', href: '/docs' },
                 { label: 'API status', href: '/docs' },
               ].map((item) => (
@@ -587,87 +585,6 @@ const payment = await zee.payments.create({
           </div>
         </section>
 
-        {/* ============ SECTION: Pricing ============ */}
-        <section id="pricing" className="py-16 sm:py-24 bg-white scroll-mt-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12 sm:mb-16">
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1a1650]">Simple, transparent pricing</h2>
-              <p className="mt-4 text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
-                Pay only for what you use. No monthly fees, no hidden costs
-              </p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
-              <div className="bg-[#f6f7fd] rounded-3xl p-8 flex flex-col">
-                <h3 className="text-lg font-bold text-[#1a1650] mb-2">Mobile Money</h3>
-                <p className="text-4xl font-extrabold text-[#1a1650] mb-1">1.5%</p>
-                <p className="text-sm text-gray-500 mb-6">per transaction</p>
-                <ul className="space-y-3 mb-8 flex-1">
-                  {['EcoCash', 'InnBucks', 'Omari', 'Instant settlement'].map((item) => (
-                    <li key={item} className="text-sm text-gray-700 flex items-center gap-2.5">
-                      <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-sm text-gray-500 mb-6">+$0.10 flat fee per transaction</p>
-                <Link href="/auth/register" className="block text-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 rounded-lg py-3 transition-colors">
-                  Get started
-                </Link>
-              </div>
-
-              <div className="bg-[#1a1650] rounded-3xl p-8 flex flex-col relative md:scale-105 shadow-2xl">
-                <span className="absolute top-5 right-5 bg-white text-[#1a1650] px-3 py-1 rounded-full text-xs font-bold">
-                  POPULAR
-                </span>
-                <h3 className="text-lg font-bold text-white mb-2">Cards</h3>
-                <p className="text-4xl font-extrabold text-white mb-1">2.0%</p>
-                <p className="text-sm text-indigo-200 mb-6">per transaction</p>
-                <ul className="space-y-3 mb-8 flex-1">
-                  {['Visa', 'Mastercard', 'American Express', 'International cards'].map((item) => (
-                    <li key={item} className="text-sm text-indigo-100 flex items-center gap-2.5">
-                      <svg className="w-4 h-4 text-indigo-300 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-sm text-indigo-200 mb-6">+$0.30 flat fee per transaction</p>
-                <Link href="/auth/register" className="block text-center text-sm font-semibold bg-white text-[#1a1650] rounded-lg py-3 hover:bg-indigo-50 transition-colors">
-                  Get started
-                </Link>
-              </div>
-
-              <div className="bg-[#f6f7fd] rounded-3xl p-8 flex flex-col">
-                <h3 className="text-lg font-bold text-[#1a1650] mb-2">Bank Transfer</h3>
-                <p className="text-4xl font-extrabold text-[#1a1650] mb-1">0.8%</p>
-                <p className="text-sm text-gray-500 mb-6">per transaction</p>
-                <ul className="space-y-3 mb-8 flex-1">
-                  {['Zimbabwean banks', 'Same-day settlement', 'Bulk payments', 'Recurring payments'].map((item) => (
-                    <li key={item} className="text-sm text-gray-700 flex items-center gap-2.5">
-                      <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-sm text-gray-500 mb-6">+$0.05 flat fee per transaction</p>
-                <Link href="/auth/register" className="block text-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 rounded-lg py-3 transition-colors">
-                  Get started
-                </Link>
-              </div>
-            </div>
-            <div className="mt-10 p-6 bg-[#eef7f0] border border-green-200 rounded-2xl">
-              <p className="text-sm sm:text-base text-green-900 text-center leading-relaxed">
-                <strong>Better than Paynow:</strong> Lower transaction fees, faster settlement times, and a modern API for seamless integration. No monthly subscription fees — you only pay when you get paid.
-              </p>
-            </div>
-          </div>
-        </section>
-
         {/* ============ SECTION: Big CTA card ============ */}
         <section className="py-16 sm:py-24 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -711,7 +628,6 @@ const payment = await zee.payments.create({
                 title: 'Product',
                 links: [
                   { label: 'Payments', href: '#payments' },
-                  { label: 'Pricing', href: '#pricing' },
                   { label: 'Documentation', href: '/docs' },
                 ],
               },
