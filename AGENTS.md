@@ -12,10 +12,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Build Commands
 
-- `npm run dev` - Start development server (http://localhost:3000)
+- `npm run dev` - Start development server (http://localhost:5050)
 - `npm run build` - Build for production
-- `npm start` - Start production server
+- `npm start` - Start production server (http://localhost:5050)
 - `npm run lint` - Run ESLint
+
+## Port
+
+**This project is locked to port 5050.** Never run it on 3000-4999 — those ports are reserved for other work on this machine. The port is pinned in `package.json` `dev`/`start` scripts; do not remove the `--port 5050` flags or start the app with `next dev`/`next start` directly.
 
 ## SDK Build Commands
 
