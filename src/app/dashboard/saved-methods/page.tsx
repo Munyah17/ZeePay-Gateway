@@ -160,7 +160,7 @@ export default function SavedMethodsPage() {
 
   return (
     <>
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
           <h2 className="h4 mb-1">Saved Payment Methods</h2>
           <p className="text-muted mb-0">

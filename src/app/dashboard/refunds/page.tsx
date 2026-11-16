@@ -98,12 +98,12 @@ export default function RefundsPage() {
 
   return (
     <>
-    <div className="d-flex justify-content-between align-items-center mb-4">
+    <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
           <h2 className="h4 mb-0">Refunds</h2>
           <p className="text-muted small mb-0">Track and initiate refunds for supported payment providers</p>
         </div>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 flex-wrap">
           <button onClick={exportCsv} className="btn btn-outline-secondary btn-sm">
             <i className="bi bi-download me-1"></i> Export
           </button>

@@ -252,11 +252,11 @@ export default function Webhooks() {
           {/* Action Bar */}
           <div className="card mb-4">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex gap-2">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <select
                     className="form-select form-select-sm"
-                    style={{ width: '150px' }}
+                    style={{ width: '150px', maxWidth: '100%' }}
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                   >
@@ -374,7 +374,7 @@ export default function Webhooks() {
             {/* Recent Deliveries */}
             <div className="col-lg-4">
               <div className="card h-100">
-                <div className="card-header d-flex justify-content-between align-items-center">
+                <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <h5 className="card-title mb-0">Recent Deliveries</h5>
                   <Link href="/dashboard/webhooks/deliveries" className="btn btn-sm btn-link">
                     View all →
@@ -384,10 +384,10 @@ export default function Webhooks() {
                   <div className="list-group list-group-flush">
                     {recentDeliveries.map((delivery) => (
                       <div key={delivery.id} className="list-group-item">
-                        <div className="d-flex justify-content-between align-items-start mb-2">
-                          <div>
+                        <div className="d-flex justify-content-between align-items-start mb-2 gap-2">
+                          <div className="min-w-0">
                             <h6 className="mb-1 small fw-medium">{delivery.event}</h6>
-                            <p className="text-muted small mb-0">{webhooks.find(w => w.id === delivery.webhookId)?.url}</p>
+                            <p className="text-muted small mb-0 text-break">{webhooks.find(w => w.id === delivery.webhookId)?.url}</p>
                           </div>
                           <span className={`badge ${getDeliveryStatusColor(delivery.status)}`}>
                             {delivery.status}
@@ -513,7 +513,7 @@ export default function Webhooks() {
               <ul className="list-group list-group-flush">
                 <li className="list-group-item px-0">
                   <p className="small text-muted mb-1">Endpoint</p>
-                  <code className="small">{viewing.url}</code>
+                  <code className="small text-break">{viewing.url}</code>
                 </li>
                 <li className="list-group-item d-flex justify-content-between px-0">
                   <span className="small text-muted">Status</span>
@@ -531,9 +531,9 @@ export default function Webhooks() {
                     ))}
                   </div>
                 </li>
-                <li className="list-group-item d-flex justify-content-between px-0 align-items-center">
-                  <span className="small text-muted">Secret</span>
-                  <button className="btn btn-link btn-sm p-0 small" onClick={() => { copyText(viewing.secret); toast('Secret copied'); }}>
+                <li className="list-group-item d-flex justify-content-between align-items-start gap-2 px-0">
+                  <span className="small text-muted flex-shrink-0">Secret</span>
+                  <button className="btn btn-link btn-sm p-0 small text-break text-end" onClick={() => { copyText(viewing.secret); toast('Secret copied'); }}>
                     {viewing.secret}
                   </button>
                 </li>

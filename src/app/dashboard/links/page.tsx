@@ -253,11 +253,11 @@ export default function PaymentLinks() {
           {/* Action Bar */}
           <div className="card mb-4">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex gap-2">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <select
                     className="form-select form-select-sm"
-                    style={{ width: '150px' }}
+                    style={{ width: '150px', maxWidth: '100%' }}
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                   >
@@ -271,7 +271,7 @@ export default function PaymentLinks() {
                     type="text"
                     className="form-control form-control-sm"
                     placeholder="Search links..."
-                    style={{ width: '250px' }}
+                    style={{ width: '250px', maxWidth: '100%' }}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -545,10 +545,10 @@ export default function PaymentLinks() {
                     {viewing.amount ? `${viewing.currency} ${viewing.amount.toFixed(2)}` : 'Open amount'}
                   </span>
                 </li>
-                <li className="list-group-item d-flex justify-content-between px-0">
-                  <span className="small text-muted">Link</span>
+                <li className="list-group-item d-flex justify-content-between align-items-start gap-2 px-0">
+                  <span className="small text-muted flex-shrink-0">Link</span>
                   <button
-                    className="btn btn-link btn-sm p-0 small"
+                    className="btn btn-link btn-sm p-0 small text-break text-end"
                     onClick={() => copyToClipboard(viewing.linkUrl)}
                   >
                     {viewing.linkUrl}

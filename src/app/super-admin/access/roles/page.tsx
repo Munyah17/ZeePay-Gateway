@@ -219,7 +219,7 @@ export default function RolesAndPermissions() {
             {/* Roles Table */}
             <div className="col-lg-8">
               <div className="card h-100">
-                <div className="card-header d-flex justify-content-between align-items-center">
+                <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <h5 className="card-title mb-0">Roles</h5>
                   <button className="btn btn-sm btn-primary" onClick={() => setShowCreateModal(true)}>
                     <i className="bi bi-plus-circle me-1"></i>
@@ -312,7 +312,7 @@ export default function RolesAndPermissions() {
             {/* Permissions List */}
             <div className="col-lg-4">
               <div className="card h-100">
-                <div className="card-header d-flex justify-content-between align-items-center">
+                <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <h5 className="card-title mb-0">Permissions</h5>
                   <Link href="/super-admin/access/permissions" className="btn btn-sm btn-link">
                     Manage →
@@ -346,7 +346,7 @@ export default function RolesAndPermissions() {
           {/* Role Details Panel */}
           {selectedRole && (
             <div className="card mb-4">
-              <div className="card-header d-flex justify-content-between align-items-center">
+              <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 className="card-title mb-0">Role Details</h5>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedRole(null)}>
                   Close
@@ -397,7 +397,7 @@ export default function RolesAndPermissions() {
                           ) : (
                             role.permissions.map((perm) => (
                               <div key={perm} className="list-group-item">
-                                <code className="small">{perm}</code>
+                                <code className="small text-break">{perm}</code>
                               </div>
                             ))
                           )}

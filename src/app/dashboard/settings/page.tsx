@@ -345,8 +345,8 @@ export default function SettingsPage() {
                   <p className="small mb-3">
                     Copy this key now. You won't be able to see it again.
                   </p>
-                  <div className="d-flex gap-2">
-                    <code className="flex-grow-1 bg-white border rounded px-3 py-2 small">
+                  <div className="d-flex gap-2 flex-wrap">
+                    <code className="flex-grow-1 bg-white border rounded px-3 py-2 small text-break">
                       {generatedKey}
                     </code>
                     <button
@@ -366,7 +366,7 @@ export default function SettingsPage() {
               )}
 
               <div className="card">
-                <div className="card-header d-flex justify-content-between align-items-center">
+                <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <h5 className="card-title mb-0">API Keys</h5>
                   <button
                     onClick={() => setShowNewKeyModal(true)}
@@ -378,8 +378,8 @@ export default function SettingsPage() {
                 <div className="card-body">
                   <div className="list-group list-group-flush">
                     {apiKeys.map((key) => (
-                      <div key={key.id} className="list-group-item d-flex justify-content-between align-items-start">
-                        <div>
+                      <div key={key.id} className="list-group-item d-flex justify-content-between align-items-start gap-2">
+                        <div className="min-w-0">
                           <h6 className="mb-1 small fw-medium">{key.keyPrefix}***</h6>
                           <p className="small text-muted mb-1">
                             Environment: <span className="fw-medium">{key.environment}</span>
@@ -464,7 +464,7 @@ export default function SettingsPage() {
           {activeTab === 'webhooks' && (
             <div className="space-y-4">
               <div className="card">
-                <div className="card-header d-flex justify-content-between align-items-center">
+                <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <h5 className="card-title mb-0">Webhook Endpoints</h5>
                   <button className="btn btn-primary btn-sm" onClick={() => setShowWebhookModal(true)}>
                     <i className="bi bi-plus-lg me-1"></i> Add Webhook
@@ -473,9 +473,9 @@ export default function SettingsPage() {
                 <div className="card-body">
                   <div className="list-group list-group-flush">
                     {webhooks.map((webhook) => (
-                      <div key={webhook.id} className="list-group-item d-flex justify-content-between align-items-start">
-                        <div className="flex-grow-1">
-                          <h6 className="mb-1 small fw-medium">{webhook.url}</h6>
+                      <div key={webhook.id} className="list-group-item d-flex justify-content-between align-items-start gap-2">
+                        <div className="flex-grow-1 min-w-0">
+                          <h6 className="mb-1 small fw-medium text-break">{webhook.url}</h6>
                           <p className="small text-muted mb-0">
                             Events: {webhook.events.join(', ')}
                           </p>
@@ -545,7 +545,7 @@ export default function SettingsPage() {
               <div className="card">
                 <div className="card-body">
                   <label className="form-label small fw-medium">Your ZeePay API key</label>
-                  <div className="d-flex gap-2">
+                  <div className="d-flex gap-2 flex-wrap">
                     <input
                       type="password"
                       className="form-control form-control-sm"
@@ -580,7 +580,7 @@ export default function SettingsPage() {
                 return (
                   <div className="card" key={provider.name}>
                     <div
-                      className="card-header d-flex justify-content-between align-items-center"
+                      className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
                       style={{ cursor: 'pointer' }}
                       onClick={() => setExpandedProvider(expandedProvider === provider.name ? null : provider.name)}
                     >
@@ -596,7 +596,7 @@ export default function SettingsPage() {
 
                     {expandedProvider === provider.name && (
                       <div className="card-body">
-                        <div className="d-flex align-items-center gap-3 mb-3">
+                        <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
                           <label className="form-label small mb-0">Environment</label>
                           <div className="btn-group btn-group-sm" role="group">
                             {(['test', 'live'] as const).map((e) => (
@@ -654,7 +654,7 @@ export default function SettingsPage() {
                           <p className="small text-muted">This provider needs no credentials.</p>
                         )}
 
-                        <div className="d-flex gap-2 mt-4">
+                        <div className="d-flex gap-2 mt-4 flex-wrap">
                           <button
                             className="btn btn-primary btn-sm"
                             onClick={() => saveCredentials(provider, env)}

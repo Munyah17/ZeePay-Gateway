@@ -300,10 +300,10 @@ function CheckoutContent() {
           {payment && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-gray-600 mb-1">Amount to pay</p>
-              <p className="text-3xl font-bold text-blue-600">
+              <p className="text-3xl font-bold text-blue-600 break-all">
                 ${payment.amount.toFixed(2)} {payment.currency}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Reference: {payment.reference}</p>
+              <p className="text-xs text-gray-500 mt-1 break-all">Reference: {payment.reference}</p>
             </div>
           )}
 

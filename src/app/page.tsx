@@ -150,52 +150,88 @@ export default function Home() {
               </div>
 
               {/* Right mockup cluster */}
-              <div className="relative mt-6 lg:mt-0 pb-16 sm:pb-0">
+              <div className="relative mt-6 lg:mt-0 pb-16 lg:pb-0">
                 {/* Main dashboard card */}
                 <div className="relative z-10 mx-auto max-w-md lg:max-w-none bg-white/10 backdrop-blur-sm rounded-[2rem] p-2.5 border border-white/10">
                   <div className="bg-[#f4f5fb] rounded-3xl p-5 sm:p-6 text-gray-900">
-                    <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
                         </span>
-                        <span className="font-bold text-sm">Payment volume</span>
+                        <div>
+                          <p className="font-bold text-sm leading-tight">Payment volume</p>
+                          <p className="text-[11px] text-gray-500">Last 30 days</p>
+                        </div>
                       </div>
-                      <span className="text-xl font-extrabold text-[#1a1650]">$124.5K</span>
+                      <div className="text-right">
+                        <p className="text-xl font-extrabold text-[#1a1650] leading-none">$124.5K</p>
+                        <p className="text-[11px] font-semibold text-emerald-600 mt-1">▲ 18.2% vs Oct</p>
+                      </div>
                     </div>
                     {/* Chart mock */}
-                    <div className="relative h-36 mb-4">
+                    <div className="relative h-36 mt-4 mb-1">
                       <div className="absolute inset-0 flex flex-col justify-between">
                         {[0, 1, 2, 3].map((i) => (
                           <div key={i} className="border-t border-dashed border-gray-300"></div>
                         ))}
                       </div>
+                      <span className="absolute -left-0.5 top-0 text-[9px] text-gray-400">$40K</span>
+                      <span className="absolute -left-0.5 bottom-0 text-[9px] text-gray-400">$0</span>
                       <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 300 140">
+                        <defs>
+                          <linearGradient id="heroVolumeFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
+                            <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          fill="url(#heroVolumeFill)"
+                          d="M0,120 L40,95 L80,105 L120,70 L160,80 L200,50 L240,60 L300,25 L300,140 L0,140 Z"
+                        />
                         <polyline
                           fill="none"
                           stroke="#6366f1"
                           strokeWidth="2.5"
+                          strokeLinejoin="round"
                           points="0,120 40,95 80,105 120,70 160,80 200,50 240,60 300,25"
                         />
                         <circle cx="300" cy="25" r="5" fill="#fff" stroke="#6366f1" strokeWidth="2.5" />
                       </svg>
-                      <div className="absolute top-2 right-2 bg-white rounded-lg shadow px-2.5 py-1.5">
-                        <div className="h-1.5 w-12 bg-gray-200 rounded-full mb-1.5"></div>
-                        <div className="h-1.5 w-8 bg-gray-200 rounded-full"></div>
+                      <div className="absolute top-1 right-1 bg-white rounded-lg shadow px-2.5 py-1.5">
+                        <p className="text-[10px] font-bold text-[#1a1650] leading-none">Nov 16</p>
+                        <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">+$8.2K today</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      {[45, 60, 35, 70].map((h, i) => (
-                        <div key={i} className="flex-1 bg-gray-200 rounded-md" style={{ height: `${h * 0.4}px` }}></div>
+                    <div className="flex justify-between text-[9px] text-gray-400 mb-4 px-0.5">
+                      <span>Oct 18</span><span>Oct 25</span><span>Nov 1</span><span>Nov 8</span><span>Nov 16</span>
+                    </div>
+                    {/* Recent payments */}
+                    <div className="border-t border-gray-200 pt-3 space-y-2.5">
+                      {[
+                        { name: 'Grace Store', method: 'EcoCash', amount: '$1,240.00', tone: 'bg-emerald-500' },
+                        { name: 'Kuda Crafts', method: 'Visa', amount: '$86.50', tone: 'bg-blue-500' },
+                        { name: 'Mbira Books', method: 'OneMoney', amount: '$42.00', tone: 'bg-indigo-500' },
+                      ].map((tx) => (
+                        <div key={tx.name} className="flex items-center gap-2.5">
+                          <span className={`w-7 h-7 rounded-full ${tx.tone} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>
+                            {tx.name.split(' ').map((w) => w[0]).join('')}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate">{tx.name}</p>
+                            <p className="text-[10px] text-gray-500">{tx.method} · Paid</p>
+                          </div>
+                          <span className="text-xs font-bold text-[#1a1650]">{tx.amount}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Floating advisor card (top right) */}
-                <div className="hidden sm:block absolute -top-4 right-0 lg:-right-4 z-20 bg-white rounded-2xl shadow-2xl p-4 w-56 text-gray-900">
+                {/* Floating advisor card (top right) — only in the wide two-column layout where it has room */}
+                <div className="hidden lg:block absolute -top-4 right-0 lg:-right-4 z-20 bg-white rounded-2xl shadow-2xl p-4 w-56 text-gray-900">
                   <div className="flex items-center gap-3">
                     <span className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold text-sm">TM</span>
                     <div>
@@ -203,14 +239,19 @@ export default function Home() {
                       <p className="text-sm font-bold">Tanaka M.</p>
                     </div>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    <div className="h-1.5 bg-gray-100 rounded-full w-full"></div>
-                    <div className="h-1.5 bg-gray-100 rounded-full w-3/4"></div>
+                  <div className="mt-3 rounded-xl bg-indigo-50 p-2.5">
+                    <p className="text-[11px] leading-snug text-gray-700">
+                      Your payout of <span className="font-bold text-[#1a1650]">$1,240</span> cleared — want me to schedule weekly auto-settlements?
+                    </p>
+                    <div className="mt-2 flex gap-1.5">
+                      <span className="flex-1 text-center text-[10px] font-semibold bg-indigo-600 text-white rounded-md py-1">Set up</span>
+                      <span className="flex-1 text-center text-[10px] font-semibold border border-indigo-200 text-indigo-700 rounded-md py-1">Later</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Floating merchant card (bottom left) — hidden on small screens to avoid overlap */}
-                <div className="hidden sm:block absolute -bottom-6 left-0 lg:-left-10 z-20 bg-white rounded-2xl shadow-2xl p-4 sm:p-5 w-64 text-gray-900">
+                {/* Floating merchant card (bottom left) — only in the wide two-column layout where it has room */}
+                <div className="hidden lg:block absolute -bottom-6 left-0 lg:-left-10 z-20 bg-white rounded-2xl shadow-2xl p-4 sm:p-5 w-64 text-gray-900">
                   <div className="flex items-center gap-3">
                     <span className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white font-bold">GS</span>
                     <div className="flex-1 min-w-0">
@@ -271,33 +312,61 @@ export default function Home() {
               {/* Right: rounded lavender card with chart mock */}
               <div className="bg-[#dfe3fa] rounded-[2rem] p-6 sm:p-10">
                 <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm">
-                  <p className="font-bold text-[#1a1650] mb-6">Transaction volume</p>
-                  <div className="relative h-44">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-bold text-[#1a1650]">Transaction volume</p>
+                      <p className="text-xs text-gray-500 mt-0.5">All payment methods · this week</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-extrabold text-[#1a1650] leading-none">$86.2K</p>
+                      <p className="text-[11px] font-semibold text-emerald-600 mt-1">▲ 12.4%</p>
+                    </div>
+                  </div>
+                  <div className="relative h-44 mt-4">
                     <div className="absolute inset-0 flex flex-col justify-between">
                       {[0, 1, 2, 3, 4].map((i) => (
                         <div key={i} className="border-t border-dashed border-gray-200"></div>
                       ))}
                     </div>
                     <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 320 170">
+                      <defs>
+                        <linearGradient id="volFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <path
+                        fill="url(#volFill)"
+                        d="M0,150 L40,110 L80,125 L120,85 L160,100 L200,60 L240,70 L280,40 L320,20 L320,170 L0,170 Z"
+                      />
                       <polyline
                         fill="none"
                         stroke="#6366f1"
                         strokeWidth="2.5"
+                        strokeLinejoin="round"
                         points="0,150 40,110 80,125 120,85 160,100 200,60 240,70 280,40 320,20"
                       />
-                      <circle cx="280" cy="40" r="6" fill="#fff" stroke="#6366f1" strokeWidth="2.5" />
+                      <circle cx="320" cy="20" r="6" fill="#fff" stroke="#6366f1" strokeWidth="2.5" />
                     </svg>
-                    <div className="absolute top-3 right-4 bg-white border border-gray-100 rounded-lg shadow px-3 py-2">
-                      <div className="h-1.5 w-14 bg-gray-200 rounded-full mb-1.5"></div>
-                      <div className="h-1.5 w-9 bg-gray-200 rounded-full"></div>
+                    <div className="absolute top-2 right-3 bg-white border border-gray-100 rounded-lg shadow px-3 py-2">
+                      <p className="text-[10px] font-bold text-[#1a1650] leading-none">Fri, Nov 14</p>
+                      <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">$14.8K collected</p>
                     </div>
                   </div>
-                  <div className="flex gap-3 mt-5">
-                    {[55, 40, 65, 30, 50].map((h, i) => (
-                      <div key={i} className="flex-1 bg-gray-100 rounded-md" style={{ height: `${h * 0.5}px` }}></div>
+                  {/* Method split */}
+                  <div className="flex items-center gap-4 mt-5 text-xs">
+                    {[
+                      { label: 'EcoCash', pct: '44%', dot: 'bg-emerald-500' },
+                      { label: 'Cards', pct: '31%', dot: 'bg-indigo-500' },
+                      { label: 'OneMoney', pct: '25%', dot: 'bg-blue-400' },
+                    ].map((m) => (
+                      <span key={m.label} className="inline-flex items-center gap-1.5 text-gray-600">
+                        <span className={`w-2 h-2 rounded-full ${m.dot}`}></span>
+                        {m.label} <span className="font-bold text-[#1a1650]">{m.pct}</span>
+                      </span>
                     ))}
                   </div>
-                  <p className="mt-5 text-right text-xs font-semibold text-gray-400">ZeePay analytics</p>
+                  <p className="mt-5 text-right text-xs font-semibold text-gray-400">ZeePay analytics · Updated just now</p>
                 </div>
               </div>
             </div>
@@ -323,7 +392,17 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="mt-4 bg-white rounded-xl p-4 text-gray-700">
-                    <p className="text-xs leading-relaxed">Here is your integration checklist — let us know if you want any changes 💜</p>
+                    <p className="text-xs leading-relaxed">Hey! Here is your integration checklist — shout if you want any changes 💜</p>
+                    <div className="mt-3 space-y-1.5">
+                      {['Create a test API key', 'Receive webhook events', 'Go live with zp_live_ keys'].map((item) => (
+                        <div key={item} className="flex items-center gap-2 text-[11px] text-gray-600">
+                          <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          {item}
+                        </div>
+                      ))}
+                    </div>
                     <div className="mt-3 flex items-center gap-2 bg-indigo-50 rounded-lg px-3 py-2">
                       <span className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center">
                         <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -333,9 +412,21 @@ export default function Home() {
                       <span className="text-xs font-semibold text-indigo-900">quickstart_guide.pdf</span>
                     </div>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    <div className="h-2 bg-white/20 rounded-full w-full"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-2/3"></div>
+                  {/* Customer reply */}
+                  <div className="mt-3 flex justify-end">
+                    <div className="bg-white/15 border border-white/20 rounded-xl rounded-br-sm px-3.5 py-2.5 max-w-[85%]">
+                      <p className="text-xs leading-relaxed">Perfect — can we also get USD settlement to our EcoCash wallet?</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-start gap-2">
+                    <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </span>
+                    <div className="bg-indigo-500/30 border border-indigo-300/30 rounded-xl rounded-bl-sm px-3.5 py-2.5 max-w-[85%]">
+                      <p className="text-xs leading-relaxed">Done! USD → EcoCash payouts are enabled on your account. First settlement lands Friday 🚀</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -392,17 +483,20 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <div className="bg-gray-50 rounded-xl p-3 flex gap-2.5">
-                    <span className="w-7 h-7 rounded-full bg-gray-300 flex-shrink-0"></span>
-                    <div className="flex-1 space-y-1.5 pt-1">
-                      <div className="h-1.5 bg-gray-200 rounded-full w-full"></div>
-                      <div className="h-1.5 bg-gray-200 rounded-full w-4/5"></div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs leading-relaxed text-gray-700">
+                      Hi Grace! Your payout of <span className="font-semibold text-[#1a1650]">$2,400</span> is scheduled for Friday. Want to switch to weekly auto-settlement?
+                    </p>
+                  </div>
+                  <div className="flex justify-end">
+                    <div className="bg-indigo-600 text-white rounded-xl rounded-br-sm px-3.5 py-2.5 max-w-[85%]">
+                      <p className="text-xs leading-relaxed">Yes please — and can we get USD instead of ZWG?</p>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-2">
-                    <span className="h-2.5 w-16 bg-indigo-200 rounded-full"></span>
-                    <span className="h-2.5 w-10 bg-indigo-200 rounded-full"></span>
-                    <span className="w-7 h-7 rounded-full bg-gray-800 flex-shrink-0"></span>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs leading-relaxed text-gray-700">
+                      Sorted! USD payouts are live on your account as of today ✅
+                    </p>
                   </div>
                 </div>
               </div>
@@ -420,25 +514,44 @@ export default function Home() {
                   </span>
                 </div>
                 <div className="space-y-3">
-                  {['Unified payments API', 'Webhooks & events', 'Escrow & settlement'].map((item) => (
-                    <div key={item} className="border border-gray-100 rounded-xl py-3.5 px-4 text-center">
-                      <span className="text-sm font-semibold text-[#1a1650]">{item}</span>
+                  {[
+                    { name: 'Unified payments API', desc: 'One integration, every method' },
+                    { name: 'Webhooks & events', desc: 'Real-time payment notifications' },
+                    { name: 'Escrow & settlement', desc: 'Funds released on delivery' },
+                  ].map((item) => (
+                    <div key={item.name} className="border border-gray-100 rounded-xl py-3.5 px-4 text-center hover:border-indigo-200 hover:bg-indigo-50/40 transition-colors">
+                      <span className="block text-sm font-semibold text-[#1a1650]">{item.name}</span>
+                      <span className="block text-[11px] text-gray-500 mt-0.5">{item.desc}</span>
                     </div>
                   ))}
+                </div>
+                <div className="mt-4 flex justify-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-200"></span>
+                  <span className="text-[10px] text-gray-400 ml-1">99.98% uptime</span>
                 </div>
               </div>
 
               {/* Customers panel */}
               <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8">
-                <p className="text-sm font-bold text-[#1a1650] mb-4">Recent payments</p>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-[#1a1650]">Recent payments</p>
+                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">3 new</span>
+                </div>
                 <div className="space-y-3">
-                  {['Invoice #1042', 'Order #8841', 'Subscription'].map((label) => (
-                    <div key={label} className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                      <div className="flex-1 space-y-1.5">
-                        <div className="h-1.5 bg-gray-200 rounded-full w-3/4"></div>
-                        <div className="h-1.5 bg-gray-200 rounded-full w-1/2"></div>
+                  {[
+                    { label: 'Invoice #1042', meta: '$120.00 · EcoCash', time: '2m ago' },
+                    { label: 'Order #8841', meta: '$64.99 · Visa', time: '18m ago' },
+                    { label: 'Pro plan · Nov', meta: '$9.99 · OneMoney', time: '1h ago' },
+                  ].map((p) => (
+                    <div key={p.label} className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-[#1a1650] truncate">{p.label}</p>
+                        <p className="text-[11px] text-gray-500 truncate">{p.meta}</p>
                       </div>
+                      <span className="text-[10px] text-gray-400 flex-shrink-0">{p.time}</span>
                     </div>
                   ))}
                 </div>
@@ -490,8 +603,8 @@ export default function Home() {
                 { name: 'Visa', type: 'Card', logo: '/logos/visa.png' },
                 { name: 'Mastercard', type: 'Card', logo: '/logos/mastercard.png' },
               ].map((method) => (
-                <div key={method.name} className="bg-[#f6f7fd] rounded-3xl p-6 sm:p-8 text-center hover:shadow-md transition-shadow">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white border border-gray-100 shadow-sm flex items-center justify-center mb-4 mx-auto overflow-hidden p-2">
+                <div key={method.name} className="bg-[#f6f7fd] rounded-3xl p-4 sm:p-8 text-center hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-white border border-gray-100 shadow-sm flex items-center justify-center mb-3 sm:mb-4 mx-auto overflow-hidden p-1.5 sm:p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={method.logo} alt={`${method.name} logo`} className="max-w-full max-h-full object-contain" />
                   </div>

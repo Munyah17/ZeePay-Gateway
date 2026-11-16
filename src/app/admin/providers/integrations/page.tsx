@@ -735,6 +735,7 @@ export default function IntegrationManager() {
       {viewingReport && (
         <Modal open title={`${viewingReport} Test Report`} onClose={() => setViewingReport(null)} size="lg">
           <p className="small text-muted">Demo certification test summary</p>
+          <div className="table-responsive">
           <table className="table table-sm mb-0">
             <thead><tr><th>Scenario</th><th>Result</th></tr></thead>
             <tbody>
@@ -745,6 +746,7 @@ export default function IntegrationManager() {
               <tr><td>Timeout handling</td><td><span className="badge bg-warning text-dark">Flaky</span></td></tr>
             </tbody>
           </table>
+          </div>
         </Modal>
       )}
     </>

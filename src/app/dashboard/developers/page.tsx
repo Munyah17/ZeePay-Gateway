@@ -254,7 +254,7 @@ export default function DeveloperPlatform() {
 
           {/* Code Example */}
           <div className="card mt-4">
-            <div className="card-header d-flex justify-content-between align-items-center">
+            <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
               <h5 className="card-title mb-0">Create Payment Example</h5>
               <div className="btn-group btn-group-sm">
                 {(['curl', 'node', 'python', 'php'] as Lang[]).map((l) => (
@@ -269,7 +269,7 @@ export default function DeveloperPlatform() {
               </div>
             </div>
             <div className="card-body">
-              <pre className="bg-dark text-light p-3 rounded">
+              <pre className="bg-dark text-light p-3 rounded overflow-x-auto">
                 <code>{langExamples[lang]}</code>
               </pre>
               <button

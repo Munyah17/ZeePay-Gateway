@@ -56,17 +56,17 @@ function CheckoutSuccessContent() {
 
           {payment && (
             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between gap-3 mb-2">
                 <span className="text-gray-600">Amount:</span>
-                <span className="font-semibold">${payment.amount.toFixed(2)} {payment.currency}</span>
+                <span className="font-semibold text-right">${payment.amount.toFixed(2)} {payment.currency}</span>
               </div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between gap-3 mb-2">
                 <span className="text-gray-600">Reference:</span>
-                <span className="font-semibold">{payment.reference}</span>
+                <span className="font-semibold text-right break-all">{payment.reference}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <span className="text-gray-600">Payment ID:</span>
-                <span className="font-semibold text-sm">{payment.id}</span>
+                <span className="font-semibold text-sm text-right break-all">{payment.id}</span>
               </div>
             </div>
           )}

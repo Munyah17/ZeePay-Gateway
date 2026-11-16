@@ -96,7 +96,7 @@ export default function CheckoutConfiguration() {
           {/* Preview Card */}
           <div className="card mb-4 bg-light">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                   <h6 className="mb-1">Checkout Preview</h6>
                   <p className="text-muted small mb-0">See how your checkout will appear to customers</p>
@@ -591,7 +591,7 @@ export default function CheckoutConfiguration() {
       {showCode && (
         <Modal open title="Integration Code" onClose={() => setShowCode(false)} size="lg">
           <p className="small text-muted">Drop this snippet into your site to launch ZeePay checkout:</p>
-          <pre className="bg-dark text-light rounded p-3 small">{`<script src="https://js.zeepay.co.zw/v1/checkout.js"></script>
+          <pre className="bg-dark text-light rounded p-3 small overflow-x-auto">{`<script src="https://js.zeepay.co.zw/v1/checkout.js"></script>
 <button id="zeepay-pay">Pay Now</button>
 <script>
   ZeePayCheckout.render('#zeepay-pay', {

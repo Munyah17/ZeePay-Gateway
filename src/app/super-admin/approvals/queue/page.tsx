@@ -261,7 +261,7 @@ export default function ApprovalQueues() {
 
           {/* Queue Cards */}
           <div className="row g-3 mb-4">
-            <div className="col-md-2">
+            <div className="col-6 col-md-2">
               <button
                 className={`card w-100 ${selectedQueue === 'all' ? 'border-primary' : ''}`}
                 onClick={() => setSelectedQueue('all')}
@@ -274,7 +274,7 @@ export default function ApprovalQueues() {
               </button>
             </div>
             {approvalQueues.map((queue) => (
-              <div className="col-md-2" key={queue.id}>
+              <div className="col-6 col-md-2" key={queue.id}>
                 <button
                   className={`card w-100 ${selectedQueue === queue.id ? 'border-primary' : ''}`}
                   onClick={() => setSelectedQueue(queue.id)}
@@ -292,11 +292,11 @@ export default function ApprovalQueues() {
 
           {/* Approvals Table */}
           <div className="card mb-4">
-            <div className="card-header d-flex justify-content-between align-items-center">
+            <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
               <h5 className="card-title mb-0">
                 {selectedQueue === 'all' ? 'All Approvals' : approvalQueues.find(q => q.id === selectedQueue)?.name}
               </h5>
-              <div className="d-flex gap-2">
+              <div className="d-flex gap-2 flex-wrap">
                 <select
                   className="form-select form-select-sm"
                   style={{ width: '120px' }}
@@ -394,7 +394,7 @@ export default function ApprovalQueues() {
           {/* Approval Details Panel */}
           {selectedItem && (
             <div className="card mb-4">
-              <div className="card-header d-flex justify-content-between align-items-center">
+              <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 className="card-title mb-0">Approval Details</h5>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedItem(null)}>
                   Close
@@ -445,7 +445,7 @@ export default function ApprovalQueues() {
                           {Object.entries(approval.data).map(([key, value]) => (
                             <div key={key} className="list-group-item d-flex justify-content-between">
                               <span className="text-capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                              <strong>{value as string}</strong>
+                              <strong className="text-break">{value as string}</strong>
                             </div>
                           ))}
                         </div>

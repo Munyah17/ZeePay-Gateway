@@ -109,7 +109,7 @@ export default function MethodsPage() {
               <div className="card-body">
                 <div className="list-group list-group-flush">
                   {methods.map((method) => (
-                    <div key={method.name} className="list-group-item d-flex justify-content-between align-items-center">
+                    <div key={method.name} className="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
                       <div className="d-flex align-items-center gap-3">
                         <div className="bg-light rounded d-flex align-items-center justify-content-center"
                              style={{ width: '40px', height: '40px' }}>

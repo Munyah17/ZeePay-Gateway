@@ -148,7 +148,7 @@ export default function MerchantOnboardingModal({ open, onClose, onSubmit }: Mer
   const reviewRow = (label: string, value: string) => (
     <li className="list-group-item d-flex justify-content-between gap-3 px-0">
       <span className="small text-muted flex-shrink-0">{label}</span>
-      <span className="small text-end">{value || '—'}</span>
+      <span className="small text-end text-break">{value || '—'}</span>
     </li>
   );
 
@@ -385,7 +385,7 @@ export default function MerchantOnboardingModal({ open, onClose, onSubmit }: Mer
             {TIERS.map((t) => {
               const on = form.tier === t.id;
               return (
-                <div key={t.id} className="col-4">
+                <div key={t.id} className="col-12 col-sm-4">
                   <button
                     type="button"
                     className={`btn w-100 py-2 ${on ? 'btn-primary' : 'btn-outline-secondary'}`}

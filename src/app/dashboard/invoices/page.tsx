@@ -287,11 +287,11 @@ export default function Invoices() {
           {/* Action Bar */}
           <div className="card mb-4">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex gap-2">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <select
                     className="form-select form-select-sm"
-                    style={{ width: '150px' }}
+                    style={{ width: '150px', maxWidth: '100%' }}
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                   >
@@ -306,7 +306,7 @@ export default function Invoices() {
                     type="text"
                     className="form-control form-select-sm"
                     placeholder="Search invoices..."
-                    style={{ width: '250px' }}
+                    style={{ width: '250px', maxWidth: '100%' }}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -577,7 +577,7 @@ export default function Invoices() {
 
           {/* Invoice Templates */}
           <div className="card">
-            <div className="card-header d-flex justify-content-between align-items-center">
+            <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
               <h5 className="card-title mb-0">Invoice Templates</h5>
               <button className="btn btn-sm btn-outline-primary" onClick={() => toast('Template builder coming soon — create an invoice and reuse it', { tone: 'info' })}>
                 <i className="bi bi-plus-circle me-1"></i>
@@ -619,7 +619,7 @@ export default function Invoices() {
           {/* View invoice modal */}
           {viewing && (
             <Modal open title={`Invoice ${viewing.id}`} onClose={() => setViewing(null)} size="lg">
-              <div className="d-flex justify-content-between mb-3">
+              <div className="d-flex justify-content-between flex-wrap gap-2 mb-3">
                 <div>
                   <p className="small text-muted mb-0">Bill to</p>
                   <p className="small fw-medium mb-0">{viewing.customer.name}</p>
@@ -627,9 +627,10 @@ export default function Invoices() {
                 </div>
                 <span className={`badge ${getStatusColor(viewing.status)} align-self-start`}>{viewing.status}</span>
               </div>
-              <table className="table table-sm">
-                <thead>
-                  <tr><th>Item</th><th className="text-end">Qty</th><th className="text-end">Unit</th><th className="text-end">Total</th></tr>
+              <div className="table-responsive">
+                <table className="table table-sm">
+                  <thead>
+                    <tr><th>Item</th><th className="text-end">Qty</th><th className="text-end">Unit</th><th className="text-end">Total</th></tr>
                 </thead>
                 <tbody>
                   {viewing.items.map((it, i) => (
@@ -645,7 +646,8 @@ export default function Invoices() {
                     <td className="text-end">{viewing.currency} {viewing.amount.toFixed(2)}</td>
                   </tr>
                 </tbody>
-              </table>
+                </table>
+              </div>
               <p className="small text-muted mb-0">
                 Due {new Date(viewing.dueDate).toLocaleDateString()}
                 {viewing.paidDate && ` · Paid ${new Date(viewing.paidDate).toLocaleDateString()}`}

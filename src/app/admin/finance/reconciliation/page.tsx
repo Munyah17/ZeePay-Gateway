@@ -271,7 +271,7 @@ export default function ReconciliationWorkbench() {
           {/* Exception Alert */}
           {batches.filter(b => b.status === 'Exception').length > 0 && (
             <div className="alert alert-warning mb-4" role="alert">
-              <div className="d-flex align-items-center gap-3">
+              <div className="d-flex align-items-center gap-3 flex-wrap">
                 <i className="bi bi-exclamation-triangle-fill fs-4"></i>
                 <div>
                   <strong>{batches.filter(b => b.status === 'Exception').length} settlement batches</strong> have discrepancies requiring attention
@@ -287,7 +287,7 @@ export default function ReconciliationWorkbench() {
             {/* Settlement Batches */}
             <div className="col-lg-8">
               <div className="card h-100">
-                <div className="card-header d-flex justify-content-between align-items-center">
+                <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <h5 className="card-title mb-0">Settlement Batches</h5>
                   <div className="d-flex gap-2">
                     <select

@@ -185,11 +185,11 @@ export default function ApiKeys() {
           {/* Action Bar */}
           <div className="card mb-4">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex gap-2">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <select
                     className="form-select form-select-sm"
-                    style={{ width: '150px' }}
+                    style={{ width: '150px', maxWidth: '100%' }}
                     value={envFilter}
                     onChange={(e) => setEnvFilter(e.target.value)}
                   >
@@ -199,7 +199,7 @@ export default function ApiKeys() {
                   </select>
                   <select
                     className="form-select form-select-sm"
-                    style={{ width: '150px' }}
+                    style={{ width: '150px', maxWidth: '100%' }}
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
                   >
@@ -240,7 +240,7 @@ export default function ApiKeys() {
                         </td>
                         <td>
                           <div className="d-flex align-items-center gap-2">
-                            <code className="small font-monospace">{key.id}</code>
+                            <code className="small font-monospace text-break">{key.id}</code>
                             <button
                               className="btn btn-sm btn-outline-secondary"
                               onClick={() => copyToClipboard(key.id)}

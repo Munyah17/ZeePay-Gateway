@@ -135,7 +135,7 @@ export default function PlansPage() {
 
   return (
     <>
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
           <h2 className="h4 mb-1">Subscription Plans</h2>
           <p className="text-muted mb-0">

@@ -82,7 +82,7 @@ export default function DocsPage() {
               <h2 className="h5 mb-3">Quickstart</h2>
               <p className="small">Install the SDK and create your first payment:</p>
               <div className="card bg-dark text-light mb-3">
-                <div className="card-body">
+                <div className="card-body overflow-x-auto">
                   <pre className="mb-0 small" style={{ color: '#c7d2fe' }}>{`npm install zeepay-sdk
 
 import ZeePay from "zeepay-sdk";
@@ -163,7 +163,7 @@ const payment = await zee.payments.create({
                 </li>
               </ol>
               <div className="card bg-dark text-light">
-                <div className="card-body">
+                <div className="card-body overflow-x-auto">
                   <pre className="mb-0 small" style={{ color: '#c7d2fe' }}>{`const sub = await zee.subscriptions.create({
   merchantReference: "plan_premium",
   amount: 9.99,
@@ -194,7 +194,7 @@ const payment = await zee.payments.create({
                 </table>
               </div>
               <div className="card bg-dark text-light">
-                <div className="card-body">
+                <div className="card-body overflow-x-auto">
                   <pre className="mb-0 small" style={{ color: '#c7d2fe' }}>{`const payout = await zee.payouts.create({
   serviceType: "enterprise_cash_in",
   amount: 150.00,

@@ -324,9 +324,19 @@ html .btn-close-sm { font-size: 10px; }
 
 /* Mobile */
 @media (max-width: 991.98px) {
-  .zp-sidebar { position: fixed; left: 0; top: 0; transform: translateX(-100%); width: 280px !important; height: 100vh; height: 100dvh; box-shadow: var(--zp-shadow-lg); }
+  /* Never let the shell itself scroll sideways — wide content scrolls
+     inside its own container (tables, code blocks, toolbars). */
+  .zp-shell,
+  .zp-main,
+  .zp-content { overflow-x: clip; }
+
+  .zp-sidebar { position: fixed; left: 0; top: 0; transform: translateX(-100%); width: 280px !important; height: 100vh; height: 100dvh; box-shadow: var(--zp-shadow-lg); overscroll-behavior: contain; }
   .zp-mobile-open .zp-sidebar { transform: none; }
   .zp-mobile-open .zp-backdrop { display: block; position: fixed; inset: 0; background: rgba(15, 13, 45, 0.45); z-index: 1035; }
+
+  /* Tables that aren't wrapped in .table-responsive still scroll inside
+     the card instead of being clipped by overflow:hidden. */
+  .zp-table-card { overflow-x: auto; }
 
   /* The mobile drawer always renders expanded — neutralize the desktop
      collapsed state so labels, brand text, search and group indents
@@ -350,9 +360,18 @@ html .btn-close-sm { font-size: 10px; }
   .zp-stat { padding: 12px; }
   .zp-stat-value { font-size: 20px; }
   .zp-table-toolbar, .zp-table-head, .zp-table-foot { padding-left: 12px; padding-right: 12px; }
-  .zp-search { max-width: none; }
+  .zp-search { max-width: none; flex: 1 1 100%; }
   .zp-dl-row { grid-template-columns: 1fr; gap: 2px; }
-  .zp-modal { border-radius: 16px; }
+  .zp-modal { border-radius: 16px; max-height: calc(100dvh - 16px); }
+  .zp-drawer { width: 100vw !important; height: 100dvh; }
+  .zp-overlay { padding: 8px; }
+  .zp-overlay-top { padding-top: 8vh; }
+  .zp-toasts { left: 10px; right: 10px; width: auto; bottom: 10px; }
+  .zp-menu { max-width: calc(100vw - 16px); }
+  .zp-pop { max-width: calc(100vw - 16px); }
+  /* Toolbar button rows shouldn't push the card wider than the screen */
+  .zp-table-head > div:last-child,
+  .zp-page-actions { max-width: 100%; }
 }
 @media print {
   .zp-sidebar, .zp-topbar, .zp-page-actions, .zp-table-toolbar, .zp-table-foot { display: none !important; }

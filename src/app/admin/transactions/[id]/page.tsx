@@ -161,7 +161,7 @@ function TransactionInvestigationContent() {
         <>
           {/* Transaction Summary Card */}
           <div className="card mb-4">
-            <div className="card-header d-flex justify-content-between align-items-center">
+            <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
               <div>
                 <h5 className="card-title mb-0">{transaction.id}</h5>
                 <small className="text-muted">Merchant Reference: {transaction.merchantRef}</small>
@@ -203,7 +203,7 @@ function TransactionInvestigationContent() {
           </div>
 
           {/* Tabs */}
-          <ul className="nav nav-tabs mb-4" role="tablist">
+          <ul className="nav nav-tabs mb-4 flex-nowrap overflow-x-auto" role="tablist">
             <li className="nav-item" role="presentation">
               <button
                 className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`}
@@ -587,7 +587,7 @@ function TransactionInvestigationContent() {
       {/* Webhook payload modal */}
       {viewingPayload && (
         <Modal open title={`Event ${viewingPayload}`} onClose={() => setViewingPayload(null)} size="lg">
-          <pre className="bg-light rounded p-3 small mb-0">{JSON.stringify(
+          <pre className="bg-light rounded p-3 small mb-0 overflow-x-auto">{JSON.stringify(
             {
               id: viewingPayload,
               type: 'payment.succeeded',

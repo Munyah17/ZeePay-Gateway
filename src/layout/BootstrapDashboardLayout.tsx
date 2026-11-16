@@ -92,6 +92,14 @@ function DashboardShell({ children, isAdmin = false, isUser = false, isSuperAdmi
     setMobileOpen(false);
   }, [activeItem]);
 
+  // Lock background scroll while the mobile nav drawer is open
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [mobileOpen]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {

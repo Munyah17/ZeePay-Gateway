@@ -260,7 +260,7 @@ export default function MerchantGovernance() {
           {/* Pending Approvals Alert */}
           {merchantList.filter(m => m.status === 'Pending Approval').length > 0 && (
             <div className="alert alert-info mb-4" role="alert">
-              <div className="d-flex align-items-center gap-3">
+              <div className="d-flex align-items-center gap-3 flex-wrap">
                 <i className="bi bi-info-circle-fill fs-4"></i>
                 <div>
                   <strong>{merchantList.filter(m => m.status === 'Pending Approval').length} merchants</strong> awaiting approval
@@ -275,8 +275,8 @@ export default function MerchantGovernance() {
           {/* Action Bar */}
           <div className="card mb-4">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex gap-2">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <select
                     className="form-select form-select-sm"
                     style={{ width: '150px' }}
@@ -316,7 +316,7 @@ export default function MerchantGovernance() {
                   type="text"
                   className="form-control form-select-sm"
                   placeholder="Search merchants..."
-                  style={{ width: '250px' }}
+                  style={{ width: '100%', maxWidth: '250px' }}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -437,7 +437,7 @@ export default function MerchantGovernance() {
           {/* Merchant Details Panel */}
           {selectedMerchant && (
             <div className="card mb-4">
-              <div className="card-header d-flex justify-content-between align-items-center">
+              <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 className="card-title mb-0">Merchant Details</h5>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedMerchant(null)}>
                   Close
@@ -518,7 +518,7 @@ export default function MerchantGovernance() {
                           </div>
                           <div className="list-group-item d-flex justify-content-between">
                             <span>Email</span>
-                            <strong>{merchant.contact.email}</strong>
+                            <strong className="text-break">{merchant.contact.email}</strong>
                           </div>
                           <div className="list-group-item d-flex justify-content-between">
                             <span>Phone</span>

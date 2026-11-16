@@ -314,7 +314,7 @@ export default function ProviderGovernance() {
           {/* Degraded Provider Alert */}
           {providerList.filter(p => p.status === 'Degraded').length > 0 && (
             <div className="alert alert-warning mb-4" role="alert">
-              <div className="d-flex align-items-center gap-3">
+              <div className="d-flex align-items-center gap-3 flex-wrap">
                 <i className="bi bi-exclamation-triangle-fill fs-4"></i>
                 <div>
                   <strong>{providerList.filter(p => p.status === 'Degraded')[0]?.name}</strong> is currently experiencing degraded performance
@@ -329,8 +329,8 @@ export default function ProviderGovernance() {
           {/* Action Bar */}
           <div className="card mb-4">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div className="d-flex gap-2">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <select
                     className="form-select form-select-sm"
                     style={{ width: '150px' }}
@@ -369,7 +369,7 @@ export default function ProviderGovernance() {
                   type="text"
                   className="form-control form-select-sm"
                   placeholder="Search providers..."
-                  style={{ width: '250px' }}
+                  style={{ width: '100%', maxWidth: '250px' }}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -494,7 +494,7 @@ export default function ProviderGovernance() {
           {/* Provider Details Panel */}
           {selectedProvider && (
             <div className="card mb-4">
-              <div className="card-header d-flex justify-content-between align-items-center">
+              <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 className="card-title mb-0">Provider Details</h5>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedProvider(null)}>
                   Close
@@ -596,7 +596,7 @@ export default function ProviderGovernance() {
                           </div>
                           <div className="list-group-item d-flex justify-content-between">
                             <span>Email</span>
-                            <strong>{provider.contact.email}</strong>
+                            <strong className="text-break">{provider.contact.email}</strong>
                           </div>
                           <div className="list-group-item d-flex justify-content-between">
                             <span>Phone</span>
